@@ -1,14 +1,32 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Dayli">
-  <rect width="64" height="64" rx="16" fill="#2F6B4F"/>
-  <rect x="13" y="17" width="38" height="34" rx="7" fill="#F6F5F1"/>
-  <rect x="13" y="17" width="38" height="10" rx="7" fill="#E6E3DA"/>
-  <rect x="13" y="22" width="38" height="5" fill="#E6E3DA"/>
-  <rect x="21" y="12" width="4" height="10" rx="2" fill="#1C1A17"/>
-  <rect x="39" y="12" width="4" height="10" rx="2" fill="#1C1A17"/>
-  <circle cx="23" cy="36" r="2.6" fill="#B8B3A6"/>
-  <circle cx="32" cy="36" r="2.6" fill="#B8B3A6"/>
-  <circle cx="41" cy="36" r="2.6" fill="#B8B3A6"/>
-  <circle cx="23" cy="44" r="2.6" fill="#B8B3A6"/>
-  <circle cx="32" cy="44" r="4.2" fill="#2F6B4F"/>
-  <circle cx="41" cy="44" r="2.6" fill="#B8B3A6"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="110 110 820 790" width="64" height="62">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#F8F7F3"/><stop offset="1" stop-color="#EDEBE4"/></linearGradient>
+    <linearGradient id="ink" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#4A9A74"/><stop offset="1" stop-color="#2F6B4F"/></linearGradient>
+    <linearGradient id="bubble" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3E8A66"/><stop offset="1" stop-color="#245741"/></linearGradient>
+    <clipPath id="cal"><rect x="150" y="235" width="600" height="560" rx="110"/></clipPath>
+  </defs>
+  <g id="art" transform="translate(-6 -10)">
+    <!-- calendar body: cream page with a green outline -->
+    <rect x="150" y="235" width="600" height="560" rx="110" fill="#FFFFFF" stroke="url(#ink)" stroke-width="44"/>
+    <rect x="150" y="235" width="600" height="135" fill="#DCEBE2" clip-path="url(#cal)"/>
+    <rect x="172" y="348" width="556" height="22" fill="#E6E3DA" clip-path="url(#cal)"/>
+    <!-- ring binders -->
+    <rect x="270" y="150" width="88" height="190" rx="44" fill="#FFFFFF" stroke="url(#ink)" stroke-width="36"/>
+    <rect x="542" y="150" width="88" height="190" rx="44" fill="#FFFFFF" stroke="url(#ink)" stroke-width="36"/>
+    <!-- days -->
+    <g fill="#9ECBB2">
+      <rect x="236" y="430" width="92" height="92" rx="24"/><rect x="356" y="430" width="92" height="92" rx="24"/>
+      <rect x="236" y="550" width="92" height="92" rx="24"/><rect x="356" y="550" width="92" height="92" rx="24"/>
+      <rect x="236" y="670" width="92" height="92" rx="24"/><rect x="356" y="670" width="92" height="92" rx="24"/>
+      <rect x="476" y="430" width="92" height="92" rx="24"/>
+    </g>
+    <rect x="236" y="430" width="92" height="92" rx="24" fill="url(#ink)"/>
+    <!-- assistant bubble, bottom right -->
+    <path d="M620 520 H760 A118 118 0 0 1 878 638 V676 A118 118 0 0 1 760 794 H690 L586 868 L612 782 A118 118 0 0 1 502 676 V638 A118 118 0 0 1 620 520 Z" fill="#FFFFFF" stroke="#FFFFFF" stroke-width="56" stroke-linejoin="round"/>
+    <path d="M620 520 H760 A118 118 0 0 1 878 638 V676 A118 118 0 0 1 760 794 H690 L586 868 L612 782 A118 118 0 0 1 502 676 V638 A118 118 0 0 1 620 520 Z" fill="url(#bubble)"/>
+    <circle cx="640" cy="640" r="30" fill="#FFFFFF"/><circle cx="740" cy="640" r="30" fill="#FFFFFF"/>
+    <path d="M648 704 Q690 744 732 704" fill="none" stroke="#FFFFFF" stroke-width="24" stroke-linecap="round"/>
+    <!-- the "something new" dot -->
+    <circle cx="862" cy="508" r="58" fill="#F2B134" stroke="#FFFFFF" stroke-width="26"/>
+  </g>
 </svg>
