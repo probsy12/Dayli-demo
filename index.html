@@ -5,52 +5,258 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dayli: a calendar you share</title>
   <meta name="description" content="Dayli is a shared calendar for families and friends: one place for plans, with an assistant that understands plain English." />
+  <link rel="icon" href="img/logo.svg" type="image/svg+xml" />
+  <link rel="apple-touch-icon" href="apple-touch-icon.png" />
+  <meta property="og:title" content="Dayli: a calendar you share" />
+  <meta property="og:description" content="One calendar for the people in your life. Say it, ask it, find a time, plan the big ones." />
+  <meta property="og:image" content="https://daylicalendar.co.uk/img/month.webp" />
   <style>
-    :root { --bg: #f6f5f1; --surface: #ffffff; --ink: #1c1a17; --muted: #847f74; --accent: #2f6b4f; --border: #e6e3da; }
+    :root {
+      --bg: #f6f5f1; --surface: #ffffff; --alt: #edebe4; --ink: #1c1a17; --muted: #847f74;
+      --accent: #2f6b4f; --accent-ink: #ffffff; --border: #e6e3da; --shadow: 0 30px 60px rgba(28, 26, 23, 0.18);
+    }
     @media (prefers-color-scheme: dark) {
-      :root { --bg: #171613; --surface: #201f1a; --ink: #f3f1ea; --muted: #a39e92; --accent: #7fbf9a; --border: #353229; }
+      :root { --bg: #171613; --surface: #201f1a; --alt: #2a2823; --ink: #f3f1ea; --muted: #a39e92; --accent: #7fbf9a; --accent-ink: #171613; --border: #353229; --shadow: 0 30px 60px rgba(0, 0, 0, 0.5); }
     }
     * { box-sizing: border-box; }
-    body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif; }
-    main { max-width: 680px; margin: 0 auto; padding: 48px 20px 64px; }
-    h1 { font-family: Georgia, "Times New Roman", serif; font-size: 44px; line-height: 1.1; letter-spacing: -0.5px; margin: 0 0 12px; }
-    h2 { font-family: Georgia, "Times New Roman", serif; font-size: 22px; margin: 36px 0 8px; }
-    p.lead { font-size: 20px; color: var(--muted); margin: 0 0 28px; }
+    html { scroll-behavior: smooth; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.55 -apple-system, "Segoe UI", Roboto, sans-serif; overflow-x: hidden; }
+    a { color: inherit; }
+    img { display: block; max-width: 100%; height: auto; }
+    .wrap { max-width: 1040px; margin: 0 auto; padding: 0 20px; }
+    .serif { font-family: Georgia, "Times New Roman", serif; letter-spacing: -0.3px; }
+
+    header { position: sticky; top: 0; z-index: 10; background: color-mix(in srgb, var(--bg) 85%, transparent); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); border-bottom: 1px solid var(--border); }
+    .nav { display: flex; align-items: center; justify-content: space-between; height: 60px; gap: 16px; }
+    .brand { display: flex; align-items: center; gap: 10px; text-decoration: none; font-family: Georgia, serif; font-size: 22px; font-weight: 700; }
+    .brand img { width: 32px; height: 32px; }
+    .nav nav { display: none; gap: 22px; font-size: 15px; color: var(--muted); }
+    .nav nav a { text-decoration: none; }
+    .nav nav a:hover { color: var(--ink); }
+    @media (min-width: 720px) { .nav nav { display: flex; } }
+
+    .btn { display: inline-flex; align-items: center; gap: 8px; padding: 12px 20px; border-radius: 999px; text-decoration: none; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--ink); transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(28, 26, 23, 0.12); }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+    .btn.small { padding: 8px 14px; font-size: 14px; }
+
+    .hero { padding: 56px 0 24px; display: grid; gap: 40px; align-items: center; }
+    @media (min-width: 860px) { .hero { grid-template-columns: 1.1fr 0.9fr; padding: 72px 0 40px; } }
+    .hero h1 { font-size: clamp(40px, 7vw, 64px); line-height: 1.02; margin: 0 0 16px; }
+    .hero h1 em { font-style: normal; color: var(--accent); }
+    .hero p.lead { font-size: 20px; color: var(--muted); margin: 0 0 28px; max-width: 480px; }
     .row { display: flex; gap: 12px; flex-wrap: wrap; }
-    .btn { display: inline-block; padding: 12px 18px; border-radius: 999px; text-decoration: none; font-weight: 600; border: 1px solid var(--border); color: var(--ink); background: var(--surface); }
-    .btn.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
-    @media (prefers-color-scheme: dark) { .btn.primary { color: #171613; } }
-    ul { padding-left: 20px; }
-    li { margin: 6px 0; }
-    footer { margin-top: 48px; padding-top: 16px; border-top: 1px solid var(--border); color: var(--muted); font-size: 14px; }
+    .fine { color: var(--muted); font-size: 14px; margin-top: 14px; }
+
+    .stage { position: relative; display: flex; justify-content: center; min-height: 560px; }
+    .phone { width: 280px; border-radius: 40px; border: 1px solid var(--border); background: var(--surface); box-shadow: var(--shadow); overflow: hidden; }
+    .phone img { width: 100%; }
+    .stage .phone { animation: float 7s ease-in-out infinite; }
+    .bubble { position: absolute; left: 50%; bottom: 36px; transform: translateX(-50%); width: 290px; background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 12px 14px; box-shadow: 0 18px 40px rgba(28, 26, 23, 0.16); font-size: 15px; animation: rise 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) 0.6s both; }
+    .bubble .q { color: var(--muted); font-size: 13px; margin-bottom: 4px; }
+    .bubble .a { display: flex; gap: 8px; align-items: flex-start; }
+    .bubble .a::before { content: "✦"; color: var(--accent); }
+    .cursor { display: inline-block; width: 2px; height: 1em; background: var(--ink); vertical-align: -0.15em; margin-left: 1px; animation: blink 1s steps(2) infinite; }
+    @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-10px); } }
+    @keyframes rise { from { opacity: 0; transform: translate(-50%, 16px); } to { opacity: 1; transform: translate(-50%, 0); } }
+    @keyframes blink { to { visibility: hidden; } }
+
+    .marquee { border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); padding: 14px 0; margin: 24px 0 0; overflow: hidden; white-space: nowrap; color: var(--muted); font-size: 15px; }
+    .marquee span { display: inline-block; padding-right: 48px; animation: slide 28s linear infinite; }
+    @keyframes slide { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+
+    section.features { padding: 48px 0 0; }
+    .feature { display: grid; gap: 28px; align-items: center; padding: 40px 0; border-bottom: 1px solid var(--border); }
+    .feature:last-child { border-bottom: 0; }
+    @media (min-width: 860px) { .feature { grid-template-columns: 1fr 1fr; gap: 56px; padding: 56px 0; } .feature.flip .text { order: 2; } }
+    .feature h2 { font-size: clamp(28px, 4vw, 38px); line-height: 1.1; margin: 0 0 12px; }
+    .feature p { color: var(--muted); font-size: 18px; margin: 0 0 14px; }
+    .feature .tag { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+    .feature .shot { display: flex; justify-content: center; }
+    .feature .phone { width: 260px; }
+    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    .reveal.in { opacity: 1; transform: none; }
+    .reveal.delay { transition-delay: 0.15s; }
+
+    .steps { padding: 56px 0; }
+    .steps h2 { text-align: center; font-size: clamp(28px, 4vw, 38px); margin: 0 0 32px; }
+    .grid3 { display: grid; gap: 16px; }
+    @media (min-width: 720px) { .grid3 { grid-template-columns: repeat(3, 1fr); } }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 20px; padding: 22px; }
+    .card .n { width: 34px; height: 34px; border-radius: 50%; background: var(--accent); color: var(--accent-ink); display: grid; place-items: center; font-weight: 700; margin-bottom: 12px; }
+    .card h3 { margin: 0 0 6px; font-size: 19px; }
+    .card p { margin: 0; color: var(--muted); font-size: 16px; }
+
+    .cta { margin: 24px 0 56px; background: var(--accent); color: var(--accent-ink); border-radius: 28px; padding: 44px 24px; text-align: center; }
+    .cta h2 { font-size: clamp(30px, 5vw, 44px); margin: 0 0 10px; }
+    .cta p { margin: 0 auto 24px; max-width: 520px; opacity: 0.9; font-size: 18px; }
+    .cta .btn { background: var(--bg); color: var(--ink); border-color: transparent; }
+    .cta .btn.ghost { background: transparent; color: var(--accent-ink); border-color: color-mix(in srgb, var(--accent-ink) 40%, transparent); }
+
+    footer { padding: 0 0 48px; color: var(--muted); font-size: 14px; display: flex; flex-wrap: wrap; gap: 8px 20px; align-items: center; }
     footer a { color: var(--muted); }
+
+    @media (prefers-reduced-motion: reduce) {
+      .stage .phone, .bubble, .marquee span, .cursor { animation: none; }
+      .reveal { opacity: 1; transform: none; transition: none; }
+    }
   </style>
 </head>
 <body>
-<main>
-  <h1>Dayli</h1>
-  <p class="lead">A calendar you share with the people you make plans with.</p>
-  <div class="row">
-    <a class="btn primary" href="app/">Open Dayli on the web</a>
-    <a class="btn" href="demo/">Try the demo</a>
-    <a class="btn" href="support.html">Support</a>
+<header>
+  <div class="wrap nav">
+    <a class="brand" href="#"><img src="img/logo.svg" alt="" width="32" height="32" />Dayli</a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="demo/">Demo</a>
+      <a href="support.html">Support</a>
+    </nav>
+    <a class="btn primary small" href="app/">Open Dayli</a>
   </div>
+</header>
 
-  <h2>What it does</h2>
-  <ul>
-    <li>One calendar per household, friend group or club. Everyone sees the same plans.</li>
-    <li>Say it or type it: "dinner with Sam Thursday at 7" becomes an event.</li>
-    <li>Ask Dayli what's on, when you're free, or to move something.</li>
-    <li>Find a time that works for everyone, from busy and free times only. Nobody sees your event titles.</li>
-    <li>Invite people to a single event with a page, a poll for the date, photos afterwards.</li>
-  </ul>
+<main class="wrap">
+  <section class="hero">
+    <div>
+      <h1 class="serif">One calendar for the <em>people in your life</em>.</h1>
+      <p class="lead">Dayli is a shared calendar for your household, your friends, your club. Everyone sees the same plans, and you can just ask it things.</p>
+      <div class="row">
+        <a class="btn primary" href="app/">Open Dayli on the web</a>
+        <a class="btn" href="demo/">Try the demo, no sign-up</a>
+      </div>
+      <p class="fine">Free. Works in your browser today; iPhone app in testing. No adverts, no tracking.</p>
+    </div>
+    <div class="stage">
+      <div class="phone"><img src="img/month.webp" width="780" height="1688" alt="Dayli month view with a family's shared events" fetchpriority="high" /></div>
+      <div class="bubble">
+        <div class="q">You: <span id="typed"></span><span class="cursor"></span></div>
+        <div class="a"><span id="answer">Tomorrow: Sam's work trip, and you're free after 2.</span></div>
+      </div>
+    </div>
+  </section>
 
-  <h2>Get it</h2>
-  <p>Use Dayli in your browser at <a href="app/">daylicalendar.co.uk/app</a>: sign in with your email, and add it to your home screen. The iPhone app is in testing; the App Store link will appear here when it is live.</p>
+  <div class="marquee" aria-hidden="true"><span>Shared calendars · Say it, it's in · Ask Dayli · Find a time · Date polls · Event pages · Photos after · Reminders · Weather on your day · Shared calendars · Say it, it's in · Ask Dayli · Find a time · Date polls · Event pages · Photos after · Reminders · Weather on your day ·</span></div>
+
+  <section class="features" id="features">
+    <div class="feature">
+      <div class="text reveal">
+        <span class="tag">Shared</span>
+        <h2 class="serif">Everyone sees the same plans.</h2>
+        <p>One calendar per household or group. Colours per person, a merged view across all your calendars, and changes appear on everyone's phone the moment they're made.</p>
+      </div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/month.webp" width="780" height="1688" alt="Month view" /></div></div>
+    </div>
+
+    <div class="feature flip">
+      <div class="text reveal">
+        <span class="tag">Your day</span>
+        <h2 class="serif">A brief, not a list.</h2>
+        <p>Tap a day and Dayli tells you what matters: who's waiting on an answer, what clashes, what the weather's doing. Then the timeline, with a line for right now.</p>
+      </div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/day.webp" width="780" height="1688" alt="Day view with a Today brief and the weather" /></div></div>
+    </div>
+
+    <div class="feature">
+      <div class="text reveal">
+        <span class="tag">Ask Dayli</span>
+        <h2 class="serif">Just say it.</h2>
+        <p>"Dinner with Sam Thursday at 7" becomes an event. "What's on tomorrow?", "When am I free this week?", "Move gym to 8" all work too, typed or spoken, in plain English.</p>
+      </div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/ask.webp" width="780" height="1688" alt="Ask Dayli answering what is on tomorrow" /></div></div>
+    </div>
+
+    <div class="feature flip">
+      <div class="text reveal">
+        <span class="tag">Find a time</span>
+        <h2 class="serif">Skip the group chat.</h2>
+        <p>"90 minutes with Jo and Priya on Tuesday or Thursday evenings" and Dayli lists the slots that work for everyone. Friends only ever share busy or free, never what they're doing.</p>
+      </div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/findtime.webp" width="780" height="1688" alt="Find a time results" /></div></div>
+    </div>
+
+    <div class="feature">
+      <div class="text reveal">
+        <span class="tag">The big ones</span>
+        <h2 class="serif">Plan it properly.</h2>
+        <p>Give an event a page with a cover photo, a link, a to-do list and a count-down. Invite people who aren't on Dayli with a link. Add the photos afterwards.</p>
+      </div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/event.webp" width="780" height="1688" alt="An event page with details and a to-do list" /></div></div>
+    </div>
+
+    <div class="feature flip">
+      <div class="text reveal">
+        <span class="tag">Date polls</span>
+        <h2 class="serif">Pick a date together.</h2>
+        <p>Offer a few dates, everyone taps yes, no or maybe, and when you close the poll the event is made and everyone is invited.</p>
+      </div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/poll.webp" width="780" height="1688" alt="A date poll with answers" /></div></div>
+    </div>
+  </section>
+
+  <section class="steps">
+    <h2 class="serif reveal">Up and running in a minute</h2>
+    <div class="grid3">
+      <div class="card reveal"><div class="n">1</div><h3>Sign in with your email</h3><p>A six-digit code, no password. Sign in with Apple on iPhone.</p></div>
+      <div class="card reveal delay"><div class="n">2</div><h3>Start a calendar</h3><p>Name it, share the join code with the people in it. Or join one you've been sent.</p></div>
+      <div class="card reveal delay"><div class="n">3</div><h3>Say what's happening</h3><p>Type or speak a sentence. Dayli makes the event and tells the others.</p></div>
+    </div>
+  </section>
+
+  <section class="cta reveal">
+    <h2 class="serif">Try it with the people you plan with.</h2>
+    <p>Dayli runs in your browser now. Add it to your home screen and it behaves like an app. The iPhone app is in testing.</p>
+    <div class="row" style="justify-content: center">
+      <a class="btn" href="app/">Open Dayli on the web</a>
+      <a class="btn ghost" href="demo/">See the demo first</a>
+    </div>
+  </section>
 
   <footer>
-    <a href="privacy.html">Privacy policy</a> · <a href="support.html">Support</a>
+    <span>© Dayli</span>
+    <a href="privacy.html">Privacy policy</a>
+    <a href="support.html">Support</a>
+    <a href="mailto:hello@daylicalendar.co.uk">hello@daylicalendar.co.uk</a>
   </footer>
 </main>
+
+<script>
+  (function () {
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    // Scroll reveals
+    var items = document.querySelectorAll('.reveal');
+    if (reduce || !('IntersectionObserver' in window)) {
+      items.forEach(function (el) { el.classList.add('in'); });
+    } else {
+      var io = new IntersectionObserver(function (entries) {
+        entries.forEach(function (e) { if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); } });
+      }, { rootMargin: '0px 0px -10% 0px', threshold: 0.1 });
+      items.forEach(function (el) { io.observe(el); });
+    }
+    // Typed questions in the hero bubble
+    var pairs = [
+      ["what's on tomorrow?", "Tomorrow: Sam's work trip, and you're free after 2."],
+      ['move gym to 8', 'Gym moved to 08:00 on Tuesday. Want me to tell Sam?'],
+      ['when are Jo and I both free?', 'Thursday 7 to 9pm, or Saturday afternoon.'],
+      ['dinner with mum friday at 7', "Added: Dinner with mum, Fri 19:00. Mum's invited."]
+    ];
+    var typed = document.getElementById('typed'), answer = document.getElementById('answer');
+    if (!typed || !answer) return;
+    if (reduce) { typed.textContent = pairs[0][0]; answer.textContent = pairs[0][1]; return; }
+    var i = 0;
+    function run() {
+      var q = pairs[i][0], a = pairs[i][1], n = 0;
+      typed.textContent = ''; answer.style.opacity = '0';
+      var t = setInterval(function () {
+        typed.textContent = q.slice(0, ++n);
+        if (n >= q.length) {
+          clearInterval(t);
+          setTimeout(function () { answer.textContent = a; answer.style.transition = 'opacity 0.4s'; answer.style.opacity = '1'; }, 350);
+          setTimeout(function () { i = (i + 1) % pairs.length; run(); }, 4200);
+        }
+      }, 45);
+    }
+    run();
+  })();
+</script>
 </body>
 </html>
