@@ -3,6 +3,8 @@
 <script>
   (function () {
     var p = location.pathname;
+    var join = p.match(/^\/join\/([A-Za-z0-9-]+)\/?$/);
+    if (join) { location.replace('/join/?code=' + encodeURIComponent(join[1])); return; }
     var base = p.indexOf('/app/') === 0 || p === '/app' ? '/app' : p.indexOf('/demo/') === 0 || p === '/demo' ? '/demo' : null;
     if (base) location.replace(base + '/?_path=' + encodeURIComponent(p + location.search + location.hash));
     else location.replace('/');

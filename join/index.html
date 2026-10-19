@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Join a calendar on Dayli</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="../img/icon.svg" type="image/svg+xml" />
+  <style>
+    :root { --bg: #f6f5f1; --surface: #ffffff; --ink: #1c1a17; --muted: #847f74; --accent: #2f6b4f; --accent-ink: #fff; --border: #e6e3da; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #171613; --surface: #201f1a; --ink: #f3f1ea; --muted: #a39e92; --accent: #7fbf9a; --accent-ink: #171613; --border: #353229; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 440px; margin: 0 auto; padding: 48px 20px 64px; text-align: center; }
+    img.logo { width: 88px; height: 86px; margin: 0 auto 16px; }
+    h1 { font-family: Georgia, "Times New Roman", serif; font-size: 32px; line-height: 1.15; margin: 0 0 8px; letter-spacing: -0.3px; }
+    p { color: var(--muted); margin: 0 0 24px; }
+    .btn { display: block; padding: 14px 20px; border-radius: 999px; text-decoration: none; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--ink); margin-bottom: 12px; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+    .code { display: inline-block; font-family: ui-monospace, Menlo, monospace; font-size: 22px; letter-spacing: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 8px 14px; margin: 4px 0 20px; color: var(--ink); }
+    .fine { font-size: 14px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+<main>
+  <img class="logo" src="../img/logo.svg" alt="" />
+  <h1 id="title">Join a calendar on Dayli</h1>
+  <p id="sub">Checking the invitation…</p>
+  <div id="actions" class="hidden">
+    <a id="open" class="btn primary" href="#">Open Dayli</a>
+    <a class="btn" href="../">What is Dayli?</a>
+    <p class="fine">Or enter this code in the app under <em>Add a calendar</em>:</p>
+    <span id="code" class="code"></span>
+  </div>
+  <div id="bad" class="hidden">
+    <p>This invitation code doesn't match a calendar. It may have been changed; ask for a fresh link.</p>
+    <a class="btn" href="../">Go to Dayli</a>
+  </div>
+</main>
+<script src="../config.js"></script>
+<script>
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var code = (params.get('code') || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    var title = document.getElementById('title'), sub = document.getElementById('sub');
+    var actions = document.getElementById('actions'), bad = document.getElementById('bad');
+    if (!code) { sub.textContent = 'This link is missing its code.'; bad.classList.remove('hidden'); return; }
+    document.getElementById('code').textContent = code.slice(0, 3) + '-' + code.slice(3);
+    document.getElementById('open').href = '../app/join/' + code;
+    var cfg = window.DAYLI_CONFIG || {};
+    fetch(cfg.supabaseUrl + '/rest/v1/rpc/calendar_invite_preview', {
+      method: 'POST',
+      headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_code: code })
+    }).then(function (r) { return r.ok ? r.json() : []; }).then(function (rows) {
+      var row = rows && rows[0];
+      if (!row) { title.textContent = 'Hmm'; sub.classList.add('hidden'); bad.classList.remove('hidden'); return; }
+      title.textContent = 'Join ' + row.name + ' on Dayli';
+      sub.textContent = row.member_count === 1 ? '1 person is in it so far.' : row.member_count + ' people are in it.';
+      actions.classList.remove('hidden');
+    }).catch(function () {
+      title.textContent = 'Join a calendar on Dayli';
+      sub.textContent = 'Open Dayli to accept the invitation.';
+      actions.classList.remove('hidden');
+    });
+  })();
+</script>
+</body>
+</html>
