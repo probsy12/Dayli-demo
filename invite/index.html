@@ -1,0 +1,66 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>You're invited to Dayli</title>
+  <meta name="robots" content="noindex" />
+  <link rel="icon" href="../img/icon.svg" type="image/svg+xml" />
+  <style>
+    :root { --bg: #f6f5f1; --surface: #ffffff; --ink: #1c1a17; --muted: #847f74; --accent: #2f6b4f; --accent-ink: #fff; --border: #e6e3da; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #171613; --surface: #201f1a; --ink: #f3f1ea; --muted: #a39e92; --accent: #7fbf9a; --accent-ink: #171613; --border: #353229; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.5 -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 440px; margin: 0 auto; padding: 48px 20px 64px; text-align: center; }
+    img.logo { width: 88px; height: 86px; margin: 0 auto 16px; }
+    h1 { font-family: Georgia, "Times New Roman", serif; font-size: 32px; line-height: 1.15; margin: 0 0 8px; letter-spacing: -0.3px; }
+    p { color: var(--muted); margin: 0 0 24px; }
+    .btn { display: block; padding: 14px 20px; border-radius: 999px; text-decoration: none; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--ink); margin-bottom: 12px; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+    .fine { font-size: 14px; }
+    .hidden { display: none; }
+  </style>
+</head>
+<body>
+<main>
+  <img class="logo" src="../img/logo.svg" alt="" />
+  <h1 id="title">You're invited to Dayli</h1>
+  <p id="sub">Checking the invitation…</p>
+  <div id="actions" class="hidden">
+    <a id="open" class="btn primary" href="#">Join Dayli</a>
+    <a class="btn" href="../">What is Dayli?</a>
+    <p class="fine">Sign up with the mobile number this was sent to and you'll be friends straight away. The link works with any number too.</p>
+  </div>
+  <div id="bad" class="hidden">
+    <p>This invitation link doesn't match anything. Ask for a fresh one.</p>
+    <a class="btn" href="../">Go to Dayli</a>
+  </div>
+</main>
+<script src="../config.js"></script>
+<script>
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var code = (params.get('code') || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
+    var title = document.getElementById('title'), sub = document.getElementById('sub');
+    var actions = document.getElementById('actions'), bad = document.getElementById('bad');
+    if (!code) { sub.textContent = 'This link is missing its code.'; bad.classList.remove('hidden'); return; }
+    document.getElementById('open').href = '../app/invite/' + code;
+    var cfg = window.DAYLI_CONFIG || {};
+    fetch(cfg.supabaseUrl + '/rest/v1/rpc/phone_invite_preview', {
+      method: 'POST',
+      headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ p_code: code })
+    }).then(function (r) { return r.ok ? r.json() : []; }).then(function (rows) {
+      var row = rows && rows[0];
+      if (!row) { title.textContent = 'Hmm'; sub.classList.add('hidden'); bad.classList.remove('hidden'); return; }
+      title.textContent = row.name + ' invited you to Dayli';
+      sub.textContent = 'A shared calendar for family and friends: see when each other is free, plan things in one tap.';
+      actions.classList.remove('hidden');
+    }).catch(function () {
+      sub.textContent = 'A shared calendar for family and friends. Open Dayli to accept.';
+      actions.classList.remove('hidden');
+    });
+  })();
+</script>
+</body>
+</html>
