@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+  <script>try { document.documentElement.className += ' js'; } catch (e) {}</script>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Dayli: a calendar you share</title>
@@ -74,9 +75,10 @@
     .feature .tag { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
     .feature .shot { display: flex; justify-content: center; }
     .feature .phone { width: 260px; }
-    .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); }
-    .reveal.in { opacity: 1; transform: none; }
-    .reveal.delay { transition-delay: 0.15s; }
+    /* The content is visible as plain HTML; only with scripts running does it fade in. */
+    html.js .reveal { opacity: 0; transform: translateY(24px); transition: opacity 0.7s ease, transform 0.7s cubic-bezier(0.2, 0.8, 0.2, 1); }
+    html.js .reveal.in { opacity: 1; transform: none; }
+    html.js .reveal.delay { transition-delay: 0.15s; }
 
     .steps { padding: 56px 0; }
     .steps h2 { text-align: center; font-size: clamp(28px, 4vw, 38px); margin: 0 0 32px; }
@@ -98,7 +100,7 @@
 
     @media (prefers-reduced-motion: reduce) {
       .stage .phone, .bubble, .marquee span, .cursor { animation: none; }
-      .reveal { opacity: 1; transform: none; transition: none; }
+      html.js .reveal { opacity: 1; transform: none; transition: none; }
     }
   </style>
 </head>
@@ -228,6 +230,8 @@
     var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     // Scroll reveals
     var items = document.querySelectorAll('.reveal');
+    // Belt and braces: whatever happens below, everything is visible after a moment.
+    setTimeout(function () { items.forEach(function (el) { el.classList.add('in'); }); }, 1500);
     if (reduce || !('IntersectionObserver' in window)) {
       items.forEach(function (el) { el.classList.add('in'); });
     } else {
