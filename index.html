@@ -39,6 +39,13 @@
     .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
     .btn.small { padding: 8px 14px; font-size: 14px; }
 
+    .stores { display: flex; flex-wrap: wrap; gap: 12px; margin: 0 0 18px; }
+    .stores.centre { justify-content: center; margin-bottom: 20px; }
+    .store { display: inline-flex; align-items: center; gap: 10px; padding: 9px 18px 9px 14px; border-radius: 12px; background: #000; color: #fff; text-decoration: none; border: 1px solid #000; transition: transform 0.15s ease, box-shadow 0.15s ease; }
+    .store:hover { transform: translateY(-1px); box-shadow: 0 6px 16px rgba(28, 26, 23, 0.18); }
+    .store span { display: flex; flex-direction: column; font-size: 18px; font-weight: 600; line-height: 1.1; }
+    .store small { font-size: 11px; font-weight: 500; opacity: 0.85; }
+    .cta .store { border-color: color-mix(in srgb, var(--accent-ink) 30%, transparent); }
     .hero { padding: 56px 0 24px; display: grid; gap: 40px; align-items: center; }
     @media (min-width: 860px) { .hero { grid-template-columns: 1.1fr 0.9fr; padding: 72px 0 40px; } }
     .hero h1 { font-size: clamp(40px, 7vw, 64px); line-height: 1.02; margin: 0 0 16px; }
@@ -110,6 +117,8 @@
       <a href="#features">Features</a>
       <a href="demo/">Demo</a>
       <a href="support.html">Support</a>
+    <a href="https://apps.apple.com/gb/app/dayli/id6767814466">App Store</a>
+    <a href="https://play.google.com/store/apps/details?id=uk.co.dayli.app">Google Play</a>
     </nav>
     <div class="row" style="gap: 8px">
       <a class="btn small" href="app/">Log in</a>
@@ -123,12 +132,16 @@
     <div>
       <h1 class="serif">One calendar for the <em>people in your life</em>.</h1>
       <p class="lead">Dayli is a shared calendar for your household, your friends, your club. Everyone sees the same plans, and you can just ask it things.</p>
+      <div class="stores">
+        <a class="store" href="https://apps.apple.com/gb/app/dayli/id6767814466" rel="noopener"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.47.83-.72 0-1.82-.81-2.99-.79-1.54.02-2.96.9-3.75 2.27-1.6 2.78-.41 6.89 1.15 9.14.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.23-.02 2.01-1.12 2.76-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.39-.92-2.4-3.66zM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.01.61-2.66 1.37-.58.67-1.09 1.75-.96 2.79 1.02.08 2.05-.52 2.68-1.27z"/></svg><span><small>Download on the</small>App Store</span></a>
+        <a class="store" href="https://play.google.com/store/apps/details?id=uk.co.dayli.app" rel="noopener"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#34A853" d="M3.6 2.3 13.4 12l-9.8 9.7c-.2-.2-.3-.6-.3-1V3.3c0-.4.1-.8.3-1z"/><path fill="#FBBC04" d="m17.2 8.2 3.2 1.8c1 .6 1 1.5 0 2.1l-3.2 1.8L13.4 12z"/><path fill="#4285F4" d="M13.4 12 3.6 21.7c.4.4 1 .4 1.7 0l11.9-6.7z"/><path fill="#EA4335" d="M3.6 2.3c.4-.4 1-.4 1.7 0l11.9 6.7L13.4 12z"/></svg><span><small>Get it on</small>Google Play</span></a>
+      </div>
       <div class="row">
         <a class="btn primary" href="app/?signup=1">Sign up free</a>
         <a class="btn" href="app/">Log in</a>
         <a class="btn" href="demo/">Try the demo</a>
       </div>
-      <p class="fine">Free. Works in your browser today; iPhone app in testing. No adverts, no tracking.</p>
+      <p class="fine">Free on iPhone and Android, and in your browser. No adverts, no tracking.</p>
     </div>
     <div class="stage">
       <div class="phone"><img src="img/month.webp" width="780" height="1688" alt="Dayli month view with a family's shared events" fetchpriority="high" /></div>
@@ -208,7 +221,11 @@
 
   <section class="cta reveal">
     <h2 class="serif">Try it with the people you plan with.</h2>
-    <p>Dayli runs in your browser now. Add it to your home screen and it behaves like an app. The iPhone app is in testing.</p>
+    <p>Get Dayli for iPhone or Android, or open it in your browser.</p>
+    <div class="stores centre">
+        <a class="store" href="https://apps.apple.com/gb/app/dayli/id6767814466" rel="noopener"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.47.83-.72 0-1.82-.81-2.99-.79-1.54.02-2.96.9-3.75 2.27-1.6 2.78-.41 6.89 1.15 9.14.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.23-.02 2.01-1.12 2.76-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.39-.92-2.4-3.66zM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.01.61-2.66 1.37-.58.67-1.09 1.75-.96 2.79 1.02.08 2.05-.52 2.68-1.27z"/></svg><span><small>Download on the</small>App Store</span></a>
+        <a class="store" href="https://play.google.com/store/apps/details?id=uk.co.dayli.app" rel="noopener"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#34A853" d="M3.6 2.3 13.4 12l-9.8 9.7c-.2-.2-.3-.6-.3-1V3.3c0-.4.1-.8.3-1z"/><path fill="#FBBC04" d="m17.2 8.2 3.2 1.8c1 .6 1 1.5 0 2.1l-3.2 1.8L13.4 12z"/><path fill="#4285F4" d="M13.4 12 3.6 21.7c.4.4 1 .4 1.7 0l11.9-6.7z"/><path fill="#EA4335" d="M3.6 2.3c.4-.4 1-.4 1.7 0l11.9 6.7L13.4 12z"/></svg><span><small>Get it on</small>Google Play</span></a>
+      </div>
     <div class="row" style="justify-content: center">
       <a class="btn" href="app/">Open Dayli on the web</a>
       <a class="btn ghost" href="demo/">See the demo first</a>
