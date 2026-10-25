@@ -47,7 +47,8 @@
     #date { font-size: 3.6vmin; margin-top: 1vmin; opacity: .92; }
     #caption { position: absolute; right: 4vmin; bottom: 4vmin; max-width: 45%; text-align: right; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
     #caption .c { font-size: 3.4vmin; line-height: 1.3; }
-    #caption .f { font-size: 2.4vmin; opacity: .8; margin-top: .6vmin; }
+    #caption .d { font-size: 2.6vmin; font-weight: 600; opacity: .92; margin-top: .6vmin; }
+    #caption .f { font-size: 2.4vmin; opacity: .8; margin-top: .4vmin; }
     #plans { position: absolute; top: 4vmin; right: 4vmin; width: min(42vw, 62vmin); max-height: calc(100% - 30vmin); overflow: hidden;
       background: rgba(246,245,241,.94); color: var(--ink); border-radius: 3vmin; padding: 3vmin 3.4vmin; box-shadow: 0 1vmin 5vmin rgba(0,0,0,.35); }
     #plans h2 { font-size: 3.6vmin; font-weight: 400; margin-bottom: 1.6vmin; }
@@ -89,7 +90,7 @@
     <div class="shade"></div>
     <div id="name"><img src="../img/icon.svg" alt="" /><span id="calName"></span></div>
     <aside id="plans" hidden><h2 class="serif">Coming up</h2><div id="planList"></div></aside>
-    <div id="caption"><div class="c" id="capText"></div><div class="f" id="capFrom"></div></div>
+    <div id="caption"><div class="c" id="capText"></div><div class="d" id="capDay"></div><div class="f" id="capFrom"></div></div>
     <div id="clock"><div id="time"></div><div id="date"></div></div>
     <div id="night"></div>
   </section>
@@ -149,7 +150,7 @@
     var now = new Date(), tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     if (dayKey(d) === dayKey(now)) return 'Today';
     if (dayKey(d) === dayKey(tomorrow)) return 'Tomorrow';
-    return d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' });
+    return d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
   }
 
   function tick() {
@@ -201,6 +202,7 @@
       requestAnimationFrame(function () { el.classList.add('on'); });
       setTimeout(function () { while (slides.children.length > 1) slides.removeChild(slides.firstChild); }, 1800);
       $('capText').textContent = p.caption || '';
+      $('capDay').textContent = p.day ? dayLabel(new Date(p.day + 'T12:00:00')) : '';
       $('capFrom').textContent = p.from ? 'from ' + p.from : '';
     };
     img.onerror = function () { setTimeout(nextSlide, 500); };
