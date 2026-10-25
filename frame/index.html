@@ -14,7 +14,9 @@
     phone. It shows a code; someone in the calendar enters it in Dayli
     (calendar → Photos & frame → Set up a photo frame). The frame keeps its
     key in this browser and asks the "frame" Edge Function for photos and
-    plans every minute. Unpairing in the app brings the code back.
+    plans every minute: photos as a slideshow with the clock, and the week
+    ahead across the bottom (today in paper, each event in the colour of the
+    people it's with). Unpairing in the app brings the code back.
   -->
   <style>
     :root { --green: #2F6B4F; --paper: #F6F5F1; --ink: #1C1A17; }
@@ -41,23 +43,45 @@
     .slide .bg { position: absolute; inset: -40px; background-size: cover; background-position: center; filter: blur(40px) brightness(.55); }
     .slide .ph { position: absolute; inset: 0; background-size: contain; background-repeat: no-repeat; background-position: center; }
     .shade { position: absolute; inset: 0; pointer-events: none;
-      background: linear-gradient(to top, rgba(0,0,0,.65) 0%, rgba(0,0,0,0) 38%), linear-gradient(to bottom, rgba(0,0,0,.35) 0%, rgba(0,0,0,0) 22%); }
-    #clock { position: absolute; left: 4vmin; bottom: 4vmin; text-shadow: 0 2px 12px rgba(0,0,0,.5); }
+      background: linear-gradient(to top, rgba(0,0,0,.55) 0%, rgba(0,0,0,0) 45%), linear-gradient(to bottom, rgba(0,0,0,.35) 0%, rgba(0,0,0,0) 22%); }
+    /* The week across the bottom: today in paper, the rest on dark glass. */
+    #week { position: absolute; left: 0; right: 0; bottom: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+      gap: 1px; background: rgba(0,0,0,.38); -webkit-backdrop-filter: blur(16px); backdrop-filter: blur(16px);
+      border-top: 1px solid rgba(255,255,255,.12); min-height: var(--week-h); }
+    #week .d { min-width: 0; overflow: hidden; padding: 1.4vmin 1.3vmin 1.6vmin; }
+    #week .d.today { background: rgba(246,245,241,.96); color: var(--ink); }
+    #week .dn { font-size: 1.7vmin; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; opacity: .75; }
+    #week .today .dn { color: var(--green); opacity: 1; }
+    #week .num { font-size: 4.2vmin; font-weight: 300; line-height: 1.1; margin-bottom: .6vmin; }
+    #week .today .num { font-weight: 600; }
+    #week .ev { display: flex; align-items: baseline; gap: .7vmin; font-size: 1.9vmin; line-height: 1.3; margin-top: .6vmin; min-width: 0; }
+    #week .ev i { flex: none; width: 1.1vmin; height: 1.1vmin; border-radius: 50%; align-self: center; }
+    #week .ev b { flex: none; font-weight: 700; font-variant-numeric: tabular-nums; opacity: .9; }
+    #week .ev span { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    #week .more, #week .free { font-size: 1.7vmin; opacity: .55; margin-top: .6vmin; }
+    #week .free { font-style: italic; }
+    #clock { position: absolute; left: 4vmin; bottom: calc(var(--week-h) + 3vmin); text-shadow: 0 2px 12px rgba(0,0,0,.5); }
     #time { font-size: 13vmin; font-weight: 300; letter-spacing: -0.03em; line-height: 1; }
     #date { font-size: 3.6vmin; margin-top: 1vmin; opacity: .92; }
-    #caption { position: absolute; right: 4vmin; bottom: 4vmin; max-width: 45%; text-align: right; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+    #caption { position: absolute; right: 4vmin; top: 4vmin; max-width: 50%; text-align: right; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
     #caption .c { font-size: 3.4vmin; line-height: 1.3; }
     #caption .d { font-size: 2.6vmin; font-weight: 600; opacity: .92; margin-top: .6vmin; }
     #caption .f { font-size: 2.4vmin; opacity: .8; margin-top: .4vmin; }
-    #plans { position: absolute; top: 4vmin; right: 4vmin; width: min(42vw, 62vmin); max-height: calc(100% - 30vmin); overflow: hidden;
-      background: rgba(246,245,241,.94); color: var(--ink); border-radius: 3vmin; padding: 3vmin 3.4vmin; box-shadow: 0 1vmin 5vmin rgba(0,0,0,.35); }
-    #plans h2 { font-size: 3.6vmin; font-weight: 400; margin-bottom: 1.6vmin; }
-    #plans .day { font-size: 2vmin; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #847F74; margin: 1.8vmin 0 .8vmin; }
-    #plans .day:first-of-type { margin-top: 0; }
-    #plans .ev { display: flex; gap: 2vmin; align-items: baseline; padding: .7vmin 0; font-size: 2.8vmin; line-height: 1.25; }
-    #plans .t { min-width: 9.5vmin; color: var(--green); font-weight: 700; font-variant-numeric: tabular-nums; }
-    #plans .n { flex: 1; }
-    #plans .empty { font-size: 2.6vmin; color: #847F74; }
+    :root { --week-h: 22vmin; }
+    /* Narrow screens show the next few days only; the rest come round as the week moves on. */
+    @media (orientation: portrait) {
+      :root { --week-h: 26vmin; }
+      #week { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+      #week .d:nth-child(n+5) { display: none; }
+      #week .dn { font-size: 2.2vmin; } #week .num { font-size: 5vmin; } #week .ev { font-size: 2.4vmin; } #week .more, #week .free { font-size: 2.1vmin; }
+      #caption { max-width: 60%; }
+    }
+    @media (orientation: portrait) and (min-width: 600px) {
+      #week { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+      #week .d:nth-child(5) { display: block; }
+    }
+    /* Plans switched off for this frame: the clock drops to the corner. */
+    #show.noweek #clock { bottom: 4vmin; }
     #name { position: absolute; top: 4vmin; left: 4vmin; font-size: 3vmin; opacity: .85; text-shadow: 0 2px 12px rgba(0,0,0,.5);
       display: flex; align-items: center; gap: 1.4vmin; }
     #name img { width: 4.4vmin; height: 4.4vmin; }
@@ -69,10 +93,6 @@
     #hint { position: fixed; left: 50%; top: 2vmin; transform: translateX(-50%); background: rgba(0,0,0,.6); padding: 1vmin 2.4vmin;
       border-radius: 99px; font-size: 2.2vmin; opacity: 0; transition: opacity .6s; pointer-events: none; }
     #hint.on { opacity: 1; }
-    @media (orientation: portrait) {
-      #plans { left: 4vmin; right: 4vmin; width: auto; top: auto; bottom: 30vmin; max-height: 40%; }
-      #caption { max-width: 60%; }
-    }
   </style>
 </head>
 <body>
@@ -89,9 +109,9 @@
     <div id="empty" hidden><p class="serif" id="emptyText">Send photos from Dayli and they'll appear here.</p></div>
     <div class="shade"></div>
     <div id="name"><img src="../img/icon.svg" alt="" /><span id="calName"></span></div>
-    <aside id="plans" hidden><h2 class="serif">Coming up</h2><div id="planList"></div></aside>
     <div id="caption"><div class="c" id="capText"></div><div class="d" id="capDay"></div><div class="f" id="capFrom"></div></div>
     <div id="clock"><div id="time"></div><div id="date"></div></div>
+    <div id="week" hidden></div>
     <div id="night"></div>
   </section>
   <div id="hint">Tap for full screen</div>
@@ -143,6 +163,7 @@
 
   // ---------- showing ----------
   var photos = [], idx = -1, slideTimer = null, feedTimer = null, tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  var lastEvents = null, lastShow = false, lastDayKey = null;
   var two = function (n) { return (n < 10 ? '0' : '') + n; };
   function hm(d) { return two(d.getHours()) + ':' + two(d.getMinutes()); }
   function dayKey(d) { return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); }
@@ -159,32 +180,56 @@
     $('date').textContent = now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
     var h = now.getHours();
     $('night').classList.toggle('on', h >= 22 || h < 7);
+    // Past midnight the week moves on a day, and events that have finished drop off.
+    if (lastEvents && dayKey(now) !== lastDayKey) { lastDayKey = dayKey(now); renderWeek(lastEvents, lastShow); }
   }
 
-  function renderPlans(events, showEvents) {
-    var box = $('plans'), list = $('planList');
+  // Seven days across the bottom, starting today; each event with its time
+  // and the colour of the people it's with (the calendar's own colours).
+  var MAX_PER_DAY = 3;
+  function renderWeek(events, showEvents) {
+    var box = $('week');
     box.hidden = !showEvents;
+    $('show').classList.toggle('noweek', !showEvents);
     if (!showEvents) return;
-    list.textContent = '';
-    var now = Date.now();
-    var upcoming = (events || []).filter(function (e) { return Date.parse(e.ends_at) > now; }).slice(0, 8);
-    if (!upcoming.length) {
-      var p = document.createElement('div'); p.className = 'empty'; p.textContent = 'Nothing planned this week.'; list.appendChild(p); return;
-    }
-    var lastDay = null;
-    upcoming.forEach(function (e) {
+    box.textContent = '';
+    var now = new Date(), today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    var byDay = {};
+    (events || []).forEach(function (e) {
+      if (Date.parse(e.ends_at) <= now.getTime()) return;
       var s = new Date(e.starts_at);
-      // All-day events start at midnight in their own time zone; label by that date.
-      var label = e.all_day ? dayLabel(new Date(s.toLocaleString('en-US', { timeZone: e.timezone || tz }))) : dayLabel(s);
-      if (Date.parse(e.starts_at) < now) label = 'Today';
-      if (label !== lastDay) {
-        var d = document.createElement('div'); d.className = 'day'; d.textContent = label; list.appendChild(d); lastDay = label;
-      }
-      var row = document.createElement('div'); row.className = 'ev';
-      var t = document.createElement('span'); t.className = 't'; t.textContent = e.all_day ? 'All day' : hm(s);
-      var n = document.createElement('span'); n.className = 'n'; n.textContent = e.title;
-      row.appendChild(t); row.appendChild(n); list.appendChild(row);
+      // All-day events start at midnight in their own time zone; file them by that date.
+      var d = e.all_day ? new Date(s.toLocaleString('en-US', { timeZone: e.timezone || tz })) : s;
+      var start = new Date(d.getFullYear(), d.getMonth(), d.getDate());
+      // Something already under way (or spanning days) belongs to today.
+      if (start < today) start = today;
+      var k = dayKey(start);
+      (byDay[k] = byDay[k] || []).push(e);
     });
+    for (var i = 0; i < 7; i++) {
+      var day = new Date(today.getFullYear(), today.getMonth(), today.getDate() + i);
+      var col = document.createElement('div'); col.className = 'd' + (i === 0 ? ' today' : '');
+      var dn = document.createElement('div'); dn.className = 'dn';
+      dn.textContent = i === 0 ? 'Today' : i === 1 ? 'Tomorrow' : day.toLocaleDateString(undefined, { weekday: 'short' });
+      var num = document.createElement('div'); num.className = 'num'; num.textContent = String(day.getDate());
+      col.appendChild(dn); col.appendChild(num);
+      var list = byDay[dayKey(day)] || [];
+      list.slice(0, MAX_PER_DAY).forEach(function (e) {
+        var row = document.createElement('div'); row.className = 'ev';
+        var dot = document.createElement('i'); dot.style.background = e.color || '#9fd4b4';
+        row.appendChild(dot);
+        // No time means all day: the title gets the room.
+        if (!e.all_day) { var t = document.createElement('b'); t.textContent = hm(new Date(e.starts_at)); row.appendChild(t); }
+        var n = document.createElement('span'); n.textContent = e.title; n.title = e.title;
+        row.appendChild(n); col.appendChild(row);
+      });
+      if (list.length > MAX_PER_DAY) {
+        var more = document.createElement('div'); more.className = 'more'; more.textContent = '+' + (list.length - MAX_PER_DAY) + ' more'; col.appendChild(more);
+      } else if (!list.length) {
+        var free = document.createElement('div'); free.className = 'free'; free.textContent = 'Nothing on'; col.appendChild(free);
+      }
+      box.appendChild(col);
+    }
   }
 
   function nextSlide() {
@@ -228,7 +273,8 @@
     if (idx >= photos.length) idx = -1;
     $('empty').hidden = photos.length > 0;
     $('emptyText').textContent = 'Send photos to ' + data.calendar.name + ' from Dayli and they’ll appear here.';
-    renderPlans(data.events, data.frame.show_events);
+    lastEvents = data.events; lastShow = data.frame.show_events; lastDayKey = dayKey(new Date());
+    renderWeek(data.events, data.frame.show_events);
     if (!slideTimer) {
       if (photos.length) { nextSlide(); slideTimer = setInterval(nextSlide, SLIDE_MS); }
     } else if (added.length) {
