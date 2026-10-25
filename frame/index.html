@@ -1,0 +1,264 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#000000" />
+  <title>Dayli Frame</title>
+  <link rel="icon" href="../img/icon.svg" type="image/svg+xml" />
+  <!--
+    Dayli Frame: a shared calendar's photos and plans on any tablet or spare
+    phone. It shows a code; someone in the calendar enters it in Dayli
+    (calendar → Photos & frame → Set up a photo frame). The frame keeps its
+    key in this browser and asks the "frame" Edge Function for photos and
+    plans every minute. Unpairing in the app brings the code back.
+  -->
+  <style>
+    :root { --green: #2F6B4F; --paper: #F6F5F1; --ink: #1C1A17; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { height: 100%; background: #000; color: #fff; overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; -webkit-font-smoothing: antialiased; }
+    .serif { font-family: Georgia, "Times New Roman", serif; }
+    [hidden] { display: none !important; }
+
+    /* Pairing */
+    #pair { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+      gap: 3vmin; padding: 6vmin; text-align: center; background: radial-gradient(120% 90% at 50% 0%, #3A7D5D, var(--green) 50%, #1F4a37); }
+    #pair img { width: 12vmin; height: 12vmin; }
+    #pair h1 { font-size: 6vmin; font-weight: 400; letter-spacing: -0.02em; }
+    #code { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 700; font-size: 14vmin; letter-spacing: 0.08em;
+      background: rgba(255,255,255,.12); padding: 1.5vmin 5vmin; border-radius: 3vmin; }
+    #pair p { font-size: 3vmin; line-height: 1.45; max-width: 70ch; opacity: .9; }
+    #pair .small { font-size: 2.4vmin; opacity: .7; }
+
+    /* Showing */
+    #show { position: fixed; inset: 0; }
+    .slide { position: absolute; inset: 0; opacity: 0; transition: opacity 1.6s ease; }
+    .slide.on { opacity: 1; }
+    .slide .bg { position: absolute; inset: -40px; background-size: cover; background-position: center; filter: blur(40px) brightness(.55); }
+    .slide .ph { position: absolute; inset: 0; background-size: contain; background-repeat: no-repeat; background-position: center; }
+    .shade { position: absolute; inset: 0; pointer-events: none;
+      background: linear-gradient(to top, rgba(0,0,0,.65) 0%, rgba(0,0,0,0) 38%), linear-gradient(to bottom, rgba(0,0,0,.35) 0%, rgba(0,0,0,0) 22%); }
+    #clock { position: absolute; left: 4vmin; bottom: 4vmin; text-shadow: 0 2px 12px rgba(0,0,0,.5); }
+    #time { font-size: 13vmin; font-weight: 300; letter-spacing: -0.03em; line-height: 1; }
+    #date { font-size: 3.6vmin; margin-top: 1vmin; opacity: .92; }
+    #caption { position: absolute; right: 4vmin; bottom: 4vmin; max-width: 45%; text-align: right; text-shadow: 0 2px 12px rgba(0,0,0,.6); }
+    #caption .c { font-size: 3.4vmin; line-height: 1.3; }
+    #caption .f { font-size: 2.4vmin; opacity: .8; margin-top: .6vmin; }
+    #plans { position: absolute; top: 4vmin; right: 4vmin; width: min(42vw, 62vmin); max-height: calc(100% - 30vmin); overflow: hidden;
+      background: rgba(246,245,241,.94); color: var(--ink); border-radius: 3vmin; padding: 3vmin 3.4vmin; box-shadow: 0 1vmin 5vmin rgba(0,0,0,.35); }
+    #plans h2 { font-size: 3.6vmin; font-weight: 400; margin-bottom: 1.6vmin; }
+    #plans .day { font-size: 2vmin; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: #847F74; margin: 1.8vmin 0 .8vmin; }
+    #plans .day:first-of-type { margin-top: 0; }
+    #plans .ev { display: flex; gap: 2vmin; align-items: baseline; padding: .7vmin 0; font-size: 2.8vmin; line-height: 1.25; }
+    #plans .t { min-width: 9.5vmin; color: var(--green); font-weight: 700; font-variant-numeric: tabular-nums; }
+    #plans .n { flex: 1; }
+    #plans .empty { font-size: 2.6vmin; color: #847F74; }
+    #name { position: absolute; top: 4vmin; left: 4vmin; font-size: 3vmin; opacity: .85; text-shadow: 0 2px 12px rgba(0,0,0,.5);
+      display: flex; align-items: center; gap: 1.4vmin; }
+    #name img { width: 4.4vmin; height: 4.4vmin; }
+    #empty { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center; padding: 10vmin;
+      background: radial-gradient(120% 90% at 30% 20%, #3A7D5D, var(--green) 50%, #1F4a37); }
+    #empty p { font-size: 4vmin; line-height: 1.4; max-width: 30ch; }
+    #night { position: absolute; inset: 0; background: #000; opacity: 0; transition: opacity 4s; pointer-events: none; }
+    #night.on { opacity: .82; }
+    #hint { position: fixed; left: 50%; top: 2vmin; transform: translateX(-50%); background: rgba(0,0,0,.6); padding: 1vmin 2.4vmin;
+      border-radius: 99px; font-size: 2.2vmin; opacity: 0; transition: opacity .6s; pointer-events: none; }
+    #hint.on { opacity: 1; }
+    @media (orientation: portrait) {
+      #plans { left: 4vmin; right: 4vmin; width: auto; top: auto; bottom: 30vmin; max-height: 40%; }
+      #caption { max-width: 60%; }
+    }
+  </style>
+</head>
+<body>
+  <section id="pair" hidden>
+    <img src="../img/icon.svg" alt="" />
+    <h1 class="serif">Dayli Frame</h1>
+    <div id="code">······</div>
+    <p>In Dayli, open your shared calendar → <b>Photos &amp; frame</b> → <b>Set up a photo frame</b>, and enter this code.</p>
+    <p class="small" id="pairNote">The code changes every 15 minutes.</p>
+  </section>
+
+  <section id="show" hidden>
+    <div id="slides"></div>
+    <div id="empty" hidden><p class="serif" id="emptyText">Send photos from Dayli and they'll appear here.</p></div>
+    <div class="shade"></div>
+    <div id="name"><img src="../img/icon.svg" alt="" /><span id="calName"></span></div>
+    <aside id="plans" hidden><h2 class="serif">Coming up</h2><div id="planList"></div></aside>
+    <div id="caption"><div class="c" id="capText"></div><div class="f" id="capFrom"></div></div>
+    <div id="clock"><div id="time"></div><div id="date"></div></div>
+    <div id="night"></div>
+  </section>
+  <div id="hint">Tap for full screen</div>
+
+<script src="../config.js"></script>
+<script>
+(function () {
+  var cfg = window.DAYLI_CONFIG || {};
+  var FN = cfg.supabaseUrl + '/functions/v1/frame';
+  var KEY = 'dayli.frame.token';
+  var SLIDE_MS = 12000;
+  var $ = function (id) { return document.getElementById(id); };
+  var store = {
+    get: function () { try { return localStorage.getItem(KEY); } catch (e) { return null; } },
+    set: function (v) { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch (e) {} },
+  };
+
+  function call(body) {
+    return fetch(FN, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', apikey: cfg.supabaseAnonKey, authorization: 'Bearer ' + cfg.supabaseAnonKey },
+      body: JSON.stringify(body),
+    }).then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); });
+  }
+  var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+
+  // ---------- pairing ----------
+  var pairing = false;
+  async function pair() {
+    if (pairing) return;
+    pairing = true;
+    $('show').hidden = true; $('pair').hidden = false;
+    while (true) {
+      var started;
+      try { started = await call({ action: 'start' }); } catch (e) { started = null; }
+      if (!started || started.status !== 200) { $('code').textContent = '······'; $('pairNote').textContent = 'Can’t reach Dayli. Trying again…'; await wait(10000); continue; }
+      var code = started.body.code, secret = started.body.secret;
+      $('code').textContent = code.slice(0, 3) + '-' + code.slice(3);
+      $('pairNote').textContent = 'The code changes every 15 minutes.';
+      while (true) {
+        await wait(3000);
+        var r;
+        try { r = await call({ action: 'claim', secret: secret }); } catch (e) { continue; }
+        if (r.body.status === 'paired') { store.set(r.body.token); pairing = false; return show(); }
+        if (r.body.status === 'expired') break;
+      }
+    }
+  }
+
+  // ---------- showing ----------
+  var photos = [], idx = -1, slideTimer = null, feedTimer = null, tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  var two = function (n) { return (n < 10 ? '0' : '') + n; };
+  function hm(d) { return two(d.getHours()) + ':' + two(d.getMinutes()); }
+  function dayKey(d) { return d.getFullYear() + '-' + d.getMonth() + '-' + d.getDate(); }
+  function dayLabel(d) {
+    var now = new Date(), tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    if (dayKey(d) === dayKey(now)) return 'Today';
+    if (dayKey(d) === dayKey(tomorrow)) return 'Tomorrow';
+    return d.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'short' });
+  }
+
+  function tick() {
+    var now = new Date();
+    $('time').textContent = hm(now);
+    $('date').textContent = now.toLocaleDateString(undefined, { weekday: 'long', day: 'numeric', month: 'long' });
+    var h = now.getHours();
+    $('night').classList.toggle('on', h >= 22 || h < 7);
+  }
+
+  function renderPlans(events, showEvents) {
+    var box = $('plans'), list = $('planList');
+    box.hidden = !showEvents;
+    if (!showEvents) return;
+    list.textContent = '';
+    var now = Date.now();
+    var upcoming = (events || []).filter(function (e) { return Date.parse(e.ends_at) > now; }).slice(0, 8);
+    if (!upcoming.length) {
+      var p = document.createElement('div'); p.className = 'empty'; p.textContent = 'Nothing planned this week.'; list.appendChild(p); return;
+    }
+    var lastDay = null;
+    upcoming.forEach(function (e) {
+      var s = new Date(e.starts_at);
+      // All-day events start at midnight in their own time zone; label by that date.
+      var label = e.all_day ? dayLabel(new Date(s.toLocaleString('en-US', { timeZone: e.timezone || tz }))) : dayLabel(s);
+      if (Date.parse(e.starts_at) < now) label = 'Today';
+      if (label !== lastDay) {
+        var d = document.createElement('div'); d.className = 'day'; d.textContent = label; list.appendChild(d); lastDay = label;
+      }
+      var row = document.createElement('div'); row.className = 'ev';
+      var t = document.createElement('span'); t.className = 't'; t.textContent = e.all_day ? 'All day' : hm(s);
+      var n = document.createElement('span'); n.className = 'n'; n.textContent = e.title;
+      row.appendChild(t); row.appendChild(n); list.appendChild(row);
+    });
+  }
+
+  function nextSlide() {
+    if (!photos.length) return;
+    idx = (idx + 1) % photos.length;
+    var p = photos[idx];
+    var slides = $('slides');
+    var el = document.createElement('div'); el.className = 'slide';
+    var bg = document.createElement('div'); bg.className = 'bg'; bg.style.backgroundImage = 'url("' + p.url + '")';
+    var ph = document.createElement('div'); ph.className = 'ph'; ph.style.backgroundImage = 'url("' + p.url + '")';
+    el.appendChild(bg); el.appendChild(ph);
+    var img = new Image();
+    img.onload = function () {
+      slides.appendChild(el);
+      requestAnimationFrame(function () { el.classList.add('on'); });
+      setTimeout(function () { while (slides.children.length > 1) slides.removeChild(slides.firstChild); }, 1800);
+      $('capText').textContent = p.caption || '';
+      $('capFrom').textContent = p.from ? 'from ' + p.from : '';
+    };
+    img.onerror = function () { setTimeout(nextSlide, 500); };
+    img.src = p.url;
+  }
+
+  async function feed() {
+    var token = store.get();
+    if (!token) return pair();
+    var r;
+    try { r = await call({ action: 'feed', token: token }); } catch (e) { return; }
+    if (r.status === 401) { store.set(null); clearInterval(slideTimer); clearInterval(feedTimer); return pair(); }
+    if (r.status !== 200) return;
+    var data = r.body;
+    $('calName').textContent = data.calendar.name;
+    var fresh = data.photos || [];
+    // Keep the slideshow going; newly sent photos are shown next.
+    var known = {}; photos.forEach(function (p) { known[p.id] = true; });
+    var added = fresh.filter(function (p) { return !known[p.id]; });
+    var ids = {}; fresh.forEach(function (p) { ids[p.id] = p; });
+    photos = photos.filter(function (p) { return ids[p.id]; }).map(function (p) { return ids[p.id]; });
+    if (added.length && photos.length) photos.splice(idx + 1, 0, ...added); else photos = photos.concat(added);
+    if (idx >= photos.length) idx = -1;
+    $('empty').hidden = photos.length > 0;
+    $('emptyText').textContent = 'Send photos to ' + data.calendar.name + ' from Dayli and they’ll appear here.';
+    renderPlans(data.events, data.frame.show_events);
+    if (!slideTimer) {
+      if (photos.length) { nextSlide(); slideTimer = setInterval(nextSlide, SLIDE_MS); }
+    } else if (added.length) {
+      // Show what just arrived straight away.
+      clearInterval(slideTimer); nextSlide(); slideTimer = setInterval(nextSlide, SLIDE_MS);
+    }
+  }
+
+  function show() {
+    $('pair').hidden = true; $('show').hidden = false;
+    photos = []; idx = -1; clearInterval(slideTimer); slideTimer = null; $('slides').textContent = '';
+    tick();
+    feed();
+    clearInterval(feedTimer);
+    feedTimer = setInterval(feed, 60000);
+  }
+
+  // Keep the screen awake and offer full screen.
+  var wakeLock = null;
+  function awake() { if ('wakeLock' in navigator && document.visibilityState === 'visible') navigator.wakeLock.request('screen').then(function (l) { wakeLock = l; }).catch(function () {}); }
+  document.addEventListener('visibilitychange', awake);
+  document.addEventListener('click', function () {
+    var el = document.documentElement;
+    if (!document.fullscreenElement && el.requestFullscreen) el.requestFullscreen().catch(function () {});
+    awake();
+  });
+  if (document.fullscreenEnabled) { $('hint').classList.add('on'); setTimeout(function () { $('hint').classList.remove('on'); }, 6000); }
+
+  setInterval(tick, 1000 * 15);
+  awake();
+  if (store.get()) show(); else pair();
+})();
+</script>
+</body>
+</html>
