@@ -372,22 +372,28 @@
         '">Create account</button></div>' +
         '<form class="card" id="auth-form" novalidate>' +
         '<label class="field"><span>Email</span><input type="email" name="email" autocomplete="email" required /></label>' +
+        '<div class="notice error" id="err" hidden></div>' +
+        '<button class="btn primary block" type="button" id="code">' +
+        (mode === 'create' ? 'Create account with an emailed code' : 'Email me a code to sign in') +
+        '</button>' +
+        '<div class="hint">We email a 6-digit code; no password needed. The same email as the Dayli app works here.</div>' +
+        '<div class="actions"><button type="button" class="linkish" id="use-password">' +
+        (mode === 'create' ? 'Set a password instead' : 'Sign in with a password instead') +
+        '</button></div>' +
+        '<div id="pw-block" hidden>' +
         '<label class="field"><span>Password</span><input type="password" name="password" autocomplete="' +
         (mode === 'create' ? 'new-password' : 'current-password') +
-        '" required minlength="8" />' +
+        '" minlength="8" />' +
         (mode === 'create' ? '<div class="hint">At least 8 characters.</div>' : '') +
         '</label>' +
-        '<div class="notice error" id="err" hidden></div>' +
-        '<button class="btn primary block" type="submit">' +
-        (mode === 'create' ? 'Create account' : 'Sign in') +
+        '<button class="btn block" type="submit">' +
+        (mode === 'create' ? 'Create account with this password' : 'Sign in with password') +
         '</button>' +
-        '<div class="actions" style="justify-content: space-between">' +
-        '<button type="button" class="linkish" id="code">Email me a code instead</button>' +
         (mode === 'signin'
-          ? '<button type="button" class="linkish" id="forgot">Forgot password?</button>'
+          ? '<div class="actions"><button type="button" class="linkish" id="forgot">Forgot password?</button></div>'
           : '') +
         '</div></form>' +
-        '<p class="muted small">Already use the Dayli app? The same email works here. The app signs in with an emailed code; this website also takes a password.</p>',
+        '<p class="muted small">Signed up in the Dayli app? You already have an account: just email yourself a code. You can add a password later from your profile.</p>',
       true,
     );
     $$('.tabs button').forEach(function (b) {
@@ -399,12 +405,18 @@
     });
     var form = $('#auth-form');
     var err = $('#err');
+    $('#use-password').onclick = function () {
+      var block = $('#pw-block');
+      block.hidden = !block.hidden;
+      if (!block.hidden) $('[name=password]').focus();
+    };
     form.onsubmit = function (e) {
       e.preventDefault();
       err.hidden = true;
       var address = $('[name=email]').value.trim();
       var password = $('[name=password]').value;
       if (!/^\S+@\S+\.\S+$/.test(address)) return showError(err, 'Enter your email address.');
+      if ($('#pw-block').hidden) return $('#code').click();
       if (mode === 'create' && password.length < 8)
         return showError(err, 'Use a password of at least 8 characters.');
       if (!password) return showError(err, 'Enter your password.');
@@ -416,21 +428,23 @@
           : sb.auth.signInWithPassword({ email: address, password: password });
       p.then(function (res) {
         setBusy(button, false);
+        var user = res.data && res.data.user;
+        var exists =
+          (res.error && mode === 'create' && /already|registered/i.test(res.error.message)) ||
+          (!res.error && mode === 'create' && user && user.identities && user.identities.length === 0);
+        if (exists) {
+          // They signed up in the app (an emailed code, no password): send a
+          // code and carry on, rather than turning them away.
+          return codeInstead(address, button, 'You already have a Dayli account. We’ve emailed you a code to sign in with.');
+        }
         if (res.error) {
-          if (mode === 'create' && /already|registered/i.test(res.error.message)) {
+          if (mode === 'signin' && /Invalid login credentials/i.test(res.error.message)) {
             return showError(
               err,
-              'There’s already a Dayli account for that email. Sign in with your password, or use “Email me a code instead”.',
+              'That email and password don’t match. If you signed up in the Dayli app you may not have a password yet: use “Email me a code to sign in”.',
             );
           }
           return showError(err, friendly(res.error));
-        }
-        var user = res.data && res.data.user;
-        if (mode === 'create' && user && user.identities && user.identities.length === 0) {
-          return showError(
-            err,
-            'There’s already a Dayli account for that email. Sign in with your password, or use “Email me a code instead”.',
-          );
         }
         if (!res.data || !res.data.session) {
           // Confirmation by email is on: the code route proves the address.
@@ -453,17 +467,14 @@
         showError(err, friendly(ex));
       });
     };
-    $('#code').onclick = function () {
-      err.hidden = true;
-      var address = $('[name=email]').value.trim();
-      if (!/^\S+@\S+\.\S+$/.test(address)) return showError(err, 'Enter your email address first.');
-      var button = $('#code');
+    function codeInstead(address, button, message) {
       setBusy(button, true, 'Sending…');
-      sendCode(address).then(
+      sendCode(address, mode === 'create').then(
         function () {
           setBusy(button, false);
           state.pendingEmail = address;
           state.codeSent = true;
+          if (message) toast(message);
           go('#/verify');
         },
         function (ex) {
@@ -471,11 +482,17 @@
           showError(
             err,
             /Signups not allowed|not found/i.test(ex.message || '')
-              ? 'We couldn’t find an account for that email. Create one first.'
+              ? 'We couldn’t find an account for that email. Switch to “Create account”.'
               : friendly(ex),
           );
         },
       );
+    }
+    $('#code').onclick = function () {
+      err.hidden = true;
+      var address = $('[name=email]').value.trim();
+      if (!/^\S+@\S+\.\S+$/.test(address)) return showError(err, 'Enter your email address first.');
+      codeInstead(address, $('#code'), null);
     };
     var forgot = $('#forgot');
     if (forgot) {
@@ -500,9 +517,9 @@
     }
   }
 
-  function sendCode(address) {
+  function sendCode(address, create) {
     return sb.auth
-      .signInWithOtp({ email: address, options: { shouldCreateUser: false } })
+      .signInWithOtp({ email: address, options: { shouldCreateUser: Boolean(create) } })
       .then(function (res) {
         if (res.error) throw res.error;
       });
