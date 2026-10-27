@@ -85,6 +85,12 @@
     html.js .reveal.in { opacity: 1; transform: none; }
     html.js .reveal.delay { transition-delay: 0.15s; }
 
+    .organisers { display: grid; gap: 28px; align-items: center; padding: 48px 0; border-top: 1px solid var(--border); border-bottom: 1px solid var(--border); }
+    @media (min-width: 860px) { .organisers { grid-template-columns: 0.9fr 1.1fr; gap: 56px; padding: 64px 0; } }
+    .organisers h2 { font-size: clamp(28px, 4vw, 38px); line-height: 1.1; margin: 0 0 12px; }
+    .organisers p { color: var(--muted); font-size: 18px; margin: 0 0 18px; }
+    .organisers .tag { display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--accent); margin-bottom: 10px; }
+    .wide img { width: 100%; height: auto; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 18px 40px rgba(28, 26, 23, 0.14); }
     .steps { padding: 56px 0; }
     .steps h2 { text-align: center; font-size: clamp(28px, 4vw, 38px); margin: 0 0 32px; }
     .grid3 { display: grid; gap: 16px; }
@@ -115,13 +121,13 @@
     <a class="brand" href="#"><img src="img/logo.svg" alt="" width="32" height="32" />Dayli</a>
     <nav>
       <a href="#features">Features</a>
+      <a href="#organisers">Organisers</a>
       <a href="support.html">Support</a>
       <a href="https://apps.apple.com/gb/app/dayli/id6767814466">App Store</a>
       <a href="https://play.google.com/store/apps/details?id=uk.co.dayli.app">Google Play</a>
     </nav>
     <div class="row" style="gap: 8px">
-      <a class="btn small" href="app/">Log in</a>
-      <a class="btn primary small" href="app/?signup=1">Sign up</a>
+      <a class="btn primary small" href="organisers/">Dayli for organisers</a>
     </div>
   </div>
 </header>
@@ -135,7 +141,7 @@
         <a class="store" href="https://apps.apple.com/gb/app/dayli/id6767814466" rel="noopener"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.47.83-.72 0-1.82-.81-2.99-.79-1.54.02-2.96.9-3.75 2.27-1.6 2.78-.41 6.89 1.15 9.14.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.23-.02 2.01-1.12 2.76-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.39-.92-2.4-3.66zM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.01.61-2.66 1.37-.58.67-1.09 1.75-.96 2.79 1.02.08 2.05-.52 2.68-1.27z"/></svg><span><small>Download on the</small>App Store</span></a>
         <a class="store" href="https://play.google.com/store/apps/details?id=uk.co.dayli.app" rel="noopener"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#34A853" d="M3.6 2.3 13.4 12l-9.8 9.7c-.2-.2-.3-.6-.3-1V3.3c0-.4.1-.8.3-1z"/><path fill="#FBBC04" d="m17.2 8.2 3.2 1.8c1 .6 1 1.5 0 2.1l-3.2 1.8L13.4 12z"/><path fill="#4285F4" d="M13.4 12 3.6 21.7c.4.4 1 .4 1.7 0l11.9-6.7z"/><path fill="#EA4335" d="M3.6 2.3c.4-.4 1-.4 1.7 0l11.9 6.7L13.4 12z"/></svg><span><small>Get it on</small>Google Play</span></a>
       </div>
-      <p class="fine">Free on iPhone and Android, and in your browser. No adverts, no tracking.</p>
+      <p class="fine">Free on iPhone and Android. No adverts, no tracking.</p>
     </div>
     <div class="stage">
       <div class="phone"><img src="img/month.webp" width="780" height="1688" alt="Dayli month view with a family's shared events" fetchpriority="high" /></div>
@@ -146,7 +152,7 @@
     </div>
   </section>
 
-  <div class="marquee" aria-hidden="true"><span>Shared calendars · Say it, it's in · Ask Dayli · Find a time · Date polls · Invitation pages · Photos after · Reminders · Weather on your day · Shared calendars · Say it, it's in · Ask Dayli · Find a time · Date polls · Invitation pages · Photos after · Reminders · Weather on your day ·</span></div>
+  <div class="marquee" aria-hidden="true"><span>Shared calendars · Say it, it's in · Memories · Events near you · Ask Dayli · Find a time · Date polls · Invitation pages · Photo frames · Weather on your day · Shared calendars · Say it, it's in · Memories · Events near you · Ask Dayli · Find a time · Date polls · Invitation pages · Photo frames · Weather on your day ·</span></div>
 
   <section class="features" id="features">
     <div class="feature">
@@ -155,53 +161,94 @@
         <h2 class="serif">Everyone sees the same plans.</h2>
         <p>One calendar per household or group. Colours per person, a merged view across all your calendars, and changes appear on everyone's phone the moment they're made.</p>
       </div>
-      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/month.webp" width="780" height="1688" alt="Month view" /></div></div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/month.webp" width="780" height="1688" alt="Month view with a family's shared calendar entries and the Memories row" /></div></div>
     </div>
 
     <div class="feature flip">
+      <div class="text reveal">
+        <span class="tag">Memories</span>
+        <h2 class="serif">Share the day's memories.</h2>
+        <p>Snap a photo in the app and it sits at the top of your friends' calendars for 24 hours, then stays on that day for everyone in the calendar, and on your photo frame.</p>
+      </div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/memory.webp" width="780" height="1688" alt="A memory from Sam, a walk in the woods, with a heart to send" /></div></div>
+    </div>
+
+    <div class="feature">
       <div class="text reveal">
         <span class="tag">Your day</span>
         <h2 class="serif">A brief, not a list.</h2>
-        <p>Tap a day and Dayli tells you what matters: who's waiting on an answer, what clashes, what the weather's doing. Then the timeline, with a line for right now.</p>
+        <p>Tap a day and Dayli tells you what matters: who's waiting on an answer, what clashes, what the weather's doing. Then the timeline, and the photos from that day.</p>
       </div>
-      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/day.webp" width="780" height="1688" alt="Day view with a Today brief and the weather" /></div></div>
-    </div>
-
-    <div class="feature">
-      <div class="text reveal">
-        <span class="tag">Ask Dayli</span>
-        <h2 class="serif">Just say it.</h2>
-        <p>"Dinner with Sam Thursday at 7" becomes an event. "What's on tomorrow?", "When am I free this week?", "Move gym to 8" all work too, typed or spoken, in plain English.</p>
-      </div>
-      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/ask.webp" width="780" height="1688" alt="Ask Dayli answering what is on tomorrow" /></div></div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/day.webp" width="780" height="1688" alt="Day view with a Today brief and the photos on that day" /></div></div>
     </div>
 
     <div class="feature flip">
       <div class="text reveal">
-        <span class="tag">Find a time</span>
-        <h2 class="serif">Skip the group chat.</h2>
-        <p>"90 minutes with Jo and Priya on Tuesday or Thursday evenings" and Dayli lists the slots that work for everyone. Friends only ever share busy or free, never what they're doing.</p>
+        <span class="tag">Ask Dayli</span>
+        <h2 class="serif">Just ask.</h2>
+        <p>"When are Sam and I both free for dinner next week?" and Dayli finds the evening that works, then invites them. "What's on tomorrow?" and "Move gym to 8" work too, typed or spoken.</p>
       </div>
-      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/findtime.webp" width="780" height="1688" alt="Find a time results" /></div></div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/ask.webp" width="780" height="1688" alt="Ask Dayli finding a dinner slot that suits everyone" /></div></div>
     </div>
 
     <div class="feature">
+      <div class="text reveal">
+        <span class="tag">Say it, it's in</span>
+        <h2 class="serif">Type it once.</h2>
+        <p>"Archery every Tuesday at 6pm and football every Saturday at 10am" becomes two repeating calendar entries. Photograph a letter or a poster and the dates come out of it.</p>
+      </div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/smartadd.webp" width="780" height="1688" alt="Smart add making two repeating entries from one sentence" /></div></div>
+    </div>
+
+    <div class="feature flip">
+      <div class="text reveal">
+        <span class="tag">Events near you</span>
+        <h2 class="serif">Find something to do.</h2>
+        <p>Gigs, classes, markets and quiz nights near you, from organisers who list on Dayli. Filter by when, what, price and distance, or by when you're free. Tap I'm going and it's in your calendar with the ticket link.</p>
+      </div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/events.webp" width="780" height="1688" alt="Discover: public events near Hackney with filters" /></div></div>
+    </div>
+
+    <div class="feature">
+      <div class="text reveal">
+        <span class="tag">Friends going</span>
+        <h2 class="serif">See who else is up for it.</h2>
+        <p>Every event shows which of your friends are going. Share it, add it to the family calendar, and get your tickets from the organiser's own page.</p>
+      </div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/public_event.webp" width="780" height="1688" alt="A public event with friends going and a Get tickets button" /></div></div>
+    </div>
+
+    <div class="feature flip">
       <div class="text reveal">
         <span class="tag">The big ones</span>
         <h2 class="serif">Plan it properly.</h2>
-        <p>Give an event an invitation page with a cover photo, a link, a to-do list and a count-down. Invite people who aren't on Dayli with a link. Add the photos afterwards.</p>
+        <p>Give an event an invitation page with a cover photo, the details and a guest list. Invite people who aren't on Dayli with a link. Add the photos afterwards.</p>
       </div>
-      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/event.webp" width="780" height="1688" alt="An invitation page with details and a to-do list" /></div></div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/event.webp" width="780" height="1688" alt="An invitation page with Going, Maybe and Can't go" /></div></div>
     </div>
 
-    <div class="feature flip">
+    <div class="feature">
       <div class="text reveal">
         <span class="tag">Date polls</span>
         <h2 class="serif">Pick a date together.</h2>
         <p>Offer a few dates, everyone taps yes, no or maybe, and when you close the poll the event is made and everyone is invited.</p>
       </div>
-      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/poll.webp" width="780" height="1688" alt="A date poll with answers" /></div></div>
+      <div class="shot reveal delay"><div class="phone"><img loading="lazy" src="img/poll.webp" width="780" height="1688" alt="A date poll with everyone's answers" /></div></div>
     </div>
+
+  </section>
+
+  <section class="organisers" id="organisers">
+    <div class="text reveal">
+      <span class="tag">Dayli for organisers</span>
+      <h2 class="serif">List your events where people keep their plans.</h2>
+      <p>Pubs, clubs, classes, markets, venues: list an event free on the organiser site and people nearby find it in Dayli. When someone taps I'm going it lands in their calendar, and their friends see they're going. You see views, going and interested as they happen. Tickets link to wherever you sell them.</p>
+      <div class="row" style="gap: 12px; flex-wrap: wrap">
+        <a class="btn primary" href="organisers/">Dayli for organisers</a>
+        <a class="btn" href="organisers/#/create-account">Create an organiser account</a>
+      </div>
+    </div>
+    <div class="wide reveal delay"><img loading="lazy" src="img/organisers.webp" width="1200" height="863" alt="The organiser dashboard: views over 30 days, where they came from and who is going" /></div>
   </section>
 
   <section class="steps">
@@ -215,13 +262,13 @@
 
   <section class="cta reveal">
     <h2 class="serif">Try it with the people you plan with.</h2>
-    <p>Get Dayli for iPhone or Android, or open it in your browser.</p>
+    <p>Get Dayli for iPhone or Android.</p>
     <div class="stores centre">
         <a class="store" href="https://apps.apple.com/gb/app/dayli/id6767814466" rel="noopener"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="currentColor" d="M16.37 12.6c-.02-2.3 1.88-3.4 1.96-3.46-1.07-1.56-2.73-1.78-3.32-1.8-1.41-.14-2.76.83-3.47.83-.72 0-1.82-.81-2.99-.79-1.54.02-2.96.9-3.75 2.27-1.6 2.78-.41 6.89 1.15 9.14.76 1.1 1.67 2.34 2.86 2.3 1.15-.05 1.58-.74 2.97-.74 1.38 0 1.77.74 2.98.72 1.23-.02 2.01-1.12 2.76-2.23.87-1.28 1.23-2.52 1.25-2.58-.03-.01-2.39-.92-2.4-3.66zM14.1 5.86c.63-.77 1.06-1.83.94-2.89-.91.04-2.01.61-2.66 1.37-.58.67-1.09 1.75-.96 2.79 1.02.08 2.05-.52 2.68-1.27z"/></svg><span><small>Download on the</small>App Store</span></a>
         <a class="store" href="https://play.google.com/store/apps/details?id=uk.co.dayli.app" rel="noopener"><svg viewBox="0 0 24 24" width="20" height="20" aria-hidden="true"><path fill="#34A853" d="M3.6 2.3 13.4 12l-9.8 9.7c-.2-.2-.3-.6-.3-1V3.3c0-.4.1-.8.3-1z"/><path fill="#FBBC04" d="m17.2 8.2 3.2 1.8c1 .6 1 1.5 0 2.1l-3.2 1.8L13.4 12z"/><path fill="#4285F4" d="M13.4 12 3.6 21.7c.4.4 1 .4 1.7 0l11.9-6.7z"/><path fill="#EA4335" d="M3.6 2.3c.4-.4 1-.4 1.7 0l11.9 6.7L13.4 12z"/></svg><span><small>Get it on</small>Google Play</span></a>
       </div>
     <div class="row" style="justify-content: center">
-      <a class="btn" href="app/">Open Dayli on the web</a>
+      <a class="btn" href="organisers/">Dayli for organisers</a>
     </div>
   </section>
 
