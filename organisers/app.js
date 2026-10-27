@@ -1,14 +1,18 @@
 /* Dayli for organisers: a small single-page app in plain browser JavaScript.
- * Routes live in the hash (#/events, #/events/new, #/events/<id>, …). Data
- * comes from the Supabase project in ../config.js through supabase-js
- * (vendor/supabase.js) and the RPCs in
- * supabase/migrations/20261027000100_public_events.sql. */
+ * Routes live in the hash (#/overview, #/events, #/events/new, #/events/<id>,
+ * #/analytics/<id>?tab=…, #/profile). Data comes from the Supabase project in
+ * ../config.js through supabase-js (vendor/supabase.js) and the RPCs in
+ * supabase/migrations/20261027000100_public_events.sql and
+ * 20261028000100_organiser_analytics.sql. The Overview and Analytics screens
+ * live in analytics.js. */
 (function () {
   'use strict';
 
   var cfg = window.DAYLI_CONFIG || {};
   var app = document.getElementById('app');
-  var nav = document.getElementById('nav');
+  var side = document.getElementById('side');
+  var topbar = document.getElementById('topbar');
+  var tabsNav = document.getElementById('tabs-nav');
   var SITE = 'https://daylicalendar.co.uk';
   var APP_NOTE_KEY = 'dayli_organisers_app_note_seen';
 
@@ -29,6 +33,7 @@
     codeSent: false,
     recovery: false,
     events: null,
+    overview: null,
     afterVerify: null,
   };
 
@@ -301,21 +306,67 @@
   function homeHash() {
     if (!state.organiser) return '#/profile';
     if (!isVerified()) return '#/verify';
-    return '#/events';
+    return '#/overview';
   }
+
+  // The sidebar (wide screens) or top bar + tabs (narrow) show once signed in.
+  var menuOpen = false;
+  function setShell(signedIn, current) {
+    document.body.classList.toggle('auth', !signedIn);
+    side.hidden = !signedIn;
+    topbar.hidden = !signedIn;
+    tabsNav.hidden = !signedIn;
+    var links = Array.prototype.slice.call(document.querySelectorAll('a[data-route]'));
+    links.forEach(function (a) {
+      a.classList.toggle('on', a.dataset.route === current);
+    });
+    var account = document.getElementById('account');
+    if (signedIn && account) {
+      account.innerHTML =
+        '<b>' +
+        esc(state.organiser ? state.organiser.name : 'New organiser') +
+        '</b><span>' +
+        esc(email() || '') +
+        (state.organiser ? (isVerified() ? ' · verified' : ' · not confirmed') : '') +
+        '</span>';
+    }
+    closeMenu();
+  }
+  function closeMenu() {
+    menuOpen = false;
+    var sheet = document.getElementById('menu-sheet');
+    if (sheet) sheet.remove();
+    document.getElementById('menu').setAttribute('aria-expanded', 'false');
+  }
+  document.getElementById('menu').onclick = function () {
+    if (menuOpen) return closeMenu();
+    menuOpen = true;
+    this.setAttribute('aria-expanded', 'true');
+    var sheet = document.createElement('div');
+    sheet.className = 'menu-sheet';
+    sheet.id = 'menu-sheet';
+    sheet.innerHTML =
+      '<a href="#/overview">Overview</a><a href="#/events">Events</a><a href="#/analytics">Analytics</a><a href="#/profile">Profile</a>' +
+      '<a href="#/events/new">+ New event</a><button type="button" class="linkish" id="menu-sign-out" style="padding: 12px">Sign out</button>';
+    document.body.appendChild(sheet);
+    document.getElementById('menu-sign-out').onclick = signOut;
+  };
 
   // --- router ----------------------------------------------------------------
 
   function route() {
     if (!state.ready) return;
     var hash = location.hash.replace(/^#/, '');
-    if (hash.charAt(0) !== '/') hash = '/events';
+    if (hash.charAt(0) !== '/') hash = '/overview';
     var parts = hash.split('?')[0].split('/').filter(Boolean);
-    var signedIn = !!state.session;
-    nav.hidden = !signedIn;
-    $$('a[data-route]', nav).forEach(function (a) {
-      a.classList.toggle('on', a.dataset.route === parts[0]);
+    var query = {};
+    (hash.split('?')[1] || '').split('&').forEach(function (kv) {
+      if (!kv) return;
+      var i = kv.indexOf('=');
+      query[decodeURIComponent(i < 0 ? kv : kv.slice(0, i))] = decodeURIComponent(i < 0 ? '' : kv.slice(i + 1));
     });
+    var signedIn = !!state.session;
+    setShell(signedIn && state.organiser !== undefined, parts[0]);
 
     if (parts[0] === 'reset') return screenReset();
     if (!signedIn) {
@@ -348,16 +399,48 @@
         return screenVerify();
       case 'profile':
         return screenProfile();
+      case 'overview':
+        if (!state.organiser) return screenProfile(true);
+        setShell(true, 'overview');
+        return analytics.screenOverview();
+      case 'analytics':
+        if (!state.organiser) return screenProfile(true);
+        setShell(true, 'analytics');
+        return analytics.screenAnalytics(parts[1] || null, query.tab, query.days);
       case 'events':
         if (!state.organiser) return screenProfile(true);
-        if (parts[1] === 'new') return screenForm(null);
-        if (parts[1] && parts[2] === 'stats') return screenStats(parts[1]);
+        setShell(true, 'events');
+        if (parts[1] === 'new') return screenForm(null, query.from || null);
+        if (parts[1] && parts[2] === 'stats') return go('#/analytics/' + parts[1]);
         if (parts[1]) return screenForm(parts[1]);
         return screenEvents();
       default:
-        return go('#/events');
+        return go('#/overview');
     }
   }
+
+  var analytics = window.DayliAnalytics({
+    esc: esc,
+    $: $,
+    $$: $$,
+    rpc: rpc,
+    render: render,
+    loading: loading,
+    notice: notice,
+    toast: toast,
+    go: go,
+    friendly: friendly,
+    state: state,
+    SITE: SITE,
+    setBusy: setBusy,
+    copyText: copyText,
+    isVerified: isVerified,
+    fmtWhen: fmtWhen,
+    statusBadge: statusBadge,
+    categoryLabel: categoryLabel,
+    isoToZoned: isoToZoned,
+    safeTz: safeTz,
+  });
 
   // --- sign in / create account --------------------------------------------
 
@@ -459,7 +542,7 @@
             go(homeHash());
           },
           function () {
-            go('#/events');
+            go('#/overview');
           },
         );
       }).catch(function (ex) {
@@ -548,7 +631,7 @@
         '<button class="btn primary block" type="submit">Confirm</button>' +
         '<div class="actions" style="justify-content: space-between">' +
         '<button type="button" class="linkish" id="resend">Send a new code</button>' +
-        (state.session ? '<a href="#/events">Later</a>' : '<a href="#/sign-in">Back</a>') +
+        (state.session ? '<a href="#/overview">Later</a>' : '<a href="#/sign-in">Back</a>') +
         '</div></form></div>' +
         (isVerified() ? notice('info', 'Your email is already confirmed.') : ''),
       true,
@@ -608,7 +691,8 @@
             return go('#/profile');
           }
           toast(isVerified() ? 'Email confirmed. You can publish events.' : 'Signed in.');
-          go('#/events');
+          go(state.afterVerify || '#/overview');
+          state.afterVerify = null;
         })
         .catch(function (ex) {
           setBusy(button, false);
@@ -671,51 +755,98 @@
   function screenProfile(forced) {
     var o = state.organiser || {};
     var first = !state.organiser;
-    render(
-      '<h1>' +
-        (first ? 'Tell people who you are' : 'Your organiser profile') +
-        '</h1>' +
-        '<p class="muted">' +
-        (first
-          ? 'This shows on every event you list. You can change it any time.'
-          : 'Shown on every event you list.') +
-        '</p>' +
-        (forced ? notice('info', 'Set up your profile to start listing events.') : '') +
-        '<form class="card" id="profile-form" novalidate>' +
-        '<label class="field"><span>Name (your name, venue or group)</span><input type="text" name="name" maxlength="80" required value="' +
-        esc(o.name) +
-        '" /></label>' +
-        '<label class="field"><span>A few words about you (optional)</span><textarea name="bio" maxlength="1000">' +
-        esc(o.bio) +
-        '</textarea></label>' +
-        '<div class="two">' +
-        '<label class="field"><span>Website (optional)</span><input type="url" name="website" maxlength="200" placeholder="https://" value="' +
-        esc(o.website) +
-        '" /></label>' +
-        '<label class="field"><span>Instagram (optional)</span><input type="text" name="instagram" maxlength="60" placeholder="@yourname" value="' +
-        esc(o.instagram) +
-        '" /></label></div>' +
-        '<div class="notice error" id="err" hidden></div>' +
-        '<button class="btn primary" type="submit">' +
-        (first ? 'Save and continue' : 'Save') +
-        '</button></form>' +
-        '<div class="card"><h3>Your account</h3>' +
+    var initials = (o.name || email() || '?')
+      .split(/\s+/)
+      .map(function (w) {
+        return w.charAt(0);
+      })
+      .join('')
+      .slice(0, 2)
+      .toUpperCase();
+    var steps = first
+      ? '<div class="steps"><b>1</b><span>Who you are</span><em></em><b class="off">2</b><span class="off">Confirm email</span><em></em><b class="off">3</b><span class="off">First event</span></div>'
+      : '';
+    var form =
+      '<form class="card" id="profile-form" novalidate>' +
+      (first ? '<h2>Tell people who you are</h2><p class="muted small">This shows on every event you list, in the app and on its public page. You can change it any time.</p>' : '') +
+      '<div class="row" style="margin-bottom: 14px"><span class="avatar" id="avatar">' +
+      esc(initials) +
+      '</span><div class="muted small">Your initials stand in for a logo for now.</div></div>' +
+      '<label class="field"><span>Organiser name (you, your venue or your group)</span><input type="text" name="name" maxlength="80" required value="' +
+      esc(o.name) +
+      '" /></label>' +
+      '<label class="field"><span>About (optional)</span><textarea name="bio" maxlength="1000" placeholder="Stand-up nights in East London pubs since 2019.">' +
+      esc(o.bio) +
+      '</textarea></label>' +
+      '<div class="two">' +
+      '<label class="field"><span>Website (optional)</span><input type="url" name="website" maxlength="200" placeholder="https://" value="' +
+      esc(o.website) +
+      '" /></label>' +
+      '<label class="field"><span>Instagram (optional)</span><input type="text" name="instagram" maxlength="60" placeholder="@yourname" value="' +
+      esc(o.instagram) +
+      '" /></label></div>' +
+      '<div class="notice error" id="err" hidden></div>' +
+      '<div class="row between"><button class="btn primary" type="submit">' +
+      (first ? 'Continue' : 'Save') +
+      '</button></div></form>';
+    var preview =
+      '<div class="label" style="margin-bottom: 8px">How you’ll appear</div>' +
+      '<div class="card"><div class="row"><span class="avatar" id="pv-avatar" style="width: 44px; height: 44px; font-size: 16px">' +
+      esc(initials) +
+      '</span><div class="grow"><b id="pv-name">' +
+      esc(o.name || 'Your name') +
+      '</b><div class="muted small" id="pv-bio">' +
+      esc(o.bio || 'A few words about you.') +
+      '</div></div></div><div class="muted small" style="margin-top: 10px">Shown on every event you list.</div></div>';
+    var account = first
+      ? ''
+      : '<div class="card"><h3>Your account</h3>' +
         '<p class="muted small">Signed in as <b>' +
         esc(email()) +
         '</b>. Email ' +
-        (isVerified()
-          ? 'confirmed.'
-          : 'not confirmed yet: <a href="#/verify">confirm it</a> before publishing.') +
+        (isVerified() ? 'confirmed.' : 'not confirmed yet: <a href="#/verify">confirm it</a> before publishing.') +
         '</p>' +
-        '<p class="muted small">The same email works in the Dayli app, where your events show under Events → Hosting. The app signs in with an emailed code, not this password.</p>' +
+        '<label class="switch"><input type="checkbox" id="alerts"' +
+        (o.alerts === false ? '' : ' checked') +
+        ' /> Push me when an event reaches 10, 25, 50, 100 going, and a summary the day after each event.</label>' +
+        '<p class="muted small" style="margin-top: 10px">The same email works in the Dayli app, where your events show under Events → Hosting. The app signs in with an emailed code.</p>' +
         '<details><summary class="small">Change password</summary>' +
         '<form id="pw-form" novalidate style="margin-top: 10px">' +
         '<label class="field"><span>New password</span><input type="password" name="password" autocomplete="new-password" minlength="8" /></label>' +
         '<div class="notice error" id="pw-err" hidden></div>' +
-        '<button class="btn small" type="submit">Save password</button></form></details></div>',
-      true,
+        '<button class="btn small" type="submit">Save password</button></form></details></div>';
+    render(
+      '<div class="page-head"><div><div class="label">Profile</div><h1>' +
+        (first ? 'Welcome to Dayli' : 'Your organiser profile') +
+        '</h1></div></div>' +
+        (forced ? notice('info', 'Set up your profile to start listing events.') : '') +
+        steps +
+        '<div class="form-cols"><div>' +
+        form +
+        account +
+        '</div><div>' +
+        preview +
+        '</div></div>',
     );
     var err = $('#err');
+    function syncPreview() {
+      var name = $('[name=name]').value.trim();
+      var bio = $('[name=bio]').value.trim();
+      var ini = (name || '?')
+        .split(/\s+/)
+        .map(function (w) {
+          return w.charAt(0);
+        })
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
+      $('#pv-name').textContent = name || 'Your name';
+      $('#pv-bio').textContent = bio || 'A few words about you.';
+      $('#pv-avatar').textContent = ini;
+      $('#avatar').textContent = ini;
+    }
+    $('[name=name]').oninput = syncPreview;
+    $('[name=bio]').oninput = syncPreview;
     $('#profile-form').onsubmit = function (e) {
       e.preventDefault();
       err.hidden = true;
@@ -734,35 +865,56 @@
         .then(function (row) {
           setBusy(button, false);
           state.organiser = row || state.organiser || { name: name };
+          state.overview = null;
           toast('Profile saved.');
-          if (first) go(isVerified() ? '#/events' : '#/verify');
+          if (first) {
+            if (isVerified()) return go('#/events/new');
+            state.afterVerify = '#/events/new';
+            go('#/verify');
+          }
         })
         .catch(function (ex) {
           setBusy(button, false);
           showError(err, friendly(ex));
         });
     };
-    $('#pw-form').onsubmit = function (e) {
-      e.preventDefault();
-      var pwErr = $('#pw-err');
-      pwErr.hidden = true;
-      var password = $('#pw-form [name=password]').value;
-      if (password.length < 8) return showError(pwErr, 'Use a password of at least 8 characters.');
-      var button = $('button[type=submit]', $('#pw-form'));
-      setBusy(button, true, 'Saving…');
-      sb.auth
-        .updateUser({ password: password })
-        .then(function (res) {
-          setBusy(button, false);
-          if (res.error) return showError(pwErr, friendly(res.error));
-          $('#pw-form [name=password]').value = '';
-          toast('Password saved.');
-        })
-        .catch(function (ex) {
-          setBusy(button, false);
-          showError(pwErr, friendly(ex));
-        });
-    };
+    var alerts = $('#alerts');
+    if (alerts) {
+      alerts.onchange = function () {
+        rpc('organiser_set_alerts', { p_on: alerts.checked })
+          .then(function (on) {
+            if (state.organiser) state.organiser.alerts = on;
+            toast(on ? 'Alerts on.' : 'Alerts off.');
+          })
+          .catch(function (ex) {
+            alert(friendly(ex));
+          });
+      };
+    }
+    var pw = $('#pw-form');
+    if (pw) {
+      pw.onsubmit = function (e) {
+        e.preventDefault();
+        var pwErr = $('#pw-err');
+        pwErr.hidden = true;
+        var password = $('#pw-form [name=password]').value;
+        if (password.length < 8) return showError(pwErr, 'Use a password of at least 8 characters.');
+        var button = $('button[type=submit]', pw);
+        setBusy(button, true, 'Saving…');
+        sb.auth
+          .updateUser({ password: password })
+          .then(function (res) {
+            setBusy(button, false);
+            if (res.error) return showError(pwErr, friendly(res.error));
+            $('#pw-form [name=password]').value = '';
+            toast('Password saved.');
+          })
+          .catch(function (ex) {
+            setBusy(button, false);
+            showError(pwErr, friendly(ex));
+          });
+      };
+    }
   }
 
   // --- events list -----------------------------------------------------------
@@ -812,9 +964,9 @@
           'Drafts are fine, but to publish you need to <a href="#/verify">confirm your email</a> first.',
         );
     var html =
-      '<div class="page-head"><div><h1>Your events</h1><p class="muted">' +
+      '<div class="page-head"><div><div class="label">Events</div><h1>Your events</h1><p class="muted">' +
       (state.organiser ? 'Listed as <b>' + esc(state.organiser.name) + '</b>.' : '') +
-      '</p></div><a class="btn primary" href="#/events/new">New event</a></div>' +
+      '</p></div><a class="btn primary" href="#/events/new">+ New event</a></div>' +
       appNote +
       verifyNote;
     if (!rows.length) {
@@ -868,9 +1020,12 @@
         '<a class="btn small" href="#/events/' +
         esc(ev.id) +
         '">Edit</a>' +
-        '<a class="btn small" href="#/events/' +
+        '<a class="btn small" href="#/analytics/' +
         esc(ev.id) +
-        '/stats">Stats</a>' +
+        '">Analytics</a>' +
+        (past && ev.status !== 'draft'
+          ? '<a class="btn small" href="#/events/new?from=' + esc(ev.id) + '">Run it again</a>'
+          : '') +
         (ev.status === 'draft'
           ? '<button type="button" class="btn small primary" data-act="published">Publish</button>'
           : '') +
@@ -943,6 +1098,7 @@
     setBusy(button, true);
     rpc('public_event_set_status', { p_id: ev.id, p_status: status })
       .then(function () {
+        state.overview = null;
         toast(
           status === 'published'
             ? 'Published. People can find it now.'
@@ -977,6 +1133,7 @@
     setBusy(button, true);
     rpc('public_event_delete', { p_id: ev.id })
       .then(function () {
+        state.overview = null;
         toast('Deleted.');
         screenEvents();
       })
@@ -1006,15 +1163,24 @@
       .join('');
   }
 
-  function screenForm(id) {
-    if (!id) return renderForm(null);
+  function screenForm(id, from) {
+    if (!id && !from) return renderForm(null);
     loading();
     sb.from('public_events')
       .select('*')
-      .eq('id', id)
+      .eq('id', id || from)
       .maybeSingle()
       .then(function (res) {
         if (res.error) throw res.error;
+        if (res.data && from) {
+          // Run it again: the same event with no date, as a new draft.
+          var copy = Object.assign({}, res.data);
+          delete copy.id;
+          copy.status = 'draft';
+          copy.starts_at = null;
+          copy.ends_at = null;
+          return renderForm(copy, true);
+        }
         if (!res.data) {
           render(
             '<h1>Edit event</h1>' +
@@ -1034,24 +1200,42 @@
       });
   }
 
-  function renderForm(ev) {
-    var editing = !!ev;
+  function renderForm(ev, copying) {
+    var editing = !!ev && !copying;
     ev = ev || {};
     var tz = safeTz(ev.timezone || 'Europe/London');
     var starts = isoToZoned(ev.starts_at, tz);
     var ends = isoToZoned(ev.ends_at, tz);
     var pounds = ev.price_from_pence != null ? (ev.price_from_pence / 100).toFixed(2) : '';
+    var preview =
+      '<div class="label" style="margin-bottom: 8px">How it looks in the app</div>' +
+      '<div class="preview-card"><div class="preview-cover" id="pv-cover"' +
+      (ev.cover_image_path ? ' style="background-image: url(&quot;' + esc(coverUrl(ev.cover_image_path)) + '&quot;)"' : '') +
+      '>' +
+      (ev.cover_image_path ? '' : '<span id="pv-initial">' + esc((ev.title || 'E').trim().charAt(0).toUpperCase()) + '</span>') +
+      '<span class="tag" id="pv-price">' +
+      esc(fmtPrice({ is_free: ev.is_free !== false, price_from_pence: ev.price_from_pence, currency: ev.currency || 'GBP' })) +
+      '</span></div>' +
+      '<div class="preview-body"><div class="preview-kicker" id="pv-kicker"></div><div class="preview-title" id="pv-title">' +
+      esc(ev.title || 'Your event title') +
+      '</div><div class="muted small" id="pv-place">📍 ' +
+      esc(ev.venue_name || 'Venue') +
+      '</div><div class="muted small">by ' +
+      esc(state.organiser ? state.organiser.name : 'you') +
+      '</div></div></div>' +
+      '<div class="card" style="margin-top: 12px"><b class="small">Ready to publish?</b><ul class="checklist" id="checklist"></ul></div>';
     render(
-      '<div class="page-head"><h1>' +
-        (editing ? 'Edit event' : 'New event') +
-        '</h1><a class="btn small" href="#/events">Back</a></div>' +
+      '<div class="page-head"><div><div class="label">Events</div><h1>' +
+        (editing ? 'Edit event' : copying ? 'Run it again' : 'New event') +
+        '</h1></div><a class="btn small" href="#/events">Back</a></div>' +
         (editing && ev.status === 'published'
           ? notice(
               'info',
               'This event is live. If you change the time or place, everyone going will be told.',
             )
           : '') +
-        '<form id="event-form" novalidate>' +
+        (copying ? notice('info', 'Everything but the date is copied from the last one. Set when it is and save.') : '') +
+        '<div class="form-cols"><form id="event-form" novalidate>' +
         '<section class="card"><h2>What</h2>' +
         '<label class="field"><span>Title</span><input type="text" name="title" maxlength="120" required value="' +
         esc(ev.title) +
@@ -1147,12 +1331,64 @@
         '<div class="form-foot"><button class="btn primary" type="submit">' +
         (editing ? 'Save changes' : 'Save as draft') +
         '</button><a class="btn" href="#/events">Cancel</a></div>' +
-        '</form>',
+        '</form><div>' +
+        preview +
+        '</div></div>',
     );
     var form = $('#event-form');
     var err = $('#err');
     var coverFile = null;
     var endsTouched = !!ev.ends_at;
+
+    // The preview and the checklist follow the form as it is typed.
+    function syncPreview() {
+      var title = $('[name=title]').value.trim();
+      var venue = $('[name=venue_name]').value.trim();
+      var isFree = $('[name=is_free]').checked;
+      var amount = parseFloat($('[name=price]').value);
+      var age = $('[name=min_age]').value.trim();
+      var tzNow = $('[name=timezone]').value;
+      var iso = zonedToIso($('[name=starts_date]').value, $('[name=starts_time]').value, tzNow);
+      $('#pv-title').textContent = title || 'Your event title';
+      $('#pv-place').textContent = '📍 ' + (venue || 'Venue');
+      var ini = $('#pv-initial');
+      if (ini) ini.textContent = (title || 'E').trim().charAt(0).toUpperCase();
+      $('#pv-price').textContent = fmtPrice({
+        is_free: isFree || isNaN(amount),
+        price_from_pence: isNaN(amount) ? null : Math.round(amount * 100),
+        currency: $('[name=currency]').value || 'GBP',
+      });
+      var when = iso ? new Date(iso) : null;
+      var kicker = [];
+      if (when && !isNaN(when.getTime())) {
+        var parts = isoToZoned(iso, tzNow);
+        kicker.push(
+          when.toLocaleDateString('en-GB', { weekday: 'short', timeZone: safeTz(tzNow) }).toUpperCase() + ' · ' + parts.time,
+        );
+      }
+      kicker.push(categoryLabel($('[name=category]').value).toUpperCase());
+      if (age) kicker.push(age + '+');
+      $('#pv-kicker').textContent = kicker.join(' · ');
+      var hasPlace = $('[name=lat]').value !== '' && $('[name=lon]').value !== '';
+      var future = when && when.getTime() > Date.now();
+      var cover = !!(coverFile || $('[name=cover_image_path]').value);
+      var ticket = $('[name=ticket_url]').value.trim();
+      var items = [
+        [!!title, title ? 'Has a title' : 'Needs a title'],
+        [hasPlace, hasPlace ? 'Venue found on the map' : 'Find the venue on the map'],
+        [!!future, future ? 'In the future' : 'Needs a date to come'],
+        [isVerified(), isVerified() ? 'Email confirmed' : 'Confirm your email'],
+        [cover, cover ? 'Has a cover photo' : 'A cover photo gets more taps'],
+        [isFree || !!ticket, isFree ? 'Free to attend' : ticket ? 'Ticket link added' : 'Add the ticket link'],
+      ];
+      $('#checklist').innerHTML = items
+        .map(function (it) {
+          return '<li class="' + (it[0] ? 'done' : '') + '">' + esc(it[1]) + '</li>';
+        })
+        .join('');
+    }
+    form.oninput = syncPreview;
+    form.onchange = syncPreview;
 
     // End follows the start by two hours until someone changes it by hand.
     function syncEnd() {
@@ -1187,15 +1423,24 @@
         return;
       }
       coverFile = file;
-      $('#cover-preview').style.backgroundImage = 'url("' + URL.createObjectURL(file) + '")';
+      var url = 'url("' + URL.createObjectURL(file) + '")';
+      $('#cover-preview').style.backgroundImage = url;
+      $('#pv-cover').style.backgroundImage = url;
+      var ini = $('#pv-initial');
+      if (ini) ini.hidden = true;
       $('#cover-remove').hidden = false;
+      syncPreview();
     };
     $('#cover-remove').onclick = function () {
       coverFile = null;
       $('[name=cover]').value = '';
       $('[name=cover_image_path]').value = '';
       $('#cover-preview').style.backgroundImage = '';
+      $('#pv-cover').style.backgroundImage = '';
+      var ini = $('#pv-initial');
+      if (ini) ini.hidden = false;
       this.hidden = true;
+      syncPreview();
     };
     function updateGeoCheck() {
       var lat = parseFloat($('[name=lat]').value);
@@ -1214,6 +1459,7 @@
     }
     $('[name=lat]').oninput = $('[name=lon]').oninput = updateGeoCheck;
     updateGeoCheck();
+    syncPreview();
     $('#geocode').onclick = function () {
       var address = $('[name=address]').value.trim();
       var venue = $('[name=venue_name]').value.trim();
@@ -1237,6 +1483,7 @@
           $('[name=lon]').value = found.lon.toFixed(6);
           status.textContent = 'Found' + (found.label ? ': ' + found.label : '.');
           updateGeoCheck();
+          syncPreview();
         },
         function () {
           setBusy(button, false);
@@ -1342,6 +1589,7 @@
         .then(function (saved) {
           setBusy(button, false);
           state.events = null;
+          state.overview = null;
           if (editing) toast('Saved.');
           else if (saved && saved.lat != null)
             toast('Saved as a draft. Publish it when you’re ready.');
@@ -1440,169 +1688,17 @@
       });
   }
 
-  // --- stats -------------------------------------------------------------------
-
-  function screenStats(id) {
-    loading();
-    var meta = (state.events || []).filter(function (r) {
-      return r.id === id;
-    })[0];
-    var metaP = meta
-      ? Promise.resolve(meta)
-      : sb
-          .from('public_events')
-          .select('id, title, slug, status, timezone, starts_at, ends_at')
-          .eq('id', id)
-          .maybeSingle()
-          .then(function (res) {
-            if (res.error) throw res.error;
-            return res.data;
-          });
-    Promise.all([metaP, rpc('public_event_stats', { p_id: id })])
-      .then(function (results) {
-        var ev = results[0];
-        var stats = results[1];
-        if (!ev || !stats) {
-          render(
-            '<h1>Stats</h1>' +
-              notice('error', 'We couldn’t find that event.') +
-              '<a class="btn" href="#/events">Back to your events</a>',
-          );
-          return;
-        }
-        renderStats(ev, stats);
-      })
-      .catch(function (err) {
-        render(
-          '<h1>Stats</h1>' +
-            notice('error', esc(friendly(err))) +
-            '<a class="btn" href="#/events">Back to your events</a>',
-        );
-      });
-  }
-
-  function renderStats(ev, stats) {
-    var tz = safeTz(ev.timezone || 'Europe/London');
-    var byDay = {};
-    (stats.by_day || []).forEach(function (d) {
-      byDay[d.day] = Number(d.views) || 0;
-    });
-    var days = [];
-    var max = 0;
-    for (var i = 29; i >= 0; i--) {
-      var date = new Date(Date.now() - i * 86400000);
-      var key = isoToZoned(date.toISOString(), tz).date;
-      var n = byDay[key] || 0;
-      if (n > max) max = n;
-      days.push({ key: key, n: n, date: date });
-    }
-    var bars = days
-      .map(function (d) {
-        var h = max ? Math.max(d.n ? 3 : 0, Math.round((d.n / max) * 100)) : 0;
-        var label = d.date.toLocaleDateString('en-GB', {
-          weekday: 'short',
-          day: 'numeric',
-          month: 'short',
-          timeZone: tz,
-        });
-        return (
-          '<div class="bar" data-tip="' +
-          esc(label + ': ' + d.n + (d.n === 1 ? ' view' : ' views')) +
-          '"><i style="height: ' +
-          h +
-          '%"></i></div>'
-        );
-      })
-      .join('');
-    var sources = stats.by_source || {};
-    var sourceTotal = ['app', 'web', 'share'].reduce(function (sum, k) {
-      return sum + (Number(sources[k]) || 0);
-    }, 0);
-    var sourceLabels = { app: 'In the app', web: 'Website', share: 'Shared link' };
-    var sourceRows = ['app', 'web', 'share']
-      .map(function (k) {
-        var n = Number(sources[k]) || 0;
-        var pct = sourceTotal ? Math.round((n / sourceTotal) * 100) : 0;
-        return (
-          '<div class="source"><span>' +
-          sourceLabels[k] +
-          '</span><span class="track"><i style="width: ' +
-          pct +
-          '%"></i></span><span class="v">' +
-          n +
-          '</span></div>'
-        );
-      })
-      .join('');
-    var names = stats.going_names || [];
-    function tile(n, label) {
-      return (
-        '<div class="tile"><div class="n">' +
-        esc(n) +
-        '</div><div class="l">' +
-        label +
-        '</div></div>'
-      );
-    }
-    render(
-      '<div class="page-head"><div><h1>' +
-        esc(ev.title) +
-        '</h1><p class="muted">' +
-        esc(fmtWhen(ev.starts_at, ev.ends_at, ev.timezone)) +
-        ' · ' +
-        statusBadge(ev.status) +
-        '</p></div><a class="btn small" href="#/events">Back</a></div>' +
-        '<div class="tiles">' +
-        tile(stats.views || 0, 'Views') +
-        tile(stats.unique_viewers || 0, 'People who looked') +
-        tile(stats.going || 0, 'Going') +
-        tile(stats.interested || 0, 'Interested') +
-        tile(stats.calendar_adds || 0, 'Calendar adds') +
-        '</div>' +
-        '<div class="card"><h3>Views in the last 30 days</h3>' +
-        (max
-          ? '<div class="chart" role="img" aria-label="Views by day">' +
-            bars +
-            '</div><div class="chart-axis"><span>' +
-            esc(
-              days[0].date.toLocaleDateString('en-GB', {
-                day: 'numeric',
-                month: 'short',
-                timeZone: tz,
-              }),
-            ) +
-            '</span><span>Today</span></div>'
-          : '<p class="muted">No views yet. Share the link to get the word out.</p>') +
-        '</div>' +
-        '<div class="card"><h3>Where views came from</h3>' +
-        (sourceTotal
-          ? '<div class="sources">' + sourceRows + '</div>'
-          : '<p class="muted">Nothing yet.</p>') +
-        '</div>' +
-        '<div class="card"><h3>Who’s going</h3>' +
-        (names.length
-          ? '<ul class="names">' +
-            names
-              .map(function (n) {
-                return '<li>' + esc(n) + '</li>';
-              })
-              .join('') +
-            '</ul>'
-          : '<p class="muted">No one has said they’re going yet.</p>') +
-        '</div>' +
-        '<p class="muted small">We only keep numbers about views, never who looked. First names of people going are shown because they chose to say so.</p>',
-    );
-  }
-
   // --- start ----------------------------------------------------------------------
 
-  document.getElementById('sign-out').onclick = function () {
+  function signOut() {
     sb.auth.signOut().catch(function () {});
     state.session = null;
     state.organiser = undefined;
     state.events = null;
+    state.overview = null;
     go('#/sign-in');
-  };
+  }
+  document.getElementById('sign-out').onclick = signOut;
 
   window.addEventListener('hashchange', route);
 
@@ -1631,12 +1727,14 @@
       if (event === 'SIGNED_OUT') {
         state.organiser = undefined;
         state.events = null;
+        state.overview = null;
         if (state.ready) go('#/sign-in');
         return;
       }
       if (event === 'SIGNED_IN' && uid() !== before) {
         state.organiser = undefined;
         state.events = null;
+        state.overview = null;
         if (state.ready) {
           if (state.recovery) return go('#/reset');
           route();

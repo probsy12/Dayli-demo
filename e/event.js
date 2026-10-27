@@ -166,6 +166,16 @@
 
     if (ev.ticket_url && /^https?:\/\//i.test(ev.ticket_url) && ev.status !== 'cancelled') {
       el('tickets').href = ev.ticket_url;
+      el('tickets').addEventListener('click', function () {
+        // Counted for the organiser; never who.
+        try {
+          rpc('record_public_event_ticket_click', { p_event_id: ev.id, p_source: 'web' }).catch(
+            function () {},
+          );
+        } catch (e) {
+          /* fire and forget */
+        }
+      });
       show('tickets', true);
     }
     var add = el('add');
@@ -218,8 +228,14 @@
   }
   function recordView(id) {
     var source = params.get('via') === 'share' ? 'share' : 'web';
+    var ref = (params.get('ref') || '').replace(/[^a-z0-9]/gi, '').slice(0, 8) || null;
     try {
-      rpc('record_public_event_view', { p_event_id: id, p_source: source }).catch(function () {});
+      rpc('record_public_event_view', {
+        p_event_id: id,
+        p_source: source,
+        p_via: ref ? 'link' : null,
+        p_share_code: ref,
+      }).catch(function () {});
     } catch (e) {
       /* fire and forget */
     }

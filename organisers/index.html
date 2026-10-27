@@ -11,25 +11,47 @@
     />
     <link rel="stylesheet" href="style.css" />
   <link rel="icon" type="image/png" sizes="32x32" href="/favicon-v2-32.png" /><link rel="icon" type="image/png" sizes="192x192" href="/favicon-v2-192.png" /><link rel="apple-touch-icon" href="/apple-touch-icon-v2.png" /></head>
-  <body>
-    <header>
-      <div class="bar">
-        <a class="brand" href="#/events"
-          ><img src="../img/icon.svg" alt="" /> Dayli <span>for organisers</span></a
+  <body class="auth">
+    <div class="shell">
+      <aside class="side" id="side" hidden>
+        <a class="brand" href="#/overview"
+          ><img src="../img/icon.svg" alt="" /> Dayli <span>organisers</span></a
         >
-        <nav id="nav" hidden>
+        <nav class="side-nav" id="nav">
+          <a href="#/overview" data-route="overview">Overview</a>
           <a href="#/events" data-route="events">Events</a>
+          <a href="#/analytics" data-route="analytics">Analytics</a>
           <a href="#/profile" data-route="profile">Profile</a>
-          <button type="button" id="sign-out">Sign out</button>
         </nav>
+        <div class="side-foot">
+          <div class="account" id="account"></div>
+          <button type="button" class="linkish" id="sign-out">Sign out</button>
+        </div>
+      </aside>
+      <div class="content">
+        <header class="topbar" id="topbar" hidden>
+          <a class="brand" href="#/overview"
+            ><img src="../img/icon.svg" alt="" /> Dayli <span>organisers</span></a
+          >
+          <button type="button" class="menu" id="menu" aria-label="Menu" aria-expanded="false">
+            <span></span><span></span><span></span>
+          </button>
+        </header>
+        <nav class="tabs-nav" id="tabs-nav" hidden>
+          <a href="#/overview" data-route="overview">Overview</a>
+          <a href="#/events" data-route="events">Events</a>
+          <a href="#/analytics" data-route="analytics">Analytics</a>
+          <a href="#/profile" data-route="profile">Profile</a>
+        </nav>
+        <main id="app">
+          <p class="muted">Loading…</p>
+        </main>
       </div>
-    </header>
-    <main id="app">
-      <p class="muted">Loading…</p>
-    </main>
+    </div>
     <div class="toast" id="toast" aria-live="polite"></div>
     <script src="../config.js"></script>
     <script src="vendor/supabase.js"></script>
+    <script src="analytics.js"></script>
     <script src="app.js"></script>
   </body>
 </html>
