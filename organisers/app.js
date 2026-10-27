@@ -420,6 +420,7 @@
   }
 
   var analytics = window.DayliAnalytics({
+    sb: sb,
     esc: esc,
     $: $,
     $$: $$,

@@ -50,6 +50,20 @@ The public page `web/e/` calls `public_event_by_slug(p_slug)`,
 `record_public_event_ticket_click(p_event_id, 'web')` with the anon key only.
 A `?ref=<code>` on the link is the share code of the person who sent it.
 
+## Dayli AI
+
+The card at the top of the analytics Overview tab calls the
+`organiser-insights` Edge Function (`supabase/functions/organiser-insights`)
+with the organiser's session: a summary of the event's numbers with up to
+three suggestions, made once a day per event and kept in
+`public_event_ai_notes` (so reopening the page is free; Refresh asks again),
+and an "Ask about your numbers" box answered from the same data. The model
+is DeepSeek V4 Pro (`DEEPSEEK_INSIGHTS_MODEL` overrides; Anthropic is the
+fallback when there is no DeepSeek key). It only ever sees counts, rates,
+bands and dates: `_shared/insights/prompt.ts` strips every name first. Forty
+calls a day per organiser (`organiser_ai_quota`). The card waits until an
+event has ten views.
+
 ## What the analytics page shows
 
 Every number is a count, a band or the first name of someone who said going

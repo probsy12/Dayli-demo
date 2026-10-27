@@ -568,6 +568,112 @@ window.DayliAnalytics = function (ctx) {
     );
   }
 
+  // --- Dayli AI ----------------------------------------------------------------------
+
+  function askAi(body) {
+    return ctx.sb.functions.invoke('organiser-insights', { body: body }).then(function (res) {
+      if (res.error) {
+        // supabase-js wraps non-2xx replies; the body has our error code.
+        var ctxBody = res.error && res.error.context;
+        if (ctxBody && typeof ctxBody.json === 'function') {
+          return ctxBody.json().then(
+            function (j) {
+              throw new Error((j && j.error) || res.error.message || 'failed');
+            },
+            function () {
+              throw new Error(res.error.message || 'failed');
+            },
+          );
+        }
+        throw new Error(res.error.message || 'failed');
+      }
+      if (res.data && res.data.error) throw new Error(res.data.error);
+      return res.data;
+    });
+  }
+  function aiError(err) {
+    var m = String((err && err.message) || err || '');
+    if (/no_provider/.test(m)) return 'Dayli AI is not switched on for this project yet.';
+    if (/rate_limited/.test(m)) return 'You have used today’s Dayli AI allowance. It resets tomorrow.';
+    if (/llm_|deepseek_|failed/.test(m)) return 'Dayli AI could not read the numbers just now. Try again in a minute.';
+    return friendly(err);
+  }
+  function renderAiNote(note, a, reload) {
+    var body = $('#ai-body');
+    var sub = $('#ai-sub');
+    if (!body) return;
+    var when = note.created_at ? new Date(note.created_at) : null;
+    sub.textContent =
+      'DeepSeek read today’s numbers' +
+      (when ? ' at ' + when.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' }) : '') +
+      '. Counts and rates only; no names.';
+    var acts = { remind: ['Send a reminder', 'remind'], edit: ['Edit event', null], copy: ['Copy the link', 'copy'] };
+    body.innerHTML =
+      '<p style="font-size: 15px; line-height: 1.55; margin: 0 0 6px">' +
+      esc(note.summary) +
+      '</p>' +
+      (note.suggestions || [])
+        .map(function (sg, i) {
+          var act = acts[sg.action];
+          var button = '';
+          if (act && sg.action === 'edit') button = '<a class="btn small act" href="#/events/' + esc(a.event.id) + '">Edit event</a>';
+          else if (act && (sg.action !== 'remind' || (a.remind && a.remind.ok)))
+            button = '<button type="button" class="btn small primary act" data-act="' + act[1] + '" data-i="ai' + i + '">' + act[0] + '</button>';
+          return '<div class="insight"><div class="ic">' + (i + 1) + '</div><div><b>' + esc(sg.title) + '</b><div class="muted small">' + esc(sg.why) + '</div></div>' + button + '</div>';
+        })
+        .join('');
+    var refresh = $('#ai-refresh');
+    if (refresh) refresh.hidden = false;
+    bindInsightActions(a, reload);
+  }
+  function loadAi(a, reload) {
+    var card = $('#ai-card');
+    if (!card || !ctx.sb || !ctx.sb.functions) return;
+    var id = a.event.id;
+    function fetchNote(refresh) {
+      $('#ai-sub').textContent = refresh ? 'Reading again…' : 'Reading your numbers…';
+      $('#ai-body').innerHTML = '<p class="muted small">One moment.</p>';
+      askAi({ event_id: id, refresh: !!refresh })
+        .then(function (note) {
+          renderAiNote(note, a, reload);
+        })
+        .catch(function (err) {
+          $('#ai-sub').textContent = '';
+          $('#ai-body').innerHTML = '<p class="muted small">' + esc(aiError(err)) + '</p>';
+          var refreshBtn = $('#ai-refresh');
+          if (refreshBtn) refreshBtn.hidden = false;
+        });
+    }
+    if (n(a.totals.views) < 10 && !a.reminders.length) {
+      $('#ai-sub').textContent = 'Early days.';
+      $('#ai-body').innerHTML = '<p class="muted small">Dayli AI starts once the event has a few views. Share the link to get the first ones.</p>';
+    } else fetchNote(false);
+    $('#ai-refresh').onclick = function () {
+      fetchNote(true);
+    };
+    $('#ai-ask').onsubmit = function (e) {
+      e.preventDefault();
+      var input = $('#ai-ask [name=q]');
+      var q = input.value.trim();
+      if (!q) return;
+      var button = $('#ai-ask button');
+      var out = $('#ai-answer');
+      ctx.setBusy(button, true, '…');
+      out.hidden = false;
+      out.innerHTML = '<span class="muted">Thinking…</span>';
+      askAi({ event_id: id, question: q })
+        .then(function (r) {
+          ctx.setBusy(button, false);
+          out.innerHTML = '<b>' + esc(q) + '</b><div style="margin-top: 4px">' + esc(r.answer) + '</div>';
+          input.value = '';
+        })
+        .catch(function (err) {
+          ctx.setBusy(button, false);
+          out.innerHTML = '<span class="muted">' + esc(aiError(err)) + '</span>';
+        });
+    };
+  }
+
   // --- Analytics screen ------------------------------------------------------------
 
   function screenAnalytics(id, tab, days) {
@@ -667,6 +773,7 @@ window.DayliAnalytics = function (ctx) {
       };
     });
     if (a) bindInsightActions(a, reload);
+    if (a && tab === 'overview') loadAi(a, reload);
     var alerts = $('#alerts');
     if (alerts) {
       alerts.onchange = function () {
@@ -710,11 +817,25 @@ window.DayliAnalytics = function (ctx) {
     );
   }
 
+  // The Dayli AI card: filled in after render by loadAi().
+  function aiCardHtml(ev) {
+    return (
+      '<div class="card ai" id="ai-card" data-event="' +
+      esc(ev.id) +
+      '"><div class="row between"><div><h3>Dayli AI</h3><p class="sub" id="ai-sub">Reading your numbers…</p></div>' +
+      '<button type="button" class="linkish small" id="ai-refresh" hidden>Refresh</button></div>' +
+      '<div id="ai-body"><p class="muted small">One moment.</p></div>' +
+      '<form id="ai-ask" class="row" style="margin-top: 12px; gap: 8px; flex-wrap: nowrap"><input type="text" name="q" maxlength="300" placeholder="Ask about your numbers, e.g. why did views drop on Tuesday?" aria-label="Ask about your numbers" style="min-height: 40px" /><button class="btn small" type="submit">Ask</button></form>' +
+      '<div id="ai-answer" class="small" style="margin-top: 10px" hidden></div></div>'
+    );
+  }
+
   function tabOverview(a, tz, days) {
     var t = a.totals;
     var ev = a.event;
     var list = insights(a);
     var html =
+      aiCardHtml(ev) +
       '<div class="grid g4">' +
       kpi('Views', fmtN(t.views), tagDelta(t.views_7d, t.views_prev_7d)) +
       kpi('Interested', fmtN(t.interested), n(t.unique_viewers) ? '<span class="tag info">' + pct(t.interested, t.unique_viewers) + '% of viewers</span>' : '') +
