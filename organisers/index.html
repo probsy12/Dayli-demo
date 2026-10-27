@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dayli for organisers</title>
+    <meta name="robots" content="noindex" />
+    <meta
+      name="description"
+      content="List your events on Dayli so people nearby can find them and add them to their calendars."
+    />
+    <link rel="stylesheet" href="style.css" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-v2-32.png" /><link rel="icon" type="image/png" sizes="192x192" href="/favicon-v2-192.png" /><link rel="apple-touch-icon" href="/apple-touch-icon-v2.png" /></head>
+  <body>
+    <header>
+      <div class="bar">
+        <a class="brand" href="#/events"
+          ><img src="../img/icon.svg" alt="" /> Dayli <span>for organisers</span></a
+        >
+        <nav id="nav" hidden>
+          <a href="#/events" data-route="events">Events</a>
+          <a href="#/profile" data-route="profile">Profile</a>
+          <button type="button" id="sign-out">Sign out</button>
+        </nav>
+      </div>
+    </header>
+    <main id="app">
+      <p class="muted">Loading…</p>
+    </main>
+    <div class="toast" id="toast" aria-live="polite"></div>
+    <script src="../config.js"></script>
+    <script src="vendor/supabase.js"></script>
+    <script src="app.js"></script>
+  </body>
+</html>
