@@ -4,7 +4,7 @@
  * ../config.js through supabase-js (vendor/supabase.js) and the RPCs in
  * supabase/migrations/20261027000100_public_events.sql and
  * 20261028000100_organiser_analytics.sql. The Overview and Analytics screens
- * live in analytics.js. */
+ * live in analytics.js; the admin's growth dashboard (#/admin) in admin.js. */
 (function () {
   'use strict';
 
@@ -29,6 +29,7 @@
     ready: false,
     session: null,
     organiser: undefined, // undefined = not loaded yet, null = none
+    admin: false, // on the admin list (is_admin()); shows the Admin section
     pendingEmail: null, // an address we've just emailed a code to
     codeSent: false,
     recovery: false,
@@ -294,7 +295,16 @@
       .then(function (res) {
         if (res.error) throw res.error;
         state.organiser = res.data || null;
-        return state.organiser;
+        return sb.rpc('is_admin').then(
+          function (r) {
+            state.admin = r.data === true;
+            return state.organiser;
+          },
+          function () {
+            state.admin = false;
+            return state.organiser;
+          },
+        );
       });
   }
   function isVerified() {
@@ -304,7 +314,7 @@
   // Where a signed-in person should be: profile first, then a confirmed
   // email, then their events.
   function homeHash() {
-    if (!state.organiser) return '#/profile';
+    if (!state.organiser) return state.admin ? '#/admin' : '#/profile';
     if (!isVerified()) return '#/verify';
     return '#/overview';
   }
@@ -319,6 +329,7 @@
     var links = Array.prototype.slice.call(document.querySelectorAll('a[data-route]'));
     links.forEach(function (a) {
       a.classList.toggle('on', a.dataset.route === current);
+      if (a.dataset.route === 'admin') a.hidden = !state.admin;
     });
     var account = document.getElementById('account');
     if (signedIn && account) {
@@ -347,6 +358,7 @@
     sheet.id = 'menu-sheet';
     sheet.innerHTML =
       '<a href="#/overview">Overview</a><a href="#/events">Events</a><a href="#/analytics">Analytics</a><a href="#/profile">Profile</a>' +
+      (state.admin ? '<a href="#/admin">Admin</a>' : '') +
       '<a href="#/events/new">+ New event</a><button type="button" class="linkish" id="menu-sign-out" style="padding: 12px">Sign out</button>';
     document.body.appendChild(sheet);
     document.getElementById('menu-sign-out').onclick = signOut;
@@ -407,6 +419,10 @@
         if (!state.organiser) return screenProfile(true);
         setShell(true, 'analytics');
         return analytics.screenAnalytics(parts[1] || null, query.tab, query.days);
+      case 'admin':
+        if (!state.admin) return go(homeHash());
+        setShell(true, 'admin');
+        return admin.screen(query.tab, query.days);
       case 'events':
         if (!state.organiser) return screenProfile(true);
         setShell(true, 'events');
@@ -442,6 +458,24 @@
     isoToZoned: isoToZoned,
     safeTz: safeTz,
   });
+  var admin = window.DayliAdmin(
+    {
+      sb: sb,
+      esc: esc,
+      $: $,
+      $$: $$,
+      rpc: rpc,
+      render: render,
+      loading: loading,
+      notice: notice,
+      toast: toast,
+      go: go,
+      friendly: friendly,
+      setBusy: setBusy,
+      categoryLabel: categoryLabel,
+    },
+    analytics.ui,
+  );
 
   // --- sign in / create account --------------------------------------------
 

@@ -11,10 +11,11 @@ publishing) and `20261028000100_organiser_analytics.sql` (the numbers,
 reminders, alerts); those files are the contract.
 
 The layout is a sidebar on wide screens (Overview · Events · Analytics ·
-Profile) and a top bar with a tab row on phones. `app.js` holds sign-in,
-the profile wizard, the events list and the event form; `analytics.js`
-holds the Overview and Analytics screens and is handed `app.js`'s helpers in
-a `ctx` object.
+Profile, plus Admin for the admin account) and a top bar with a tab row on
+phones. `app.js` holds sign-in, the profile wizard, the events list and the
+event form; `analytics.js` holds the Overview and Analytics screens and is
+handed `app.js`'s helpers in a `ctx` object; `admin.js` holds the growth
+dashboard and borrows the chart helpers from `analytics.js`.
 
 ## Signing in and confirming an email
 
@@ -42,6 +43,7 @@ a `ctx` object.
 | `#/events`                      | list with numbers and actions   | `my_public_events()`, `public_event_set_status(p_id, p_status)`, `public_event_delete(p_id)` |
 | `#/events/new`, `#/events/<id>` | the event form with a live app preview and a publish checklist; `?from=<id>` copies a past event ("Run it again") | `public_events` (select own row), `public_event_save(p)`, storage bucket `hero` |
 | `#/analytics/<id>?tab=&days=`   | tabs Overview · Reach · Timing · People · Tickets · All events | `organiser_event_analytics(p_id, p_days)`, `organiser_overview()`, `public_event_send_reminder(p_event_id)` |
+| `#/admin?tab=&days=`            | the admin's growth dashboard (admin.js): Overview · People · Groups · What they do · Retention · Invites · Events · Notifications · Safety · Dayli AI; only for emails in `admin_users` | `is_admin()`, `admin_dashboard(p_days)`, Edge Function `admin-insights` |
 
 `#/events/<id>/stats` from old links goes to `#/analytics/<id>`.
 

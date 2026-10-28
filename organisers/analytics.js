@@ -1301,5 +1301,13 @@ window.DayliAnalytics = function (ctx) {
     );
   }
 
-  return { screenOverview: screenOverview, screenAnalytics: screenAnalytics, loadOverview: loadOverview, focusEvent: focusEvent, spark: spark };
+  return {
+    screenOverview: screenOverview,
+    screenAnalytics: screenAnalytics,
+    loadOverview: loadOverview,
+    focusEvent: focusEvent,
+    spark: spark,
+    // The chart and card helpers, shared with admin.js.
+    ui: { kpi: kpi, card: card, bars: bars, hbars: hbars, axis: axis, spark: spark, fmtN: fmtN, n: n, pct: pct, pctText: pctText, tagDelta: tagDelta },
+  };
 };
