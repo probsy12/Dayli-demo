@@ -1415,100 +1415,116 @@
     var mode = ev.ticketing || (ev.ticket_url || ev.is_free === false ? 'external' : 'none');
     var cover = ev.cover_image_path ? coverUrl(ev.cover_image_path) : '';
     var category = ev.category || 'other';
-    var tile = function (label, body) {
-      return '<div class="po-tile"><b>' + label + '</b>' + body + '</div>';
+    var published = editing && ev.status === 'published';
+    var CAM =
+      '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 8h3l2-3h6l2 3h3v11H4z"/><circle cx="12" cy="13" r="3.5"/></svg>';
+    // One section: its name and a hint on the left, the fields on the right.
+    var sec = function (title, hint, body, id) {
+      return (
+        '<section class="ef-sec"' +
+        (id ? ' id="' + id + '"' : '') +
+        '><div class="ef-sh"><h2>' +
+        title +
+        '</h2><p>' +
+        hint +
+        '</p></div><div class="ef-sb">' +
+        body +
+        '</div></section>'
+      );
+    };
+    var field = function (label, input) {
+      return '<label class="ef-f"><span>' + label + '</span>' + input + '</label>';
     };
     render(
-      '<div class="po">' +
-        '<div class="page-head"><div><div class="label">' +
+      '<div class="ef">' +
+        '<div class="ef-top"><div class="ef-kick">' +
         (editing ? 'Edit event' : copying ? 'Run it again' : 'New event') +
-        '</div></div><div class="controls"><a class="btn" href="#/events">Back</a></div></div>' +
-        (editing && ev.status === 'published' ? notice('info', 'This event is live. If you change the time or place, everyone going will be told.') : '') +
+        '</div><a class="btn small" href="#/events">Back to events</a></div>' +
+        '<h1 class="ef-h1" id="ef-h1"></h1>' +
+        '<p class="ef-lead">' +
+        (published
+          ? 'This event is live. Changes show in the app as soon as you save.'
+          : 'Fill in what you know. It saves as a draft until you publish.') +
+        '</p>' +
+        (published ? notice('info', 'If you change the time or place, everyone going will be told.') : '') +
         (copying ? notice('info', 'Everything but the date is copied from the last one. Set when it is and save.') : '') +
-        '<form id="event-form" novalidate>' +
-        // The poster: picture, title typed on it, and what people see at a glance.
-        '<div class="po-hero" id="pv-cover"' +
-        (cover ? ' style="background-image: url(&quot;' + esc(cover) + '&quot;)"' : '') +
-        '><div class="po-hero-actions"><label class="po-glass">Change picture<input type="file" name="cover" accept="image/*" hidden /></label>' +
-        '<button type="button" class="po-glass" id="cover-remove"' +
-        (cover ? '' : ' hidden') +
-        '>Remove</button></div>' +
-        '<div class="po-hero-text"><div class="po-kicker" id="pv-kicker"></div>' +
-        '<input type="text" name="title" class="po-title" maxlength="120" required placeholder="Your event title" value="' +
-        esc(ev.title) +
-        '" /><div class="po-pills" id="pv-pills"></div></div></div>' +
-        '<input type="hidden" name="cover_image_path" value="' +
-        esc(ev.cover_image_path) +
-        '" />' +
-        '<div class="po-tiles">' +
-        tile(
+        '<form id="event-form" class="ef-cols" novalidate><div class="ef-main">' +
+        sec(
+          'What',
+          'A clear title and a picture do most of the work.',
+          field('Title', '<input type="text" name="title" maxlength="120" required placeholder="e.g. Jazz night at the Crown" value="' + esc(ev.title) + '" />') +
+            '<div class="ef-f"><span>Category</span><div class="ef-chips" id="cats">' +
+            CATEGORIES.map(function (c) {
+              return '<button type="button" class="ef-chip' + (c[0] === category ? ' on' : '') + '" data-cat="' + c[0] + '">' + esc(c[1]) + '</button>';
+            }).join('') +
+            '</div><input type="hidden" name="category" value="' + esc(category) + '" /></div>' +
+            field('Description', '<textarea name="description" class="ef-desc" maxlength="4000" placeholder="What happens, who it’s for, what to bring.">' + esc(ev.description) + '</textarea>') +
+            '<div class="ef-photo" id="pv-cover"' +
+            (cover ? ' style="background-image: url(&quot;' + esc(cover) + '&quot;)"' : '') +
+            '><div class="ef-photo-btns"><button type="button" class="ef-pbtn" id="cover-remove"' +
+            (cover ? '' : ' hidden') +
+            '>Remove</button><label class="ef-pbtn">' +
+            CAM +
+            ' <span id="cover-label">' +
+            (cover ? 'Change picture' : 'Add a picture') +
+            '</span><input type="file" name="cover" accept="image/*" hidden /></label></div></div>' +
+            '<input type="hidden" name="cover_image_path" value="' + esc(ev.cover_image_path) + '" />' +
+            field('Tags <i>optional, comma separated</i>', '<input type="text" name="tags" placeholder="jazz, live, outdoors" value="' + esc((ev.tags || []).join(', ')) + '" />'),
+        ) +
+        sec(
           'When',
-          '<div class="po-two"><input type="date" name="starts_date" required value="' + starts.date + '" aria-label="Start date" /><input type="time" name="starts_time" required value="' + starts.time + '" aria-label="Start time" /></div>' +
-            '<div class="po-two"><input type="date" name="ends_date" required value="' + ends.date + '" aria-label="End date" /><input type="time" name="ends_time" required value="' + ends.time + '" aria-label="End time" /></div>' +
-            '<select name="timezone" aria-label="Time zone">' + options(TIMEZONES, tz) + '</select>',
+          'Times are in the venue’s time zone.',
+          '<div class="ef-two"><div class="ef-f"><span>Starts</span><div class="ef-dt"><input type="date" name="starts_date" required value="' + starts.date + '" aria-label="Start date" /><input type="time" name="starts_time" required value="' + starts.time + '" aria-label="Start time" /></div></div>' +
+            '<div class="ef-f"><span>Ends</span><div class="ef-dt"><input type="date" name="ends_date" required value="' + ends.date + '" aria-label="End date" /><input type="time" name="ends_time" required value="' + ends.time + '" aria-label="End time" /></div></div></div>' +
+            '<div class="ef-tz"><span id="tz-label"></span> · <a href="#" id="tz-change">change</a></div>' +
+            '<div id="tz-pick" hidden><select name="timezone" aria-label="Time zone">' + options(TIMEZONES, tz) + '</select></div>',
         ) +
-        tile(
+        sec(
           'Where',
-          '<input type="text" name="venue_name" maxlength="120" placeholder="Venue, e.g. The Old Crown" value="' + esc(ev.venue_name) + '" />' +
-            '<input type="text" name="address" maxlength="300" placeholder="Address and postcode" value="' + esc(ev.address) + '" />' +
-            '<button type="button" class="btn small" id="geocode">Find on map</button> <span class="muted small" id="geo-status"></span>',
+          'Type the venue and address, then put it on the map.',
+          field('Venue', '<input type="text" name="venue_name" maxlength="120" placeholder="e.g. The Old Crown" value="' + esc(ev.venue_name) + '" />') +
+            field('Address', '<input type="text" name="address" maxlength="300" placeholder="Street, town and postcode" value="' + esc(ev.address) + '" />') +
+            '<div class="ef-geo"><button type="button" class="btn small" id="geocode">Find on map</button> <span class="muted small" id="geo-status"></span></div>' +
+            '<div class="po-map ef-map" id="po-map"></div><div class="muted small ef-hint" id="map-hint"></div>' +
+            '<input type="hidden" name="lat" value="' + esc(ev.lat) + '" /><input type="hidden" name="lon" value="' + esc(ev.lon) + '" />',
         ) +
-        tile('Getting in', '<div class="po-entry-sum" id="entry-sum"></div><a class="small" href="#entry" id="entry-jump">Change</a>') +
-        '</div>' +
-        '<div class="po-body"><div>' +
-        '<section class="po-block"><h3>What’s it about?</h3>' +
-        '<textarea name="description" class="po-desc" maxlength="4000" placeholder="What happens, who it’s for, what to bring.">' +
-        esc(ev.description) +
-        '</textarea><div class="po-chips" id="cats">' +
-        CATEGORIES.map(function (c) {
-          return '<button type="button" class="po-chip' + (c[0] === category ? ' on' : '') + '" data-cat="' + c[0] + '">' + esc(c[1]) + '</button>';
-        }).join('') +
-        '</div><input type="hidden" name="category" value="' +
-        esc(category) +
-        '" /><label class="field" style="margin-top: 12px"><span>Tags (optional, comma separated)</span><input type="text" name="tags" placeholder="jazz, live, outdoors" value="' +
-        esc((ev.tags || []).join(', ')) +
-        '" /></label></section>' +
-        '<section class="po-block" id="entry"><h3>How do people get in?</h3>' +
-        ENTRY.map(function (m) {
-          return '<button type="button" class="po-opt' + (m[0] === mode ? ' on' : '') + '" data-mode="' + m[0] + '"><span><b>' + m[1] + '</b><span>' + m[2] + '</span></span><i></i></button>';
-        }).join('') +
-        '<div id="ext-fields"' +
-        (mode === 'external' ? '' : ' hidden') +
-        '><div class="two"><label class="field"><span>From (cheapest ticket, optional)</span><input type="number" name="price" step="0.01" min="0" placeholder="12.00" value="' +
-        esc(pounds) +
-        '" /></label><label class="field"><span>Currency</span><select name="currency">' +
-        options(CURRENCIES, ev.currency || 'GBP') +
-        '</select></label></div><label class="field"><span>Ticket link</span><input type="url" name="ticket_url" maxlength="500" placeholder="https://" value="' +
-        esc(ev.ticket_url) +
-        '" /></label></div>' +
-        '<p class="muted small" id="dayli-note"' +
-        (mode === 'dayli' ? '' : ' hidden') +
-        '>' +
-        (editing
-          ? 'Prices, early bird, codes and orders are on this event’s <a href="#/tickets/' + esc(ev.id) + '">Tickets screen</a>. The “from” price here follows your tickets.'
-          : 'After saving you’ll set up the tickets: free or paid, how many, an early bird, codes. The “from” price follows your tickets.') +
-        '</p></section>' +
-        '<section class="po-block"><h3>Good to know</h3><div class="po-three">' +
-        '<label class="field"><span>Minimum age</span><input type="number" name="min_age" min="0" max="99" step="1" placeholder="Any" value="' +
-        esc(ev.min_age) +
-        '" /></label><label class="field"><span>Capacity</span><input type="number" name="capacity" min="1" step="1" placeholder="No limit" value="' +
-        esc(ev.capacity) +
-        '" /></label><label class="field"><span>Accessibility</span><input type="text" name="accessibility" maxlength="500" placeholder="Step-free, hearing loop…" value="' +
-        esc(ev.accessibility) +
-        '" /></label></div></section>' +
-        '</div><div class="po-side">' +
-        '<section class="po-block po-mapcard"><div class="po-map" id="po-map"></div><div class="muted small" id="map-hint" style="padding: 12px 16px"></div>' +
-        '<input type="hidden" name="lat" value="' +
-        esc(ev.lat) +
-        '" /><input type="hidden" name="lon" value="' +
-        esc(ev.lon) +
-        '" /></section>' +
-        '<section class="po-block"><h3 style="font-size: 17px">Before you publish</h3><ul class="checklist" id="checklist"></ul>' +
+        sec(
+          'Tickets & details',
+          'Sell through Dayli, or link to your own page.',
+          '<div class="ef-f"><span>Entry</span><div class="ef-entry">' +
+            ENTRY.map(function (m) {
+              return '<button type="button" class="po-opt' + (m[0] === mode ? ' on' : '') + '" data-mode="' + m[0] + '"><span><b>' + m[1] + '</b><span>' + m[2] + '</span></span><i></i></button>';
+            }).join('') +
+            '</div></div>' +
+            '<div id="ext-fields"' + (mode === 'external' ? '' : ' hidden') + '><div class="ef-two">' +
+            field('From (cheapest ticket, optional)', '<input type="number" name="price" step="0.01" min="0" placeholder="12.00" value="' + esc(pounds) + '" />') +
+            field('Currency', '<select name="currency">' + options(CURRENCIES, ev.currency || 'GBP') + '</select>') +
+            '</div>' +
+            field('Ticket link', '<input type="url" name="ticket_url" maxlength="500" placeholder="https://" value="' + esc(ev.ticket_url) + '" />') +
+            '</div>' +
+            '<p class="muted small ef-note" id="dayli-note"' + (mode === 'dayli' ? '' : ' hidden') + '>' +
+            (editing
+              ? 'Prices, early bird, codes and orders are on this event’s <a href="#/tickets/' + esc(ev.id) + '">Tickets screen</a>. The “from” price here follows your tickets.'
+              : 'After saving you’ll set up the tickets: free or paid, how many, an early bird, codes. The “from” price follows your tickets.') +
+            '</p>' +
+            '<div class="ef-two">' +
+            field('Capacity', '<input type="number" name="capacity" min="1" step="1" placeholder="No limit" value="' + esc(ev.capacity) + '" />') +
+            field('Minimum age', '<input type="number" name="min_age" min="0" max="99" step="1" placeholder="Any" value="' + esc(ev.min_age) + '" />') +
+            '</div>' +
+            field('Accessibility', '<input type="text" name="accessibility" maxlength="500" placeholder="Step-free, accessible toilet, hearing loop…" value="' + esc(ev.accessibility) + '" />'),
+          'entry',
+        ) +
+        '</div><aside class="ef-side">' +
+        '<div class="ef-lbl">In the Dayli app</div>' +
+        '<div class="ef-card"><div class="ef-card-pic" id="pv-pic"></div><div class="ef-card-body"><div class="ef-card-when" id="pv-when"></div><div class="ef-card-title" id="pv-title"></div><div class="ef-card-meta" id="pv-meta"></div></div></div>' +
+        '<div class="ef-lbl ef-lbl2">Ready to publish?</div><ul class="ef-chk" id="checklist"></ul>' +
         '<div class="notice error" id="err" hidden></div>' +
-        '<button class="btn primary block" type="submit">' +
-        (editing ? 'Save changes' : mode === 'dayli' ? 'Save and set up tickets' : 'Save as draft') +
-        '</button><p class="muted small" style="margin: 10px 0 0">You publish from the Events list.</p></section>' +
-        '</div></div></form></div>',
+        '<div class="ef-actions">' +
+        (published
+          ? '<button class="btn primary" type="submit" data-go="save">Save changes</button>'
+          : '<button class="btn" type="submit" data-go="save">Save draft</button><button class="btn primary" type="submit" data-go="publish" id="publish-btn">Publish</button>') +
+        '</div><p class="muted small ef-foot" id="ef-foot"></p>' +
+        '</aside></form></div>',
     );
     var form = $('#event-form');
     var err = $('#err');
@@ -1522,57 +1538,58 @@
       var amount = parseFloat($('[name=price]').value);
       return isNaN(amount) ? 'Tickets' : fmtPrice({ is_free: false, price_from_pence: Math.round(amount * 100), currency: $('[name=currency]').value || 'GBP' });
     }
+    // The words on the Publish button and under it.
+    function syncButtons() {
+      var pub = $('#publish-btn');
+      var needsTickets = mode === 'dayli' && ev.ticketing !== 'dayli';
+      if (pub) pub.textContent = needsTickets ? 'Next: tickets' : 'Publish';
+      $('#ef-foot').textContent = published
+        ? ''
+        : needsTickets
+          ? 'Set up the tickets next, then publish from there or from Events.'
+          : 'Publishing puts it in Discover for people nearby.';
+    }
     function syncPreview() {
       var title = $('[name=title]').value.trim();
       var venue = $('[name=venue_name]').value.trim();
-      var age = $('[name=min_age]').value.trim();
       var tzNow = $('[name=timezone]').value;
       var iso = zonedToIso($('[name=starts_date]').value, $('[name=starts_time]').value, tzNow);
-      var endIso = zonedToIso($('[name=ends_date]').value, $('[name=ends_time]').value, tzNow);
       var when = iso ? new Date(iso) : null;
-      var kicker = [categoryLabel($('[name=category]').value).toUpperCase()];
-      if (age) kicker.push(age + '+');
-      $('#pv-kicker').textContent = kicker.join(' · ');
-      var pills = [];
+      $('#ef-h1').textContent = title || (editing ? 'Edit event' : 'New event');
+      $('#pv-title').textContent = title || 'Your event title';
+      var whenText = '';
       if (when && !isNaN(when.getTime())) {
-        var s = isoToZoned(iso, tzNow);
-        var e2 = endIso ? isoToZoned(endIso, tzNow) : null;
-        pills.push(when.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: safeTz(tzNow) }) + ', ' + s.time + (e2 && e2.date === s.date ? '–' + e2.time : ''));
+        var z = safeTz(tzNow);
+        var day = when.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: z });
+        var time = when
+          .toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: z })
+          .replace(':00', '')
+          .replace(/\s/g, '');
+        whenText = (day.replace(',', '') + ' · ' + time).toUpperCase();
       }
-      if (venue) pills.push(venue);
-      pills.push(priceText());
-      $('#pv-pills').innerHTML = pills
-        .map(function (p) {
-          return '<span>' + esc(p) + '</span>';
-        })
-        .join('');
-      var m = ENTRY.filter(function (x) {
-        return x[0] === mode;
-      })[0];
-      $('#entry-sum').innerHTML = '<div class="po-big">' + esc(priceText()) + '</div><div class="muted small">' + esc(m[1]) + '</div>';
+      $('#pv-when').textContent = whenText || 'DATE AND TIME';
+      $('#pv-meta').textContent = [venue || 'Venue', priceText()].join(' · ');
+      $('#tz-label').textContent = (tzNow.split('/').pop() || tzNow).replace(/_/g, ' ') + ' time';
       var hasPlace = $('[name=lat]').value !== '' && $('[name=lon]').value !== '';
       var future = when && when.getTime() > Date.now();
       var hasCover = !!(coverFile || $('[name=cover_image_path]').value);
       var words = $('[name=description]').value.trim().split(/\s+/).filter(Boolean).length;
       var ticket = $('[name=ticket_url]').value.trim();
       var items = [
-        [!!title, title ? 'Has a title' : 'Needs a title'],
-        [hasPlace, hasPlace ? 'Pin on the map' : 'Find the venue on the map'],
-        [!!future, future ? 'Date to come' : 'Needs a date to come'],
-        [isVerified(), isVerified() ? 'Email confirmed' : 'Confirm your email'],
-        [hasCover, hasCover ? 'Has a picture' : 'A picture gets more taps'],
-        [words >= 30, words >= 30 ? 'A good description' : 'A few more words about it'],
-        mode === 'external'
-          ? [!!ticket, ticket ? 'Ticket link added' : 'Add the ticket link']
-          : mode === 'dayli'
-            ? [ev.ticketing === 'dayli', ev.ticketing === 'dayli' ? 'Tickets through Dayli' : 'Set up tickets after saving']
-            : [true, 'Free to attend'],
+        [!!title && hasCover, 'Title and picture'],
+        [!!future, 'Date and time'],
+        [hasPlace, 'Place on the map'],
+        [words >= 30, 'Description of 30+ words'],
       ];
+      if (mode === 'external') items.push([!!ticket, 'Ticket link']);
+      if (mode === 'dayli') items.push([ev.ticketing === 'dayli', 'Tickets set up']);
+      if (!isVerified()) items.push([false, 'Email confirmed']);
       $('#checklist').innerHTML = items
         .map(function (it) {
-          return '<li class="' + (it[0] ? 'done' : '') + '">' + esc(it[1]) + '</li>';
+          return '<li class="' + (it[0] ? 'ok' : '') + '"><i></i>' + esc(it[1]) + '</li>';
         })
         .join('');
+      syncButtons();
     }
     function showMap() {
       var lat = parseFloat($('[name=lat]').value);
@@ -1612,13 +1629,14 @@
         });
         $('#ext-fields').hidden = mode !== 'external';
         $('#dayli-note').hidden = mode !== 'dayli';
-        if (!editing) $('button[type=submit]', form).textContent = mode === 'dayli' ? 'Save and set up tickets' : 'Save as draft';
         syncPreview();
       };
     });
-    $('#entry-jump').onclick = function (e) {
+    $('#tz-change').onclick = function (e) {
       e.preventDefault();
-      $('#entry').scrollIntoView({ behavior: 'smooth', block: 'center' });
+      $('#tz-pick').hidden = false;
+      this.parentNode.hidden = true;
+      $('[name=timezone]').focus();
     };
     // End follows the start by two hours until someone changes it by hand.
     function syncEnd() {
@@ -1651,7 +1669,10 @@
         return;
       }
       coverFile = file;
-      $('#pv-cover').style.backgroundImage = 'url("' + URL.createObjectURL(file) + '")';
+      var url = URL.createObjectURL(file);
+      $('#pv-cover').style.backgroundImage = 'url("' + url + '")';
+      $('#pv-pic').style.backgroundImage = 'url("' + url + '")';
+      $('#cover-label').textContent = 'Change picture';
       $('#cover-remove').hidden = false;
       syncPreview();
     };
@@ -1660,6 +1681,8 @@
       $('[name=cover]').value = '';
       $('[name=cover_image_path]').value = '';
       $('#pv-cover').style.backgroundImage = '';
+      $('#pv-pic').style.backgroundImage = '';
+      $('#cover-label').textContent = 'Add a picture';
       this.hidden = true;
       syncPreview();
     };
@@ -1694,12 +1717,14 @@
         },
       );
     };
+    if (cover) $('#pv-pic').style.backgroundImage = 'url("' + cover + '")';
     showMap();
     syncPreview();
 
     form.onsubmit = function (e) {
       e.preventDefault();
       err.hidden = true;
+      var publish = !!(e.submitter && e.submitter.dataset.go === 'publish');
       var v = function (name) {
         return $('[name=' + name + ']').value.trim();
       };
@@ -1737,8 +1762,8 @@
       var minAge = v('min_age') === '' ? null : parseInt(v('min_age'), 10);
       if (minAge !== null && (isNaN(minAge) || minAge < 0 || minAge > 99)) return showError(err, 'Minimum age must be between 0 and 99.');
 
-      var button = $('button[type=submit]', form);
-      setBusy(button, true, 'Saving…');
+      var button = e.submitter && e.submitter.form === form ? e.submitter : $('button[type=submit]', form);
+      setBusy(button, true, publish ? 'Publishing…' : 'Saving…');
       var upload = Promise.resolve($('[name=cover_image_path]').value || null);
       if (coverFile) {
         var ext = (coverFile.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
@@ -1794,6 +1819,26 @@
           if (mode === 'dayli' && ev.ticketing !== 'dayli') {
             toast('Saved. Now the tickets.');
             return go('#/tickets/' + id);
+          }
+          if (publish) {
+            if (!isVerified()) {
+              toast('Saved. Confirm your email to publish.');
+              return go('#/verify');
+            }
+            setBusy(button, true, 'Publishing…');
+            return rpc('public_event_set_status', { p_id: id, p_status: 'published' }).then(
+              function () {
+                setBusy(button, false);
+                toast('Published. People can find it now.');
+                go('#/events');
+              },
+              function (ex) {
+                // Saved, but not published (something is missing): say what, from its edit page.
+                setBusy(button, false);
+                toast('Saved as a draft: ' + friendly(ex));
+                go('#/events/' + id);
+              },
+            );
           }
           if (editing) toast('Saved.');
           else if (saved && saved.lat != null) toast('Saved as a draft. Publish it when you’re ready.');
