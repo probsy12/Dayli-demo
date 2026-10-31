@@ -88,7 +88,7 @@ window.DayliTickets = function (ctx) {
         var status;
         if (!o.can_sell_tickets) {
           status =
-            '<h3>Selling tickets through Dayli</h3><p class="sub">This is by invitation while it’s new. Email <a href="mailto:hello@daylicalendar.co.uk">hello@daylicalendar.co.uk</a> and we’ll switch it on for you. Until then, keep using your own ticket link on each event.</p>';
+            '<h3>Selling tickets through Dayli</h3><p class="sub">Selling tickets isn’t switched on for your account. Email <a href="mailto:hello@daylicalendar.co.uk">hello@daylicalendar.co.uk</a> and we’ll look at it. Until then, keep using your own ticket link on each event.</p>';
         } else if (!o.stripe_account_id) {
           status =
             '<h3>Connect Stripe to get paid</h3><p class="sub">Free tickets work already. For paid ones, ticket money goes straight to your own Stripe account, and Stripe pays it into your bank. Setting up takes about five minutes: your details, your bank account, and a check of who you are.</p><button class="btn primary" id="tk-connect">Connect with Stripe</button>';
@@ -1422,7 +1422,18 @@ window.DayliTickets = function (ctx) {
           '" style="max-width: 120px" /></label><label class="field" style="margin: 0"><span>Plus (pence)</span><input type="number" name="fixed" min="0" max="1000" value="' +
           esc(String(d.fee_fixed_pence)) +
           '" style="max-width: 120px" /></label><button class="btn primary" type="submit" style="align-self: flex-end">Save</button></form></div>' +
-          '<div class="card"><h3>Who can sell tickets</h3><p class="sub">Switch it on for organisers you trust; they then connect Stripe from Tickets & payouts.</p>' +
+          '<div class="card"><div class="row between"><div><h3>Selling tickets is ' +
+          (d.open_to_all ? '<span class="tag ok">open to every organiser</span>' : '<span class="tag plain">by invitation</span>') +
+          '</h3><p class="sub">' +
+          (d.open_to_all
+            ? 'Any organiser can set up tickets: free ones straight away, paid ones once they connect Stripe. You can still stop one below.'
+            : 'Only organisers you let sell can set up tickets. New organisers wait for you.') +
+          '</p></div><button type="button" class="btn" id="tk-open">' +
+          (d.open_to_all ? 'Make it invitation only' : 'Open to every organiser') +
+          '</button></div></div>' +
+          '<div class="card"><h3>Who can sell tickets</h3><p class="sub">' +
+          (d.open_to_all ? 'Everyone can, unless you stop them here.' : 'Switch it on for organisers you trust; they then connect Stripe from Tickets & payouts.') +
+          '</p>' +
           ((d.organisers || []).length
             ? '<div class="scroll-x"><table><tr><th>Organiser</th><th class="r">Events</th><th class="r">Tickets sold</th><th class="r">Stripe</th><th></th></tr>' +
               d.organisers
@@ -1451,6 +1462,19 @@ window.DayliTickets = function (ctx) {
               '</table></div>'
             : '<p class="muted small">No organisers yet.</p>') +
           '</div>';
+        el.querySelector('#tk-open').onclick = function () {
+          var open = !d.open_to_all;
+          if (!confirm(open ? 'Open ticket selling to every organiser? Everyone you haven’t stopped can sell straight away.' : 'Make ticket selling invitation only? Organisers who can sell now keep it; new ones wait for you.')) return;
+          rpc('admin_ticket_open_save', { p_open: open }).then(
+            function () {
+              toast(open ? 'Open to every organiser' : 'Invitation only');
+              adminMount(el);
+            },
+            function (err) {
+              toast(friendly(err));
+            },
+          );
+        };
         el.querySelector('#tk-fee').onsubmit = function (e) {
           e.preventDefault();
           rpc('admin_ticket_fee_save', { p_percent: Number(this.pct.value), p_fixed_pence: Number(this.fixed.value) }).then(
