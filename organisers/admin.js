@@ -34,6 +34,7 @@ window.DayliAdmin = function (ctx, ui) {
     ['notifications', 'Notifications'],
     ['safety', 'Safety'],
     ['ai', 'Dayli AI'],
+    ['costs', 'Costs'],
   ];
   var RANGES = [
     ['7', '7 days'],
@@ -88,6 +89,8 @@ window.DayliAdmin = function (ctx, ui) {
   };
 
   var state = { data: null, days: '30', loadedAt: 0 };
+  // The Costs tab has its own numbers and periods (costs.js).
+  var costs = window.DayliCosts(ctx, ui);
 
   // --- helpers ---------------------------------------------------------------------
 
@@ -380,6 +383,16 @@ window.DayliAdmin = function (ctx, ui) {
     })
       ? days
       : state.days || '30';
+    costs.stop();
+    if (tab === 'costs') {
+      render(
+        '<div class="page-head"><div><h1>Dayli admin</h1><p class="muted">What Dayli costs to run: your monthly bills and the AI it uses, in pounds</p></div></div>' +
+          tabsHtml(tab, days) +
+          '<div id="costs"></div>',
+      );
+      costs.mount($('#costs'));
+      return;
+    }
     ctx.loading();
     load(days)
       .then(function (d) {
@@ -398,6 +411,16 @@ window.DayliAdmin = function (ctx, ui) {
       });
   }
 
+  function tabsHtml(tab, days) {
+    return (
+      '<div class="tabs scroll">' +
+      TABS.map(function (t) {
+        return '<a class="' + (t[0] === tab ? 'on' : '') + '" href="#/admin?tab=' + t[0] + '&days=' + days + '">' + t[1] + '</a>';
+      }).join('') +
+      '</div>'
+    );
+  }
+
   function renderScreen(d, tab, days) {
     var head =
       '<div class="page-head"><div><h1>Dayli admin</h1><p class="muted">How Dayli is growing · numbers as of ' +
@@ -413,11 +436,7 @@ window.DayliAdmin = function (ctx, ui) {
       '<button type="button" class="btn small" id="adm-refresh">Refresh</button>' +
       '<button type="button" class="btn small" id="adm-download">Download JSON</button>' +
       '</div></div>' +
-      '<div class="tabs scroll">' +
-      TABS.map(function (t) {
-        return '<a class="' + (t[0] === tab ? 'on' : '') + '" href="#/admin?tab=' + t[0] + '&days=' + days + '">' + t[1] + '</a>';
-      }).join('') +
-      '</div>';
+      tabsHtml(tab, days);
     var body = '';
     switch (tab) {
       case 'people':

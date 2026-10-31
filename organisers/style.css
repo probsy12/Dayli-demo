@@ -1283,3 +1283,79 @@ th.r {
     height: 9px;
   }
 }
+
+/* Costs tab (costs.js): bills and AI use stacked per day, week or month. */
+.sbars {
+  display: flex;
+  align-items: flex-end;
+  gap: 3px;
+  height: 140px;
+}
+.sbars .sb {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  display: flex;
+  flex-direction: column-reverse;
+  position: relative;
+}
+.sbars .sb i {
+  display: block;
+  width: 100%;
+}
+.sbars .sb i.fx {
+  background: var(--accent);
+  border-radius: 0;
+}
+.sbars .sb i.ai {
+  background: var(--orange);
+  border-radius: 3px 3px 0 0;
+}
+.sbars .sb:hover::after {
+  content: attr(data-tip);
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--ink);
+  color: var(--bg);
+  font-size: 12px;
+  padding: 4px 8px;
+  border-radius: 8px;
+  white-space: nowrap;
+  z-index: 2;
+}
+.nowrap {
+  white-space: nowrap;
+}
+td input.price {
+  min-height: 36px;
+  padding: 6px 8px;
+  max-width: 110px;
+  text-align: right;
+}
+td input.price-model {
+  min-height: 36px;
+  padding: 6px 8px;
+}
+tr.muted td {
+  opacity: 0.6;
+}
+tr.bad-row td {
+  background: var(--danger-bg);
+}
+.live-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--danger);
+  margin-left: 6px;
+  vertical-align: middle;
+  animation: live-pulse 1.6s ease-in-out infinite;
+}
+@keyframes live-pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
