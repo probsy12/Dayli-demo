@@ -26,7 +26,7 @@
 <body>
 <main>
   <h1>Dayli privacy policy</h1>
-  <p class="muted">Last updated 19 October 2026</p>
+  <p class="muted">Last updated 30 October 2026</p>
 
   <p>Dayli is a shared calendar for families and friends. This page says what the app stores, why, who else sees it, and how to delete it. It is written to be read, not skimmed past.</p>
 
@@ -37,7 +37,7 @@
     <tr><td>Calendars, events, participants, comments, polls, invitation pages and the photos or files you attach</td><td>That is the calendar. Shared with the members of each calendar and the people you invite, and nobody else</td></tr>
     <tr><td>Your mobile number, asked for when you sign up</td><td>So friends who have your number can find you, and so an invitation sent to your number reaches you in Dayli. Only you can see it</td></tr>
     <tr><td>Phone numbers from your contacts, only if you allow access</td><td>To show which of your contacts are on Dayli, and to show people you already know under the name saved in your phone. Numbers are checked and not kept; names from your contacts never leave your phone</td></tr>
-    <tr><td>Photos you send to a shared calendar, and the photo frames paired with it</td><td>Shown to the members of that calendar and on its photo frames, and nobody else. The sender or the calendar's owner can remove a photo; anyone in the calendar can report one, which takes it down at once. A frame shows the calendar's photos and its next week of plans (never "only me" events) until it is disconnected in the app</td></tr>
+    <tr><td>Photos you send to a shared calendar, and the photo frames paired with it</td><td>Shown to the members of that calendar and on its photo frames, and nobody else. The sender or the calendar's owner can remove a photo; anyone else in the calendar can report one, which hides it for them at once and asks the Dayli team, who remove it if it breaks the rules. A frame shows the calendar's photos and its next week of plans (never "only me" events) until it is disconnected in the app</td></tr>
     <tr><td>Stories, and private messages between friends</td><td>A story is a photo your friends can see for 24 hours; it then stays on the day it was posted in the calendar you chose. Replies to a story, and messages, are private between the two of you. Blocking someone hides their stories and messages and stops them writing to you; reports go to the Dayli team</td></tr>
     <tr><td>Your profile photo, only if you add one</td><td>So people can tell who's who. Anyone with the photo's link can open it, so it is stored under a random link</td></tr>
     <tr><td>Messages in event and calendar chats, and anything you report or block</td><td>Seen by the people on that event or calendar. Reports go to the Dayli team to review; blocks are private to you</td></tr>
@@ -45,7 +45,10 @@
     <tr><td>Busy times from your phone's own calendars, only if you turn that on</td><td>So friends see those as busy too. Only start and end times leave the phone, never titles, places or people</td></tr>
     <tr><td>A private calendar link, only if you make one</td><td>So Apple Calendar, Google Calendar or Outlook can show your Dayli entries. Those apps read the link on their own schedule; anyone who has the link can see the entries in it. Switch it off in More → Synced calendars and the link stops working</td></tr>
     <tr><td>Links to other calendars you choose to follow (Google, Apple, Outlook), and the events they contain</td><td>To show those events inside Dayli. Only you see them; removing the link removes the events</td></tr>
-    <tr><td>A home town and its coordinates, only if you set one</td><td>To show the weather on your day view</td></tr>
+    <tr><td>A home town and its coordinates, only if you set one</td><td>To show the weather on your day view, and as the starting point for travel times</td></tr>
+    <tr><td>The places in your events, for travel times</td><td>To show how long it takes to get there. The place's name is looked up on a map, and the start and end points go to a route service; nothing else about the event is sent</td></tr>
+    <tr><td>Your location, only when you use Discover and allow it (or a postcode or town you type instead)</td><td>To find events near you. It is used for that search and not kept; when you open an event, only a rough distance band (such as "1–3 km") is noted for the organiser's statistics</td></tr>
+    <tr><td>Emails you forward to add@daylicalendar.co.uk</td><td>To turn a booking or invitation into an event in your calendar. Only emails from the address you sign in with are read. The email's text goes to the assistant (DeepSeek, below) to draft the event; the email itself is not kept</td></tr>
     <tr><td>A push notification token for your device, only if you allow notifications</td><td>To deliver invitations, replies and reminders</td></tr>
     <tr><td>What you type or say into Ask Dayli and smart add, and the answer</td><td>To turn it into events, and so we can fix mistakes the assistant makes. Voice is turned into text on your phone; only the text is sent</td></tr>
   </table>
@@ -53,15 +56,18 @@
   <h2>Who else processes it</h2>
   <ul>
     <li><strong>Supabase</strong> hosts the database, files and sign-in, in a European data centre.</li>
-    <li><strong>DeepSeek</strong> reads the text you type into Ask Dayli and smart add, together with the names of people in your calendars, to draft events and answer questions. The suggestion on your home screen sends your first name and a short summary of how busy your day is. No other calendar data is sent.</li>
+    <li><strong>DeepSeek</strong> reads the text you type into Ask Dayli and smart add (and emails you forward to Dayli), together with the names of people in your calendars, to draft events and answer questions. The suggestion on your home screen sends your first name and a short summary of how busy your day is. No other calendar data is sent.</li>
     <li><strong>Anthropic</strong> (the Claude assistant, in the United States) reads any photo or screenshot you choose to scan, with the names of people in your calendars, to turn it into events. Under Anthropic's commercial terms it is not used to train their models.</li>
-    <li><strong>Open-Meteo</strong> receives the coordinates of your home town to return a forecast.</li>
+    <li><strong>Open-Meteo</strong> receives the coordinates of your home town to return a forecast, and looks up the names of places (a town you type, or the place in an event) to find them on a map.</li>
+    <li><strong>OpenRouteService</strong> (Heidelberg Institute for Geoinformation Technology, Germany) receives the start and end points of a journey to work out a travel time.</li>
+    <li><strong>postcodes.io</strong> receives a postcode you type into Discover to find where it is.</li>
+    <li><strong>Resend</strong> sends Dayli's emails (sign-in links) and receives emails you forward to add@daylicalendar.co.uk.</li>
     <li><strong>Apple and Google</strong> handle sign-in with those accounts. <strong>Expo</strong> relays push notifications to Apple and Google.</li>
   </ul>
   <p>Dayli does not sell data, does not show adverts, and does not use third-party analytics or tracking libraries. It keeps its own note of when the app is opened (the moment, the platform and the app version, against your account) so we can see how many people use Dayli and whether it is growing; those notes are deleted after 13 months and are never shared.</p>
 
   <h2>How long it is kept</h2>
-  <p>As long as you have an account. Deleting your account in the app (<em>More → Delete account</em>) removes your profile, your events, photos, files, friendships, tokens and assistant history at once. Events in calendars you shared stay with the other members, without your name attached.</p>
+  <p>As long as you have an account. Deleting your account in the app (<em>More → Delete account</em>) removes your profile, your events, the photos and files you uploaded, your profile photo, friendships, tokens and assistant history at once. Events in calendars you shared stay with the other members, without your name attached.</p>
 
   <h2>Your rights</h2>
   <p>Under UK and EU data protection law you can ask for a copy of your data, a correction, or deletion. Deletion is self-service in the app. For anything else, write to the address below and we will answer within a month.</p>

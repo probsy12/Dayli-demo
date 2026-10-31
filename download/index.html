@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Get Dayli · 下载 Dayli</title>
+  <meta name="description" content="Download Dayli for iPhone or Android. 下载 Dayli 安卓版或 iPhone 版。" />
+  <link rel="icon" href="../img/icon.svg" type="image/svg+xml" />
+  <style>
+    :root { --bg: #f6f5f1; --surface: #ffffff; --ink: #1c1a17; --muted: #847f74; --accent: #2f6b4f; --accent-ink: #fff; --border: #e6e3da; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #171613; --surface: #201f1a; --ink: #f3f1ea; --muted: #a39e92; --accent: #7fbf9a; --accent-ink: #171613; --border: #353229; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 17px/1.5 -apple-system, "PingFang SC", "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 460px; margin: 0 auto; padding: 40px 20px 64px; }
+    .top { text-align: center; }
+    img.logo { width: 80px; height: 78px; margin: 0 auto 12px; }
+    h1 { font-family: Georgia, "Times New Roman", serif; font-size: 30px; line-height: 1.15; margin: 0 0 6px; }
+    h2 { font-size: 19px; margin: 0 0 6px; }
+    p { color: var(--muted); margin: 0 0 12px; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 18px; padding: 18px; margin-top: 18px; }
+    .btn { display: block; text-align: center; padding: 14px 20px; border-radius: 999px; text-decoration: none; font-weight: 600; border: 1px solid var(--border); background: var(--surface); color: var(--ink); margin-top: 10px; }
+    .btn.primary { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+    ol { margin: 6px 0 0; padding-left: 20px; color: var(--muted); }
+    li { margin: 4px 0; }
+    .lang { text-align: center; margin-top: 22px; font-size: 14px; }
+    .lang a { color: var(--accent); }
+    [data-zh] { display: none; }
+    html[lang="zh"] [data-zh] { display: block; }
+    html[lang="zh"] [data-en] { display: none; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="top">
+    <img class="logo" src="../img/logo.svg" alt="" />
+    <h1 data-en>Get Dayli</h1>
+    <h1 data-zh>下载 Dayli</h1>
+    <p data-en>A shared calendar for family and friends.</p>
+    <p data-zh>和家人朋友共享的日历，轻松约好时间。</p>
+  </div>
+
+  <div class="card">
+    <h2 data-en>iPhone</h2>
+    <h2 data-zh>iPhone</h2>
+    <a class="btn primary" href="https://apps.apple.com/app/id6767814466" rel="noopener">
+      <span data-en>Download on the App Store</span><span data-zh>在 App Store 下载</span>
+    </a>
+    <p data-en style="margin-top:12px">In mainland China the App Store doesn't list Dayli. Sign in to the App Store with a Hong Kong, UK or other non-mainland Apple ID, then download it.</p>
+    <p data-zh style="margin-top:12px">中国大陆的 App Store 暂时搜不到 Dayli。请在 App Store 登录香港、英国等非大陆地区的 Apple ID 后下载。</p>
+  </div>
+
+  <div class="card">
+    <h2 data-en>Android</h2>
+    <h2 data-zh>安卓手机</h2>
+    <a class="btn primary" href="https://github.com/probsy12/Dayli-demo/releases/latest/download/dayli.apk" rel="noopener">
+      <span data-en>Download for Android (.apk)</span><span data-zh>下载安卓版（.apk）</span>
+    </a>
+    <ol data-en>
+      <li>Open the downloaded file.</li>
+      <li>If your phone asks, allow installing apps from this browser.</li>
+      <li>Updates arrive by themselves when you open Dayli.</li>
+    </ol>
+    <ol data-zh>
+      <li>打开下载好的文件。</li>
+      <li>如果手机提示，请允许从该浏览器安装应用。</li>
+      <li>之后打开 Dayli 就会自动更新。</li>
+    </ol>
+    <a class="btn" href="https://play.google.com/store/apps/details?id=uk.co.dayli.app" rel="noopener">
+      <span data-en>Or Google Play</span><span data-zh>或在 Google Play 下载</span>
+    </a>
+  </div>
+
+  <p class="lang"><a href="#" id="switch"></a></p>
+</main>
+<script src="../wechat.js"></script>
+<script>
+  (function () {
+    var params = new URLSearchParams(location.search);
+    var zh = params.get('lang') ? params.get('lang') === 'zh' : /^zh/i.test(navigator.language || '');
+    function show(z) {
+      document.documentElement.lang = z ? 'zh' : 'en';
+      document.getElementById('switch').textContent = z ? 'English' : '简体中文';
+    }
+    show(zh);
+    document.getElementById('switch').addEventListener('click', function (e) {
+      e.preventDefault();
+      zh = !zh;
+      show(zh);
+    });
+  })();
+</script>
+</body>
+</html>
