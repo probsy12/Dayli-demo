@@ -35,6 +35,7 @@ window.DayliAdmin = function (ctx, ui) {
     ['safety', 'Safety'],
     ['ai', 'Dayli AI'],
     ['costs', 'Costs'],
+    ['premium', 'Premium'],
   ];
   var RANGES = [
     ['7', '7 days'],
@@ -91,6 +92,7 @@ window.DayliAdmin = function (ctx, ui) {
   var state = { data: null, days: '30', loadedAt: 0 };
   // The Costs tab has its own numbers and periods (costs.js).
   var costs = window.DayliCosts(ctx, ui);
+  var premium = window.DayliPremium(ctx, ui);
 
   // --- helpers ---------------------------------------------------------------------
 
@@ -384,6 +386,15 @@ window.DayliAdmin = function (ctx, ui) {
       ? days
       : state.days || '30';
     costs.stop();
+    if (tab === 'premium') {
+      render(
+        '<div class="page-head"><div><h1>Dayli admin</h1><p class="muted">Dayli Plus: the switch, founders, free limits and who has which plan</p></div></div>' +
+          tabsHtml(tab, days) +
+          '<div id="premium"></div>',
+      );
+      premium.mount($('#premium'));
+      return;
+    }
     if (tab === 'costs') {
       render(
         '<div class="page-head"><div><h1>Dayli admin</h1><p class="muted">What Dayli costs to run: your monthly bills and the AI it uses, in pounds</p></div></div>' +
