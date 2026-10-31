@@ -818,84 +818,8 @@
   function screenProfile(forced) {
     var o = state.organiser || {};
     var first = !state.organiser;
-    var initials = (o.name || email() || '?')
-      .split(/\s+/)
-      .map(function (w) {
-        return w.charAt(0);
-      })
-      .join('')
-      .slice(0, 2)
-      .toUpperCase();
-    var steps = first
-      ? '<div class="steps"><b>1</b><span>Who you are</span><em></em><b class="off">2</b><span class="off">Confirm email</span><em></em><b class="off">3</b><span class="off">First event</span></div>'
-      : '';
-    var form =
-      '<form class="card" id="profile-form" novalidate>' +
-      (first ? '<h2>Tell people who you are</h2><p class="muted small">This shows on every event you list, in the app and on its public page. You can change it any time.</p>' : '') +
-      '<div class="row" style="margin-bottom: 14px"><span class="avatar" id="avatar">' +
-      esc(initials) +
-      '</span><div class="muted small">Your initials stand in for a logo for now.</div></div>' +
-      '<label class="field"><span>Organiser name (you, your venue or your group)</span><input type="text" name="name" maxlength="80" required value="' +
-      esc(o.name) +
-      '" /></label>' +
-      '<label class="field"><span>About (optional)</span><textarea name="bio" maxlength="1000" placeholder="Stand-up nights in East London pubs since 2019.">' +
-      esc(o.bio) +
-      '</textarea></label>' +
-      '<div class="two">' +
-      '<label class="field"><span>Website (optional)</span><input type="url" name="website" maxlength="200" placeholder="https://" value="' +
-      esc(o.website) +
-      '" /></label>' +
-      '<label class="field"><span>Instagram (optional)</span><input type="text" name="instagram" maxlength="60" placeholder="@yourname" value="' +
-      esc(o.instagram) +
-      '" /></label></div>' +
-      '<div class="notice error" id="err" hidden></div>' +
-      '<div class="row between"><button class="btn primary" type="submit">' +
-      (first ? 'Continue' : 'Save') +
-      '</button></div></form>';
-    var preview =
-      '<div class="label" style="margin-bottom: 8px">How you’ll appear</div>' +
-      '<div class="card"><div class="row"><span class="avatar" id="pv-avatar" style="width: 44px; height: 44px; font-size: 16px">' +
-      esc(initials) +
-      '</span><div class="grow"><b id="pv-name">' +
-      esc(o.name || 'Your name') +
-      '</b><div class="muted small" id="pv-bio">' +
-      esc(o.bio || 'A few words about you.') +
-      '</div></div></div><div class="muted small" style="margin-top: 10px">Shown on every event you list.</div></div>';
-    var account = first
-      ? ''
-      : '<div class="card"><h3>Your account</h3>' +
-        '<p class="muted small">Signed in as <b>' +
-        esc(email()) +
-        '</b>. Email ' +
-        (isVerified() ? 'confirmed.' : 'not confirmed yet: <a href="#/verify">confirm it</a> before publishing.') +
-        '</p>' +
-        '<label class="switch"><input type="checkbox" id="alerts"' +
-        (o.alerts === false ? '' : ' checked') +
-        ' /> Push me when an event reaches 10, 25, 50, 100 going, and a summary the day after each event.</label>' +
-        '<p class="muted small" style="margin-top: 10px">The same email works in the Dayli app, where your events show under Events → Hosting. The app signs in with an emailed code.</p>' +
-        '<details><summary class="small">Change password</summary>' +
-        '<form id="pw-form" novalidate style="margin-top: 10px">' +
-        '<label class="field"><span>New password</span><input type="password" name="password" autocomplete="new-password" minlength="8" /></label>' +
-        '<div class="notice error" id="pw-err" hidden></div>' +
-        '<button class="btn small" type="submit">Save password</button></form></details></div>';
-    render(
-      '<div class="page-head"><div><div class="label">Profile</div><h1>' +
-        (first ? 'Welcome to Dayli' : 'Your organiser profile') +
-        '</h1></div></div>' +
-        (forced ? notice('info', 'Set up your profile to start listing events.') : '') +
-        steps +
-        '<div class="form-cols"><div>' +
-        form +
-        account +
-        '</div><div>' +
-        preview +
-        '</div></div>',
-    );
-    var err = $('#err');
-    function syncPreview() {
-      var name = $('[name=name]').value.trim();
-      var bio = $('[name=bio]').value.trim();
-      var ini = (name || '?')
+    var initialsOf = function (name) {
+      return (name || '?')
         .split(/\s+/)
         .map(function (w) {
           return w.charAt(0);
@@ -903,13 +827,149 @@
         .join('')
         .slice(0, 2)
         .toUpperCase();
+    };
+    var initials = initialsOf(o.name || email());
+    var logoUrl = o.logo_path ? coverUrl(o.logo_path) : '';
+    var mark = function (id, size) {
+      return (
+        '<span class="pa-logo" id="' +
+        id +
+        '" style="width: ' +
+        size +
+        'px; height: ' +
+        size +
+        'px; font-size: ' +
+        Math.round(size * 0.4) +
+        'px' +
+        (logoUrl ? '; background-image: url(&quot;' + esc(logoUrl) + '&quot;)' : '') +
+        '">' +
+        (logoUrl ? '' : esc(initials)) +
+        '</span>'
+      );
+    };
+    var steps = first
+      ? '<div class="steps"><b>1</b><span>Who you are</span><em></em><b class="off">2</b><span class="off">Confirm email</span><em></em><b class="off">3</b><span class="off">First event</span></div>'
+      : '';
+    var section = function (title, sub, body) {
+      return '<div class="pa-sec"><div><h2>' + title + '</h2><p>' + sub + '</p></div><div>' + body + '</div></div>';
+    };
+    var form =
+      '<form id="profile-form" novalidate>' +
+      section(
+        'Who you are',
+        'Your name or your venue’s, as people will know it. Shown on every event you list.',
+        '<div class="pa-logo-row">' +
+          mark('avatar', 76) +
+          '<div><label class="btn" style="cursor: pointer">Upload a logo<input type="file" name="logo" accept="image/png,image/jpeg,image/webp" hidden /></label>' +
+          '<button type="button" class="btn ghost" id="logo-remove"' +
+          (logoUrl ? '' : ' hidden') +
+          '>Remove</button><div class="muted small" style="margin-top: 6px">Square works best, at least 400 px. Until then your initials stand in.</div></div></div>' +
+          '<label class="field"><span>Organiser name</span><input type="text" name="name" maxlength="80" required placeholder="You, your venue or your group" value="' +
+          esc(o.name) +
+          '" /></label>' +
+          '<label class="field"><span>About</span><textarea name="bio" maxlength="1000" placeholder="Stand-up nights in East London pubs since 2019.">' +
+          esc(o.bio) +
+          '</textarea><div class="hint" id="bio-count"></div></label>',
+      ) +
+      section(
+        'Where to find you',
+        'Optional links shown under your name.',
+        '<div class="two"><label class="field"><span>Website</span><input type="url" name="website" maxlength="200" placeholder="https://" value="' +
+          esc(o.website) +
+          '" /></label><label class="field"><span>Instagram</span><input type="text" name="instagram" maxlength="60" placeholder="@yourname" value="' +
+          esc(o.instagram) +
+          '" /></label></div>',
+      ) +
+      '<div class="notice error" id="err" hidden></div>' +
+      '<div class="pa-save"><button class="btn primary" type="submit">' +
+      (first ? 'Continue' : 'Save profile') +
+      '</button></div></form>';
+    var account = first
+      ? ''
+      : section(
+          'Your account',
+          'Signed in as <b>' + esc(email()) + '</b>. ' + (isVerified() ? 'Email confirmed.' : 'Email not confirmed yet: <a href="#/verify">confirm it</a> before publishing.'),
+          '<label class="switch"><input type="checkbox" id="alerts"' +
+            (o.alerts === false ? '' : ' checked') +
+            ' /> Push me when an event reaches 10, 25, 50, 100 going, and a summary the day after each event.</label>' +
+            '<p class="muted small" style="margin: 12px 0">The same email works in the Dayli app, where your events show under Events → Hosting. The app signs in with an emailed code.</p>' +
+            '<details><summary class="btn small" style="display: inline-flex">Change password</summary>' +
+            '<form id="pw-form" novalidate style="margin-top: 12px; max-width: 360px">' +
+            '<label class="field"><span>New password</span><input type="password" name="password" autocomplete="new-password" minlength="8" /></label>' +
+            '<div class="notice error" id="pw-err" hidden></div>' +
+            '<button class="btn small" type="submit">Save password</button></form></details>',
+        );
+    var preview =
+      '<div class="pa-stick"><div class="label" style="margin-bottom: 10px">How you’ll appear</div>' +
+      '<div class="pa-card"><div class="pa-banner"></div><div class="pa-card-body"><div class="pa-who">' +
+      mark('pv-avatar', 48) +
+      '<div><b id="pv-name">' +
+      esc(o.name || 'Your name') +
+      '</b><div class="muted small">Organiser on Dayli</div></div></div><p id="pv-bio">' +
+      esc(o.bio || 'A few words about you.') +
+      '</p><div id="pv-links"></div></div></div>' +
+      '<p class="muted small" style="margin-top: 12px">Under every event you list, in the app and on its web page.</p></div>';
+    render(
+      '<div class="pa"><div class="pa-kick">Profile</div><h1>' +
+        (first ? 'Welcome to Dayli' : 'Your organiser profile') +
+        '</h1><p class="pa-lead">' +
+        (first ? 'Tell people who you are. You can change it any time.' : 'Shown on every event you list. Keep it short and friendly.') +
+        '</p>' +
+        (forced ? notice('info', 'Set up your profile to start listing events.') : '') +
+        steps +
+        '<div class="pa-cols"><div>' +
+        form +
+        account +
+        '</div><div>' +
+        preview +
+        '</div></div></div>',
+    );
+    var err = $('#err');
+    var logoFile = null;
+    var logoPath = o.logo_path || null;
+    function setMark(url, ini) {
+      ['#avatar', '#pv-avatar'].forEach(function (sel) {
+        var el = $(sel);
+        el.style.backgroundImage = url ? 'url("' + url + '")' : '';
+        el.textContent = url ? '' : ini;
+      });
+    }
+    function syncPreview() {
+      var name = $('[name=name]').value.trim();
+      var bio = $('[name=bio]').value.trim();
       $('#pv-name').textContent = name || 'Your name';
       $('#pv-bio').textContent = bio || 'A few words about you.';
-      $('#pv-avatar').textContent = ini;
-      $('#avatar').textContent = ini;
+      $('#bio-count').textContent = bio.length ? bio.length + ' of 1000' : '';
+      if (!logoFile && !logoPath) setMark('', initialsOf(name));
+      var links = [];
+      var site = $('[name=website]').value.trim().replace(/^https?:\/\//i, '').replace(/\/$/, '');
+      var ig = $('[name=instagram]').value.trim().replace(/^@/, '');
+      if (site) links.push(site);
+      if (ig) links.push('@' + ig);
+      $('#pv-links').innerHTML = links
+        .map(function (l) {
+          return '<span class="pa-chip">' + esc(l) + '</span>';
+        })
+        .join('');
     }
-    $('[name=name]').oninput = syncPreview;
-    $('[name=bio]').oninput = syncPreview;
+    $('#profile-form').oninput = syncPreview;
+    syncPreview();
+    $('[name=logo]').onchange = function () {
+      var file = this.files && this.files[0];
+      if (!file) return;
+      if (!/^image\/(png|jpeg|webp)$/.test(file.type)) return showError(err, 'Choose a PNG, JPEG or WebP picture.');
+      if (file.size > 5 * 1024 * 1024) return showError(err, 'That picture is over 5 MB. Choose a smaller one.');
+      logoFile = file;
+      setMark(URL.createObjectURL(file), '');
+      $('#logo-remove').hidden = false;
+    };
+    $('#logo-remove').onclick = function () {
+      logoFile = null;
+      logoPath = null;
+      $('[name=logo]').value = '';
+      this.hidden = true;
+      setMark('', initialsOf($('[name=name]').value.trim()));
+    };
     $('#profile-form').onsubmit = function (e) {
       e.preventDefault();
       err.hidden = true;
@@ -926,8 +986,30 @@
         p_instagram: $('[name=instagram]').value.trim().replace(/^@/, '') || null,
       })
         .then(function (row) {
-          setBusy(button, false);
           state.organiser = row || state.organiser || { name: name };
+          if (!logoFile && logoPath === (o.logo_path || null)) return row;
+          var up = Promise.resolve(logoPath);
+          if (logoFile) {
+            var ext = logoFile.type === 'image/png' ? 'png' : logoFile.type === 'image/webp' ? 'webp' : 'jpg';
+            var path = uid() + '/logo-' + Date.now() + '.' + ext;
+            up = sb.storage
+              .from('hero')
+              .upload(path, logoFile, { upsert: true, contentType: logoFile.type })
+              .then(function (res) {
+                if (res.error) throw new Error('We couldn’t upload the logo: ' + (res.error.message || 'try again.'));
+                return path;
+              });
+          }
+          return up.then(function (p) {
+            return rpc('organiser_logo_set', { p_path: p }).then(function () {
+              state.organiser.logo_path = p;
+              logoPath = p;
+              logoFile = null;
+            });
+          });
+        })
+        .then(function () {
+          setBusy(button, false);
           state.overview = null;
           toast('Profile saved.');
           if (first) {
@@ -1273,6 +1355,56 @@
       });
   }
 
+  // A small street map from OpenStreetMap tiles, with the pin in the middle.
+  // Clicking the map moves the pin there. No library: tiles are placed by hand.
+  function drawMap(el, lat, lon, zoom, onPick) {
+    var w = el.clientWidth || 300;
+    var h = el.clientHeight || 200;
+    var n = Math.pow(2, zoom) * 256;
+    var rad = (lat * Math.PI) / 180;
+    var cx = ((lon + 180) / 360) * n;
+    var cy = ((1 - Math.log(Math.tan(rad) + 1 / Math.cos(rad)) / Math.PI) / 2) * n;
+    var left = cx - w / 2;
+    var top = cy - h / 2;
+    var max = Math.pow(2, zoom);
+    var html = '';
+    for (var tx = Math.floor(left / 256); tx <= Math.floor((left + w) / 256); tx++) {
+      for (var ty = Math.floor(top / 256); ty <= Math.floor((top + h) / 256); ty++) {
+        if (ty < 0 || ty >= max) continue;
+        var wx = ((tx % max) + max) % max;
+        html +=
+          '<img alt="" draggable="false" onerror="this.style.visibility=\'hidden\'" src="https://tile.openstreetmap.org/' +
+          zoom + '/' + wx + '/' + ty +
+          '.png" style="left: ' + Math.round(tx * 256 - left) + 'px; top: ' + Math.round(ty * 256 - top) + 'px" />';
+      }
+    }
+    el.innerHTML =
+      html +
+      '<span class="po-pin"></span><span class="po-zoom"><button type="button" data-z="1" aria-label="Zoom in">+</button><button type="button" data-z="-1" aria-label="Zoom out">−</button></span>' +
+      '<span class="po-attr">© <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">OpenStreetMap</a></span>';
+    Array.prototype.forEach.call(el.querySelectorAll('[data-z]'), function (b) {
+      b.onclick = function (e) {
+        e.stopPropagation();
+        drawMap(el, lat, lon, Math.max(3, Math.min(18, zoom + Number(b.dataset.z))), onPick);
+      };
+    });
+    el.onclick = function (e) {
+      if (e.target.closest && e.target.closest('.po-zoom, .po-attr')) return;
+      var r = el.getBoundingClientRect();
+      var px = left + (e.clientX - r.left);
+      var py = top + (e.clientY - r.top);
+      var nlon = (px / n) * 360 - 180;
+      var nlat = (Math.atan(Math.sinh(Math.PI * (1 - (2 * py) / n))) * 180) / Math.PI;
+      onPick(nlat, nlon, zoom);
+    };
+  }
+
+  var ENTRY = [
+    ['none', 'Free, just turn up', 'No tickets. People say they’re going in the app.'],
+    ['dayli', 'Tickets through Dayli', 'Free or paid tickets with a code for the door. You set them up next.'],
+    ['external', 'Tickets sold elsewhere', 'Link to your own ticket page, like Eventbrite or Skiddle.'],
+  ];
+
   function renderForm(ev, copying) {
     var editing = !!ev && !copying;
     ev = ev || {};
@@ -1280,179 +1412,161 @@
     var starts = isoToZoned(ev.starts_at, tz);
     var ends = isoToZoned(ev.ends_at, tz);
     var pounds = ev.price_from_pence != null ? (ev.price_from_pence / 100).toFixed(2) : '';
-    var preview =
-      '<div class="label" style="margin-bottom: 8px">How it looks in the app</div>' +
-      '<div class="preview-card"><div class="preview-cover" id="pv-cover"' +
-      (ev.cover_image_path ? ' style="background-image: url(&quot;' + esc(coverUrl(ev.cover_image_path)) + '&quot;)"' : '') +
-      '>' +
-      (ev.cover_image_path ? '' : '<span id="pv-initial">' + esc((ev.title || 'E').trim().charAt(0).toUpperCase()) + '</span>') +
-      '<span class="tag" id="pv-price">' +
-      esc(fmtPrice({ is_free: ev.is_free !== false, price_from_pence: ev.price_from_pence, currency: ev.currency || 'GBP' })) +
-      '</span></div>' +
-      '<div class="preview-body"><div class="preview-kicker" id="pv-kicker"></div><div class="preview-title" id="pv-title">' +
-      esc(ev.title || 'Your event title') +
-      '</div><div class="muted small" id="pv-place">📍 ' +
-      esc(ev.venue_name || 'Venue') +
-      '</div><div class="muted small">by ' +
-      esc(state.organiser ? state.organiser.name : 'you') +
-      '</div></div></div>' +
-      '<div class="card" style="margin-top: 12px"><b class="small">Ready to publish?</b><ul class="checklist" id="checklist"></ul></div>';
+    var mode = ev.ticketing || (ev.ticket_url || ev.is_free === false ? 'external' : 'none');
+    var cover = ev.cover_image_path ? coverUrl(ev.cover_image_path) : '';
+    var category = ev.category || 'other';
+    var tile = function (label, body) {
+      return '<div class="po-tile"><b>' + label + '</b>' + body + '</div>';
+    };
     render(
-      '<div class="page-head"><div><div class="label">Events</div><h1>' +
+      '<div class="po">' +
+        '<div class="page-head"><div><div class="label">' +
         (editing ? 'Edit event' : copying ? 'Run it again' : 'New event') +
-        '</h1></div><a class="btn small" href="#/events">Back</a></div>' +
-        (editing && ev.status === 'published'
-          ? notice(
-              'info',
-              'This event is live. If you change the time or place, everyone going will be told.',
-            )
-          : '') +
+        '</div></div><div class="controls"><a class="btn" href="#/events">Back</a></div></div>' +
+        (editing && ev.status === 'published' ? notice('info', 'This event is live. If you change the time or place, everyone going will be told.') : '') +
         (copying ? notice('info', 'Everything but the date is copied from the last one. Set when it is and save.') : '') +
-        '<div class="form-cols"><form id="event-form" novalidate>' +
-        '<section class="card"><h2>What</h2>' +
-        '<label class="field"><span>Title</span><input type="text" name="title" maxlength="120" required value="' +
+        '<form id="event-form" novalidate>' +
+        // The poster: picture, title typed on it, and what people see at a glance.
+        '<div class="po-hero" id="pv-cover"' +
+        (cover ? ' style="background-image: url(&quot;' + esc(cover) + '&quot;)"' : '') +
+        '><div class="po-hero-actions"><label class="po-glass">Change picture<input type="file" name="cover" accept="image/*" hidden /></label>' +
+        '<button type="button" class="po-glass" id="cover-remove"' +
+        (cover ? '' : ' hidden') +
+        '>Remove</button></div>' +
+        '<div class="po-hero-text"><div class="po-kicker" id="pv-kicker"></div>' +
+        '<input type="text" name="title" class="po-title" maxlength="120" required placeholder="Your event title" value="' +
         esc(ev.title) +
-        '" /></label>' +
-        '<div class="two">' +
-        '<label class="field"><span>Category</span><select name="category">' +
-        options(CATEGORIES, ev.category || 'other') +
-        '</select></label>' +
-        '<label class="field"><span>Tags (optional, comma separated)</span><input type="text" name="tags" placeholder="jazz, live, outdoors" value="' +
-        esc((ev.tags || []).join(', ')) +
-        '" /><div class="hint">Up to 8.</div></label></div>' +
-        '<label class="field"><span>Description</span><textarea name="description" maxlength="4000" placeholder="What happens, who it’s for, what to bring.">' +
-        esc(ev.description) +
-        '</textarea></label>' +
-        '<div class="field-label">Cover picture (optional)</div>' +
-        '<div class="cover-preview" id="cover-preview"' +
-        (ev.cover_image_path
-          ? ' style="background-image: url(&quot;' + esc(coverUrl(ev.cover_image_path)) + '&quot;)"'
-          : '') +
-        '></div>' +
-        '<div class="actions" style="margin-top: 0; margin-bottom: 8px"><input type="file" name="cover" accept="image/*" />' +
-        '<button type="button" class="btn small" id="cover-remove"' +
-        (ev.cover_image_path ? '' : ' hidden') +
-        '>Remove picture</button></div>' +
+        '" /><div class="po-pills" id="pv-pills"></div></div></div>' +
         '<input type="hidden" name="cover_image_path" value="' +
         esc(ev.cover_image_path) +
         '" />' +
-        '</section>' +
-        '<section class="card"><h2>When</h2>' +
-        '<div class="two">' +
-        '<label class="field"><span>Starts</span><input type="date" name="starts_date" required value="' +
-        starts.date +
-        '" /></label>' +
-        '<label class="field"><span>Time</span><input type="time" name="starts_time" required value="' +
-        starts.time +
-        '" /></label>' +
-        '<label class="field"><span>Ends</span><input type="date" name="ends_date" required value="' +
-        ends.date +
-        '" /></label>' +
-        '<label class="field"><span>Time</span><input type="time" name="ends_time" required value="' +
-        ends.time +
-        '" /></label></div>' +
-        '<label class="field"><span>Time zone</span><select name="timezone">' +
-        options(TIMEZONES, tz) +
-        '</select></label>' +
-        '</section>' +
-        '<section class="card"><h2>Where</h2>' +
-        '<label class="field"><span>Venue name</span><input type="text" name="venue_name" maxlength="120" placeholder="The Old Crown" value="' +
-        esc(ev.venue_name) +
-        '" /></label>' +
-        '<label class="field"><span>Address</span><input type="text" name="address" maxlength="300" placeholder="12 High Street, Hackney, London E8 1AA" value="' +
-        esc(ev.address) +
-        '" /></label>' +
-        '<div class="actions" style="margin: 0 0 12px"><button type="button" class="btn" id="geocode">Find on map</button><span class="muted small" id="geo-status"></span></div>' +
-        '<div class="two">' +
-        '<label class="field"><span>Latitude</span><input type="number" name="lat" step="any" min="-90" max="90" value="' +
-        esc(ev.lat) +
-        '" /></label>' +
-        '<label class="field"><span>Longitude</span><input type="number" name="lon" step="any" min="-180" max="180" value="' +
-        esc(ev.lon) +
-        '" /></label></div>' +
-        '<div class="hint" id="geo-check"></div>' +
-        '<div class="hint">People find events by place, so an event needs a pin on the map before it can be published. Find on map fills these in; you can also type them.</div>' +
-        '</section>' +
-        '<section class="card"><h2>Tickets</h2>' +
-        '<label class="check"><input type="checkbox" name="is_free"' +
-        (ev.is_free === false ? '' : ' checked') +
-        ' /> Free to attend</label>' +
-        '<div class="two" id="price-row"' +
-        (ev.is_free === false ? '' : ' hidden') +
-        '>' +
-        '<label class="field"><span>From (price of the cheapest ticket)</span><input type="number" name="price" step="0.01" min="0" placeholder="12.00" value="' +
+        '<div class="po-tiles">' +
+        tile(
+          'When',
+          '<div class="po-two"><input type="date" name="starts_date" required value="' + starts.date + '" aria-label="Start date" /><input type="time" name="starts_time" required value="' + starts.time + '" aria-label="Start time" /></div>' +
+            '<div class="po-two"><input type="date" name="ends_date" required value="' + ends.date + '" aria-label="End date" /><input type="time" name="ends_time" required value="' + ends.time + '" aria-label="End time" /></div>' +
+            '<select name="timezone" aria-label="Time zone">' + options(TIMEZONES, tz) + '</select>',
+        ) +
+        tile(
+          'Where',
+          '<input type="text" name="venue_name" maxlength="120" placeholder="Venue, e.g. The Old Crown" value="' + esc(ev.venue_name) + '" />' +
+            '<input type="text" name="address" maxlength="300" placeholder="Address and postcode" value="' + esc(ev.address) + '" />' +
+            '<button type="button" class="btn small" id="geocode">Find on map</button> <span class="muted small" id="geo-status"></span>',
+        ) +
+        tile('Getting in', '<div class="po-entry-sum" id="entry-sum"></div><a class="small" href="#entry" id="entry-jump">Change</a>') +
+        '</div>' +
+        '<div class="po-body"><div>' +
+        '<section class="po-block"><h3>What’s it about?</h3>' +
+        '<textarea name="description" class="po-desc" maxlength="4000" placeholder="What happens, who it’s for, what to bring.">' +
+        esc(ev.description) +
+        '</textarea><div class="po-chips" id="cats">' +
+        CATEGORIES.map(function (c) {
+          return '<button type="button" class="po-chip' + (c[0] === category ? ' on' : '') + '" data-cat="' + c[0] + '">' + esc(c[1]) + '</button>';
+        }).join('') +
+        '</div><input type="hidden" name="category" value="' +
+        esc(category) +
+        '" /><label class="field" style="margin-top: 12px"><span>Tags (optional, comma separated)</span><input type="text" name="tags" placeholder="jazz, live, outdoors" value="' +
+        esc((ev.tags || []).join(', ')) +
+        '" /></label></section>' +
+        '<section class="po-block" id="entry"><h3>How do people get in?</h3>' +
+        ENTRY.map(function (m) {
+          return '<button type="button" class="po-opt' + (m[0] === mode ? ' on' : '') + '" data-mode="' + m[0] + '"><span><b>' + m[1] + '</b><span>' + m[2] + '</span></span><i></i></button>';
+        }).join('') +
+        '<div id="ext-fields"' +
+        (mode === 'external' ? '' : ' hidden') +
+        '><div class="two"><label class="field"><span>From (cheapest ticket, optional)</span><input type="number" name="price" step="0.01" min="0" placeholder="12.00" value="' +
         esc(pounds) +
-        '" /></label>' +
-        '<label class="field"><span>Currency</span><select name="currency">' +
+        '" /></label><label class="field"><span>Currency</span><select name="currency">' +
         options(CURRENCIES, ev.currency || 'GBP') +
-        '</select></label></div>' +
-        '<label class="field"><span>Ticket link (optional)</span><input type="url" name="ticket_url" maxlength="500" placeholder="https://" value="' +
+        '</select></label></div><label class="field"><span>Ticket link</span><input type="url" name="ticket_url" maxlength="500" placeholder="https://" value="' +
         esc(ev.ticket_url) +
-        '" /><div class="hint">Where tickets are sold. We don’t take payments.</div></label>' +
-        '<div class="two">' +
-        '<label class="field"><span>Capacity (optional)</span><input type="number" name="capacity" min="1" step="1" value="' +
-        esc(ev.capacity) +
-        '" /></label>' +
-        '<label class="field"><span>Minimum age (optional)</span><input type="number" name="min_age" min="0" max="99" step="1" placeholder="18" value="' +
-        esc(ev.min_age) +
         '" /></label></div>' +
-        '<label class="field"><span>Accessibility notes (optional)</span><textarea name="accessibility" maxlength="500" placeholder="Step-free entrance, accessible toilet, hearing loop…" style="min-height: 72px">' +
+        '<p class="muted small" id="dayli-note"' +
+        (mode === 'dayli' ? '' : ' hidden') +
+        '>' +
+        (editing
+          ? 'Prices, early bird, codes and orders are on this event’s <a href="#/tickets/' + esc(ev.id) + '">Tickets screen</a>. The “from” price here follows your tickets.'
+          : 'After saving you’ll set up the tickets: free or paid, how many, an early bird, codes. The “from” price follows your tickets.') +
+        '</p></section>' +
+        '<section class="po-block"><h3>Good to know</h3><div class="po-three">' +
+        '<label class="field"><span>Minimum age</span><input type="number" name="min_age" min="0" max="99" step="1" placeholder="Any" value="' +
+        esc(ev.min_age) +
+        '" /></label><label class="field"><span>Capacity</span><input type="number" name="capacity" min="1" step="1" placeholder="No limit" value="' +
+        esc(ev.capacity) +
+        '" /></label><label class="field"><span>Accessibility</span><input type="text" name="accessibility" maxlength="500" placeholder="Step-free, hearing loop…" value="' +
         esc(ev.accessibility) +
-        '</textarea></label>' +
-        '</section>' +
+        '" /></label></div></section>' +
+        '</div><div class="po-side">' +
+        '<section class="po-block po-mapcard"><div class="po-map" id="po-map"></div><div class="muted small" id="map-hint" style="padding: 12px 16px"></div>' +
+        '<input type="hidden" name="lat" value="' +
+        esc(ev.lat) +
+        '" /><input type="hidden" name="lon" value="' +
+        esc(ev.lon) +
+        '" /></section>' +
+        '<section class="po-block"><h3 style="font-size: 17px">Before you publish</h3><ul class="checklist" id="checklist"></ul>' +
         '<div class="notice error" id="err" hidden></div>' +
-        '<div class="form-foot"><button class="btn primary" type="submit">' +
-        (editing ? 'Save changes' : 'Save as draft') +
-        '</button><a class="btn" href="#/events">Cancel</a></div>' +
-        '</form><div>' +
-        preview +
-        '</div></div>',
+        '<button class="btn primary block" type="submit">' +
+        (editing ? 'Save changes' : mode === 'dayli' ? 'Save and set up tickets' : 'Save as draft') +
+        '</button><p class="muted small" style="margin: 10px 0 0">You publish from the Events list.</p></section>' +
+        '</div></div></form></div>',
     );
     var form = $('#event-form');
     var err = $('#err');
     var coverFile = null;
     var endsTouched = !!ev.ends_at;
+    var zoom = 16;
 
-    // The preview and the checklist follow the form as it is typed.
+    function priceText() {
+      if (mode === 'none') return 'Free';
+      if (mode === 'dayli') return ev.ticketing === 'dayli' ? fmtPrice(ev) : 'Tickets on Dayli';
+      var amount = parseFloat($('[name=price]').value);
+      return isNaN(amount) ? 'Tickets' : fmtPrice({ is_free: false, price_from_pence: Math.round(amount * 100), currency: $('[name=currency]').value || 'GBP' });
+    }
     function syncPreview() {
       var title = $('[name=title]').value.trim();
       var venue = $('[name=venue_name]').value.trim();
-      var isFree = $('[name=is_free]').checked;
-      var amount = parseFloat($('[name=price]').value);
       var age = $('[name=min_age]').value.trim();
       var tzNow = $('[name=timezone]').value;
       var iso = zonedToIso($('[name=starts_date]').value, $('[name=starts_time]').value, tzNow);
-      $('#pv-title').textContent = title || 'Your event title';
-      $('#pv-place').textContent = '📍 ' + (venue || 'Venue');
-      var ini = $('#pv-initial');
-      if (ini) ini.textContent = (title || 'E').trim().charAt(0).toUpperCase();
-      $('#pv-price').textContent = fmtPrice({
-        is_free: isFree || isNaN(amount),
-        price_from_pence: isNaN(amount) ? null : Math.round(amount * 100),
-        currency: $('[name=currency]').value || 'GBP',
-      });
+      var endIso = zonedToIso($('[name=ends_date]').value, $('[name=ends_time]').value, tzNow);
       var when = iso ? new Date(iso) : null;
-      var kicker = [];
-      if (when && !isNaN(when.getTime())) {
-        var parts = isoToZoned(iso, tzNow);
-        kicker.push(
-          when.toLocaleDateString('en-GB', { weekday: 'short', timeZone: safeTz(tzNow) }).toUpperCase() + ' · ' + parts.time,
-        );
-      }
-      kicker.push(categoryLabel($('[name=category]').value).toUpperCase());
+      var kicker = [categoryLabel($('[name=category]').value).toUpperCase()];
       if (age) kicker.push(age + '+');
       $('#pv-kicker').textContent = kicker.join(' · ');
+      var pills = [];
+      if (when && !isNaN(when.getTime())) {
+        var s = isoToZoned(iso, tzNow);
+        var e2 = endIso ? isoToZoned(endIso, tzNow) : null;
+        pills.push(when.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: safeTz(tzNow) }) + ', ' + s.time + (e2 && e2.date === s.date ? '–' + e2.time : ''));
+      }
+      if (venue) pills.push(venue);
+      pills.push(priceText());
+      $('#pv-pills').innerHTML = pills
+        .map(function (p) {
+          return '<span>' + esc(p) + '</span>';
+        })
+        .join('');
+      var m = ENTRY.filter(function (x) {
+        return x[0] === mode;
+      })[0];
+      $('#entry-sum').innerHTML = '<div class="po-big">' + esc(priceText()) + '</div><div class="muted small">' + esc(m[1]) + '</div>';
       var hasPlace = $('[name=lat]').value !== '' && $('[name=lon]').value !== '';
       var future = when && when.getTime() > Date.now();
-      var cover = !!(coverFile || $('[name=cover_image_path]').value);
+      var hasCover = !!(coverFile || $('[name=cover_image_path]').value);
+      var words = $('[name=description]').value.trim().split(/\s+/).filter(Boolean).length;
       var ticket = $('[name=ticket_url]').value.trim();
       var items = [
         [!!title, title ? 'Has a title' : 'Needs a title'],
-        [hasPlace, hasPlace ? 'Venue found on the map' : 'Find the venue on the map'],
-        [!!future, future ? 'In the future' : 'Needs a date to come'],
+        [hasPlace, hasPlace ? 'Pin on the map' : 'Find the venue on the map'],
+        [!!future, future ? 'Date to come' : 'Needs a date to come'],
         [isVerified(), isVerified() ? 'Email confirmed' : 'Confirm your email'],
-        [cover, cover ? 'Has a cover photo' : 'A cover photo gets more taps'],
-        [isFree || !!ticket, isFree ? 'Free to attend' : ticket ? 'Ticket link added' : 'Add the ticket link'],
+        [hasCover, hasCover ? 'Has a picture' : 'A picture gets more taps'],
+        [words >= 30, words >= 30 ? 'A good description' : 'A few more words about it'],
+        mode === 'external'
+          ? [!!ticket, ticket ? 'Ticket link added' : 'Add the ticket link']
+          : mode === 'dayli'
+            ? [ev.ticketing === 'dayli', ev.ticketing === 'dayli' ? 'Tickets through Dayli' : 'Set up tickets after saving']
+            : [true, 'Free to attend'],
       ];
       $('#checklist').innerHTML = items
         .map(function (it) {
@@ -1460,28 +1574,69 @@
         })
         .join('');
     }
+    function showMap() {
+      var lat = parseFloat($('[name=lat]').value);
+      var lon = parseFloat($('[name=lon]').value);
+      var box = $('#po-map');
+      if (isNaN(lat) || isNaN(lon)) {
+        box.onclick = null;
+        box.innerHTML = '<div class="po-map-empty">Type the address and press <b>Find on map</b>.<br />People find events by place, so it needs a pin before it’s published.</div>';
+        $('#map-hint').textContent = '';
+        return;
+      }
+      drawMap(box, lat, lon, zoom, function (nlat, nlon, z) {
+        zoom = z;
+        $('[name=lat]').value = nlat.toFixed(6);
+        $('[name=lon]').value = nlon.toFixed(6);
+        showMap();
+        syncPreview();
+      });
+      $('#map-hint').textContent = 'Not quite right? Click the map where the entrance is.';
+    }
     form.oninput = syncPreview;
     form.onchange = syncPreview;
-
+    $$('[data-cat]').forEach(function (b) {
+      b.onclick = function () {
+        $$('[data-cat]').forEach(function (x) {
+          x.classList.toggle('on', x === b);
+        });
+        $('[name=category]').value = b.dataset.cat;
+        syncPreview();
+      };
+    });
+    $$('[data-mode]').forEach(function (b) {
+      b.onclick = function () {
+        mode = b.dataset.mode;
+        $$('[data-mode]').forEach(function (x) {
+          x.classList.toggle('on', x === b);
+        });
+        $('#ext-fields').hidden = mode !== 'external';
+        $('#dayli-note').hidden = mode !== 'dayli';
+        if (!editing) $('button[type=submit]', form).textContent = mode === 'dayli' ? 'Save and set up tickets' : 'Save as draft';
+        syncPreview();
+      };
+    });
+    $('#entry-jump').onclick = function (e) {
+      e.preventDefault();
+      $('#entry').scrollIntoView({ behavior: 'smooth', block: 'center' });
+    };
     // End follows the start by two hours until someone changes it by hand.
     function syncEnd() {
       var tzNow = $('[name=timezone]').value;
       var iso = zonedToIso($('[name=starts_date]').value, $('[name=starts_time]').value, tzNow);
-      if (!iso) return;
-      if (endsTouched) return;
+      if (!iso || endsTouched) return;
       var end = isoToZoned(new Date(new Date(iso).getTime() + 2 * 3600000).toISOString(), tzNow);
       $('[name=ends_date]').value = end.date;
       $('[name=ends_time]').value = end.time;
     }
-    $('[name=starts_date]').onchange = syncEnd;
-    $('[name=starts_time]').onchange = syncEnd;
-    $('[name=ends_date]').onchange = $('[name=ends_time]').onchange = function () {
+    $('[name=starts_date]').addEventListener('change', syncEnd);
+    $('[name=starts_time]').addEventListener('change', syncEnd);
+    $('[name=ends_date]').addEventListener('change', function () {
       endsTouched = true;
-    };
-    // Changing the zone keeps the clock times, so the instant moves with it.
-    $('[name=is_free]').onchange = function () {
-      $('#price-row').hidden = this.checked;
-    };
+    });
+    $('[name=ends_time]').addEventListener('change', function () {
+      endsTouched = true;
+    });
     $('[name=cover]').onchange = function () {
       var file = this.files && this.files[0];
       if (!file) return;
@@ -1496,11 +1651,7 @@
         return;
       }
       coverFile = file;
-      var url = 'url("' + URL.createObjectURL(file) + '")';
-      $('#cover-preview').style.backgroundImage = url;
-      $('#pv-cover').style.backgroundImage = url;
-      var ini = $('#pv-initial');
-      if (ini) ini.hidden = true;
+      $('#pv-cover').style.backgroundImage = 'url("' + URL.createObjectURL(file) + '")';
       $('#cover-remove').hidden = false;
       syncPreview();
     };
@@ -1508,31 +1659,10 @@
       coverFile = null;
       $('[name=cover]').value = '';
       $('[name=cover_image_path]').value = '';
-      $('#cover-preview').style.backgroundImage = '';
       $('#pv-cover').style.backgroundImage = '';
-      var ini = $('#pv-initial');
-      if (ini) ini.hidden = false;
       this.hidden = true;
       syncPreview();
     };
-    function updateGeoCheck() {
-      var lat = parseFloat($('[name=lat]').value);
-      var lon = parseFloat($('[name=lon]').value);
-      var box = $('#geo-check');
-      if (isNaN(lat) || isNaN(lon)) {
-        box.innerHTML = '';
-        return;
-      }
-      box.innerHTML =
-        'Looks right? <a href="https://maps.google.com/?q=' +
-        lat +
-        ',' +
-        lon +
-        '" target="_blank" rel="noopener">Check the pin on Google Maps</a>.';
-    }
-    $('[name=lat]').oninput = $('[name=lon]').oninput = updateGeoCheck;
-    updateGeoCheck();
-    syncPreview();
     $('#geocode').onclick = function () {
       var address = $('[name=address]').value.trim();
       var venue = $('[name=venue_name]').value.trim();
@@ -1548,23 +1678,24 @@
         function (found) {
           setBusy(button, false);
           if (!found) {
-            status.textContent =
-              'We couldn’t place that address. Try adding the town or postcode, or type the latitude and longitude.';
+            status.textContent = 'We couldn’t place that address. Add the town or postcode, or click the map.';
             return;
           }
           $('[name=lat]').value = found.lat.toFixed(6);
           $('[name=lon]').value = found.lon.toFixed(6);
-          status.textContent = 'Found' + (found.label ? ': ' + found.label : '.');
-          updateGeoCheck();
+          status.textContent = 'Found.';
+          zoom = 16;
+          showMap();
           syncPreview();
         },
         function () {
           setBusy(button, false);
-          status.textContent =
-            'The map service didn’t answer. Try again, or type the latitude and longitude.';
+          status.textContent = 'The map service didn’t answer. Try again.';
         },
       );
     };
+    showMap();
+    syncPreview();
 
     form.onsubmit = function (e) {
       e.preventDefault();
@@ -1579,8 +1710,7 @@
       var endsAt = zonedToIso(v('ends_date'), v('ends_time'), tzNow);
       if (!startsAt) return showError(err, 'Enter when it starts.');
       if (!endsAt) return showError(err, 'Enter when it ends.');
-      if (new Date(endsAt) <= new Date(startsAt))
-        return showError(err, 'The end has to come after the start.');
+      if (new Date(endsAt) <= new Date(startsAt)) return showError(err, 'The end has to come after the start.');
       var tags = v('tags')
         .split(',')
         .map(function (t) {
@@ -1588,48 +1718,36 @@
         })
         .filter(Boolean);
       if (tags.length > 8) return showError(err, 'Up to 8 tags, please.');
-      var isFree = $('[name=is_free]').checked;
       var pence = null;
-      if (!isFree) {
-        var amount = parseFloat(v('price'));
-        if (isNaN(amount) || amount < 0)
-          return showError(err, 'Enter the price of the cheapest ticket, or tick Free.');
-        pence = Math.round(amount * 100);
-      }
-      var ticket = v('ticket_url');
-      if (ticket && !/^https?:\/\//i.test(ticket)) {
-        if (/^[\w.-]+\.[a-z]{2,}/i.test(ticket)) ticket = 'https://' + ticket;
-        else return showError(err, 'The ticket link must start with http:// or https://.');
+      var ticket = '';
+      if (mode === 'external') {
+        var amount = v('price') === '' ? NaN : parseFloat(v('price'));
+        if (v('price') !== '' && (isNaN(amount) || amount < 0)) return showError(err, 'The “from” price doesn’t look right.');
+        pence = isNaN(amount) ? null : Math.round(amount * 100);
+        ticket = v('ticket_url');
+        if (ticket && !/^https?:\/\//i.test(ticket)) {
+          if (/^[\w.-]+\.[a-z]{2,}/i.test(ticket)) ticket = 'https://' + ticket;
+          else return showError(err, 'The ticket link must start with http:// or https://.');
+        }
       }
       var lat = v('lat') === '' ? null : parseFloat(v('lat'));
       var lon = v('lon') === '' ? null : parseFloat(v('lon'));
-      if ((lat === null) !== (lon === null))
-        return showError(err, 'Enter both latitude and longitude, or neither.');
-      if (lat !== null && (isNaN(lat) || isNaN(lon) || Math.abs(lat) > 90 || Math.abs(lon) > 180))
-        return showError(err, 'Those coordinates don’t look right.');
       var capacity = v('capacity') === '' ? null : parseInt(v('capacity'), 10);
-      if (capacity !== null && (isNaN(capacity) || capacity < 1))
-        return showError(err, 'Capacity must be a whole number above 0.');
+      if (capacity !== null && (isNaN(capacity) || capacity < 1)) return showError(err, 'Capacity must be a whole number above 0.');
       var minAge = v('min_age') === '' ? null : parseInt(v('min_age'), 10);
-      if (minAge !== null && (isNaN(minAge) || minAge < 0 || minAge > 99))
-        return showError(err, 'Minimum age must be between 0 and 99.');
+      if (minAge !== null && (isNaN(minAge) || minAge < 0 || minAge > 99)) return showError(err, 'Minimum age must be between 0 and 99.');
 
       var button = $('button[type=submit]', form);
       setBusy(button, true, 'Saving…');
       var upload = Promise.resolve($('[name=cover_image_path]').value || null);
       if (coverFile) {
-        var ext =
-          (coverFile.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') ||
-          'jpg';
+        var ext = (coverFile.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
         var path = uid() + '/public-events/' + Date.now() + '.' + ext;
         upload = sb.storage
           .from('hero')
           .upload(path, coverFile, { upsert: true, contentType: coverFile.type })
           .then(function (res) {
-            if (res.error)
-              throw new Error(
-                'We couldn’t upload the picture: ' + (res.error.message || 'try again.'),
-              );
+            if (res.error) throw new Error('We couldn’t upload the picture: ' + (res.error.message || 'try again.'));
             return path;
           });
       }
@@ -1648,24 +1766,37 @@
             address: v('address') || null,
             lat: lat,
             lon: lon,
-            is_free: isFree,
-            price_from_pence: pence,
-            currency: v('currency') || 'GBP',
-            ticket_url: ticket || null,
             capacity: capacity,
             min_age: minAge,
             accessibility: v('accessibility') || null,
           };
+          // With Dayli tickets the price comes from the tickets themselves.
+          if (mode !== 'dayli') {
+            payload.is_free = mode === 'none' || pence === null;
+            payload.price_from_pence = mode === 'none' ? null : pence;
+            payload.currency = v('currency') || 'GBP';
+            payload.ticket_url = mode === 'external' ? ticket || null : null;
+          }
           if (editing) payload.id = ev.id;
           return rpc('public_event_save', { p: payload });
+        })
+        .then(function (saved) {
+          var id = (saved && saved.id) || ev.id;
+          return rpc('public_event_ticketing_set', { p_id: id, p_mode: mode }).then(function () {
+            return saved;
+          });
         })
         .then(function (saved) {
           setBusy(button, false);
           state.events = null;
           state.overview = null;
+          var id = (saved && saved.id) || ev.id;
+          if (mode === 'dayli' && ev.ticketing !== 'dayli') {
+            toast('Saved. Now the tickets.');
+            return go('#/tickets/' + id);
+          }
           if (editing) toast('Saved.');
-          else if (saved && saved.lat != null)
-            toast('Saved as a draft. Publish it when you’re ready.');
+          else if (saved && saved.lat != null) toast('Saved as a draft. Publish it when you’re ready.');
           else toast('Saved as a draft. Add the place before publishing.');
           go('#/events');
         })
