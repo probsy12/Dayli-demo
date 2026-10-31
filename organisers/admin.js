@@ -36,6 +36,7 @@ window.DayliAdmin = function (ctx, ui) {
     ['ai', 'Dayli AI'],
     ['costs', 'Costs'],
     ['premium', 'Premium'],
+    ['tickets', 'Tickets'],
   ];
   var RANGES = [
     ['7', '7 days'],
@@ -86,7 +87,7 @@ window.DayliAdmin = function (ctx, ui) {
   var SOURCE = { manual: 'Typed in', ai: 'Smart add / Ask Dayli', rsvp: 'From an RSVP', whatsapp: 'WhatsApp', ical: 'Synced', public_event: 'Public event', email: 'Email' };
   var VIEW_SOURCE = { app: 'Discover in the app', friend: 'A friend was going', share: 'Shared link', web: 'Public web page', notification: 'A reminder' };
   var NOTE_TYPE = {
-    page_invite: 'Invitation page', page_rsvp: 'Page RSVP', friend_request: 'Friend request', friend_accepted: 'Friend accepted', event_added: 'Event added', event_changed: 'Event changed', member_joined: 'Someone joined', event_comment: 'Event comment', poll_invite: 'Poll invite', poll_closed: 'Poll closed', event_rsvp: 'Event RSVP', rsvp_ask: 'RSVP nudge', event_invite: 'Event invite', event_invite_reply: 'Invite reply', calendar_message: 'Calendar chat', event_deleted: 'Event deleted', calendar_invite: 'Calendar invite', calendar_photo: 'Photo sent', story_posted: 'Memory posted', dm_message: 'Message', public_event_cancelled: 'Event cancelled', public_event_changed: 'Event changed', time_suggested: 'Time suggested', time_suggestion_reply: 'Time reply', public_event_reminder: 'Event reminder', public_event_milestone: 'Milestone', public_event_summary: 'Event summary',
+    page_invite: 'Invitation page', page_rsvp: 'Page RSVP', friend_request: 'Friend request', friend_accepted: 'Friend accepted', event_added: 'Event added', event_changed: 'Event changed', member_joined: 'Someone joined', event_comment: 'Event comment', poll_invite: 'Poll invite', poll_closed: 'Poll closed', event_rsvp: 'Event RSVP', rsvp_ask: 'RSVP nudge', event_invite: 'Event invite', event_invite_reply: 'Invite reply', calendar_message: 'Calendar chat', event_deleted: 'Event deleted', calendar_invite: 'Calendar invite', calendar_photo: 'Photo sent', story_posted: 'Memory posted', dm_message: 'Message', public_event_cancelled: 'Event cancelled', public_event_changed: 'Event changed', time_suggested: 'Time suggested', time_suggestion_reply: 'Time reply', public_event_reminder: 'Event reminder', public_event_milestone: 'Milestone', public_event_summary: 'Event summary', tickets_ready: 'Tickets bought',
   };
 
   var state = { data: null, days: '30', loadedAt: 0 };
@@ -393,6 +394,15 @@ window.DayliAdmin = function (ctx, ui) {
           '<div id="premium"></div>',
       );
       premium.mount($('#premium'));
+      return;
+    }
+    if (tab === 'tickets') {
+      render(
+        '<div class="page-head"><div><h1>Dayli admin</h1><p class="muted">Tickets through Dayli: who can sell, the booking fee and the takings</p></div></div>' +
+          tabsHtml(tab, days) +
+          '<div id="tickets"></div>',
+      );
+      ctx.tickets.adminMount($('#tickets'));
       return;
     }
     if (tab === 'costs') {

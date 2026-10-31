@@ -357,7 +357,7 @@
     sheet.className = 'menu-sheet';
     sheet.id = 'menu-sheet';
     sheet.innerHTML =
-      '<a href="#/overview">Overview</a><a href="#/events">Events</a><a href="#/analytics">Analytics</a><a href="#/profile">Profile</a>' +
+      '<a href="#/overview">Overview</a><a href="#/events">Events</a><a href="#/analytics">Analytics</a><a href="#/payouts">Tickets &amp; payouts</a><a href="#/profile">Profile</a>' +
       (state.admin ? '<a href="#/admin">Admin</a>' : '') +
       '<a href="#/events/new">+ New event</a><button type="button" class="linkish" id="menu-sign-out" style="padding: 12px">Sign out</button>';
     document.body.appendChild(sheet);
@@ -378,6 +378,7 @@
       query[decodeURIComponent(i < 0 ? kv : kv.slice(0, i))] = decodeURIComponent(i < 0 ? '' : kv.slice(i + 1));
     });
     var signedIn = !!state.session;
+    if (parts[0] !== 'checkin') tickets.stopCamera();
     setShell(signedIn && state.organiser !== undefined, parts[0]);
 
     if (parts[0] === 'reset') return screenReset();
@@ -423,6 +424,16 @@
         if (!state.admin) return go(homeHash());
         setShell(true, 'admin');
         return admin.screen(query.tab, query.days);
+      case 'payouts':
+        if (!state.organiser) return screenProfile(true);
+        setShell(true, 'payouts');
+        return tickets.payouts(query);
+      case 'tickets':
+      case 'checkin':
+        if (!state.organiser) return screenProfile(true);
+        if (!parts[1]) return go('#/payouts');
+        setShell(true, 'payouts');
+        return parts[0] === 'tickets' ? tickets.eventScreen(parts[1]) : tickets.checkin(parts[1]);
       case 'events':
         if (!state.organiser) return screenProfile(true);
         setShell(true, 'events');
@@ -458,8 +469,24 @@
     isoToZoned: isoToZoned,
     safeTz: safeTz,
   });
+  var tickets = window.DayliTickets({
+    sb: sb,
+    esc: esc,
+    $: $,
+    $$: $$,
+    rpc: rpc,
+    render: render,
+    loading: loading,
+    notice: notice,
+    toast: toast,
+    friendly: friendly,
+    setBusy: setBusy,
+    uid: uid,
+    kpi: analytics.ui.kpi,
+  });
   var admin = window.DayliAdmin(
     {
+      tickets: tickets,
       sb: sb,
       esc: esc,
       $: $,
@@ -1058,6 +1085,9 @@
         '<a class="btn small" href="#/analytics/' +
         esc(ev.id) +
         '">Analytics</a>' +
+        (state.organiser && state.organiser.can_sell_tickets
+          ? '<a class="btn small" href="#/tickets/' + esc(ev.id) + '">Tickets</a>'
+          : '') +
         (past && ev.status !== 'draft'
           ? '<a class="btn small" href="#/events/new?from=' + esc(ev.id) + '">Run it again</a>'
           : '') +
@@ -1122,7 +1152,11 @@
       var ok = confirm(
         'Cancel “' +
           ev.title +
-          '”?\n\nEveryone who said they’re going or interested will be told, and the event comes off their calendars. You can’t undo this for them.',
+          '”?\n\nEveryone who said they’re going or interested will be told, and the event comes off their calendars.' +
+          (state.organiser && state.organiser.can_sell_tickets
+            ? ' Anyone who bought a ticket through Dayli gets a full refund.'
+            : '') +
+          ' You can’t undo this for them.',
       );
       if (!ok) return;
     }
@@ -1132,6 +1166,9 @@
     }
     setBusy(button, true);
     rpc('public_event_set_status', { p_id: ev.id, p_status: status })
+      .then(function () {
+        return status === 'cancelled' ? tickets.refundAll(ev.id) : null;
+      })
       .then(function () {
         state.overview = null;
         toast(

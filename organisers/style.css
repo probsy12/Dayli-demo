@@ -537,6 +537,7 @@ input[type='password'],
 input[type='url'],
 input[type='number'],
 input[type='date'],
+input[type='datetime-local'],
 input[type='time'],
 select,
 textarea {
@@ -1358,4 +1359,26 @@ tr.bad-row td {
   50% {
     opacity: 0.25;
   }
+}
+
+/* Check-in at the door (tickets.js) */
+.ci-result {
+  padding: 22px 18px;
+  border-radius: 14px;
+  background: var(--accent-soft);
+  color: var(--muted, inherit);
+  font-size: 17px;
+  text-align: center;
+}
+.ci-result b {
+  display: block;
+  font-size: 22px;
+}
+.ci-result.ok {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+.ci-result.bad {
+  background: var(--danger-bg);
+  color: var(--danger);
 }

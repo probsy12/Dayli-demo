@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dayli tickets</title>
+    <meta name="robots" content="noindex" />
+    <style>
+      body {
+        margin: 0;
+        font-family: -apple-system, 'Inter', 'Helvetica Neue', Arial, sans-serif;
+        background: #f6f5f1;
+        color: #1c1a17;
+        display: flex;
+        min-height: 100vh;
+        align-items: center;
+        justify-content: center;
+        padding: 24px;
+        box-sizing: border-box;
+      }
+      .card {
+        background: #fff;
+        border-radius: 22px;
+        padding: 32px 26px;
+        max-width: 380px;
+        text-align: center;
+        box-shadow: 0 10px 30px rgba(28, 26, 23, 0.08);
+      }
+      .icon {
+        font-size: 44px;
+      }
+      h1 {
+        font-family: Georgia, serif;
+        font-size: 26px;
+        margin: 12px 0 8px;
+      }
+      p {
+        color: #847f74;
+        line-height: 1.5;
+        margin: 0 0 22px;
+      }
+      a.btn {
+        display: block;
+        background: #2f6b4f;
+        color: #fff;
+        text-decoration: none;
+        font-weight: 700;
+        padding: 14px;
+        border-radius: 14px;
+      }
+    </style>
+  </head>
+  <body>
+    <!-- Where Stripe's checkout sends a buyer back to (ticket-checkout). -->
+    <div class="card">
+      <div class="icon" id="icon">🎟️</div>
+      <h1 id="title">Payment received</h1>
+      <p id="text">Your tickets are on their way to Dayli. They appear on the event in a moment, with a code to show at the door.</p>
+      <a class="btn" id="back" href="dayli://">Back to Dayli</a>
+    </div>
+    <script>
+      var q = new URLSearchParams(location.search);
+      if (q.get('cancelled')) {
+        document.getElementById('icon').textContent = '↩️';
+        document.getElementById('title').textContent = 'No payment taken';
+        document.getElementById('text').textContent =
+          'You left before paying, so nothing was charged. Your tickets are held for a little while if you want to try again.';
+      }
+    </script>
+  </body>
+</html>
