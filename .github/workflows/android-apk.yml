@@ -1,0 +1,36 @@
+# Puts the Android .apk on the "android" release, which
+# daylicalendar.co.uk/download links to
+# (releases/latest/download/dayli.apk). It runs when .github/apk-url.txt
+# changes; that file holds the EAS download link of a production-apk build
+# (printed by the dayli repo's Build Android workflow). Only EAS .apk links
+# are accepted.
+name: Android apk
+on:
+  push:
+    branches: [main]
+    paths: ['.github/apk-url.txt']
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Download and publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          url=$(tr -d '[:space:]' < .github/apk-url.txt)
+          case "$url" in
+            https://expo.dev/artifacts/eas/*.apk) ;;
+            *) echo "::error::Not an EAS .apk link: $url"; exit 1 ;;
+          esac
+          curl -fsSL "$url" -o dayli.apk
+          unzip -tq dayli.apk > /dev/null
+          unzip -l dayli.apk AndroidManifest.xml > /dev/null
+          gh release view android > /dev/null 2>&1 ||
+            gh release create android --latest --title "Dayli for Android" \
+              --notes "Direct download for phones without Google Play: https://daylicalendar.co.uk/download"
+          gh release upload android dayli.apk --clobber
+          echo "Published: https://github.com/probsy12/Dayli-demo/releases/latest/download/dayli.apk ($(du -h dayli.apk | cut -f1))"
