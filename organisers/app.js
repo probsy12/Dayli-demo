@@ -433,7 +433,7 @@
         if (!state.organiser) return screenProfile(true);
         if (!parts[1]) return go('#/payouts');
         setShell(true, 'payouts');
-        return parts[0] === 'tickets' ? tickets.eventScreen(parts[1]) : tickets.checkin(parts[1]);
+        return parts[0] === 'tickets' ? tickets.eventScreen(parts[1], query) : tickets.checkin(parts[1]);
       case 'events':
         if (!state.organiser) return screenProfile(true);
         setShell(true, 'events');
@@ -483,6 +483,7 @@
     setBusy: setBusy,
     uid: uid,
     kpi: analytics.ui.kpi,
+    go: go,
   });
   var admin = window.DayliAdmin(
     {

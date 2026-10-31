@@ -774,6 +774,7 @@ window.DayliAnalytics = function (ctx) {
     });
     if (a) bindInsightActions(a, reload);
     if (a && tab === 'overview') loadAi(a, reload);
+    if (a && tab === 'tickets') loadTicketStats(ev.id);
     var alerts = $('#alerts');
     if (alerts) {
       alerts.onchange = function () {
@@ -787,6 +788,39 @@ window.DayliAnalytics = function (ctx) {
           });
       };
     }
+  }
+
+  // The Dayli tickets part of the Tickets tab (ticket-stats.js), when the
+  // event sells tickets here; otherwise the ticket-link card stays.
+  var ticketStats = null;
+  function loadTicketStats(id) {
+    var el = $('#tk-stats');
+    if (!el || !window.DayliTicketStats) return;
+    if (!ticketStats)
+      ticketStats = window.DayliTicketStats(ctx, {
+        kpi: kpi,
+        card: card,
+        bars: bars,
+        hbars: hbars,
+        axis: axis,
+        fmtN: fmtN,
+        n: n,
+        pct: pct,
+        dayLabel: dayLabel,
+        plural: plural,
+        askAi: askAi,
+        aiError: aiError,
+      });
+    el.innerHTML = '<p class="muted">Loading ticket sales…</p>';
+    ticketStats.mount(el, id).then(
+      function (sells) {
+        if (!sells) el.innerHTML = '';
+        else if ($('#tk-link')) $('#tk-link').hidden = true;
+      },
+      function () {
+        el.innerHTML = '';
+      },
+    );
   }
 
   // Views (green) and net going (orange) by day, over the window.
@@ -1189,7 +1223,9 @@ window.DayliAnalytics = function (ctx) {
     var tk = a.tickets;
     var b = a.benchmarks || {};
     var ev = a.event;
-    var html = '';
+    // Tickets sold through Dayli fill #tk-stats after render (ticket-stats.js);
+    // the ticket-link card below is for events that sell elsewhere.
+    var html = '<div id="tk-stats"></div><div id="tk-link">';
     if (!ev.ticket_url) {
       html += card(
         'Tickets',
@@ -1214,6 +1250,7 @@ window.DayliAnalytics = function (ctx) {
           '<p class="muted small" style="margin: 10px 0 0">Clicks open your ticket page; sales happen there, so we can’t count them.</p>',
       );
     }
+    html += '</div>';
     var rem = a.reminders || [];
     var r = a.remind || {};
     var upcoming = ev.status === 'published' && new Date(ev.starts_at).getTime() > Date.now();
