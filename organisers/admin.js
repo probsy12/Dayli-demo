@@ -39,6 +39,7 @@ window.DayliAdmin = function (ctx, ui) {
     ['tickets', 'Tickets'],
   ];
   var RANGES = [
+    ['1', '1 day'],
     ['7', '7 days'],
     ['30', '30 days'],
     ['90', '90 days'],
@@ -353,7 +354,7 @@ window.DayliAdmin = function (ctx, ui) {
       out.push({
         icon: '🗑️',
         title: 'Accounts are deleted soon after joining',
-        detail: fmtN(s.deletions) + ' accounts were deleted in the last ' + days + ' days, typically ' + fmtN(s.deletions_median_days) + ' days old. People who leave that fast did not find a reason to stay: look at what the first screen asks of them.',
+        detail: fmtN(s.deletions) + ' accounts were deleted in the last ' + (days === 1 ? '24 hours' : days + ' days') + ', typically ' + fmtN(s.deletions_median_days) + ' days old. People who leave that fast did not find a reason to stay: look at what the first screen asks of them.',
       });
     }
     if (!out.length) {
@@ -446,11 +447,9 @@ window.DayliAdmin = function (ctx, ui) {
     var head =
       '<div class="page-head"><div><h1>Dayli admin</h1><p class="muted">How Dayli is growing · numbers as of ' +
       esc(timeText(d.generated_at)) +
-      ' · the last ' +
-      esc(days) +
-      ' days against the ' +
-      esc(days) +
-      ' before</p></div><div class="controls">' +
+      ' · ' +
+      (days === '1' ? 'the last 24 hours against the 24 before' : 'the last ' + esc(days) + ' days against the ' + esc(days) + ' before') +
+      '</p></div><div class="controls">' +
       RANGES.map(function (r) {
         return '<a class="pill ' + (r[0] === days ? 'on' : '') + '" href="#/admin?tab=' + tab + '&days=' + r[0] + '">' + r[1] + '</a>';
       }).join('') +
@@ -1163,8 +1162,8 @@ window.DayliAdmin = function (ctx, ui) {
       '<button type="button" class="btn small" id="ai-read">Read the numbers</button></div>' +
       '<div id="ai-summary" style="margin-top: 12px"></div></div>' +
       '<div class="card"><h3>Talk it through</h3><p class="sub">Ask anything about the numbers for the last ' +
-      esc(d.days) +
-      ' days. No daily limit. The conversation stays in this browser.</p>' +
+      (Number(d.days) === 1 ? '24 hours' : esc(d.days) + ' days') +
+      '. No daily limit. The conversation stays in this browser.</p>' +
       '<div class="chat" id="ai-chat">' +
       (history.length ? history.map(msgHtml).join('') : '<p class="muted small" id="ai-empty">Try “Where are we losing people?”, “What should I build next?” or “Which notification should I turn down?”</p>') +
       '</div>' +
