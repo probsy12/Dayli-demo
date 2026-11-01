@@ -36,8 +36,8 @@
     <a class="btn" href="../">Go to Dayli</a>
   </div>
 </main>
-<script src="../wechat.js?v=f46399b"></script>
-<script src="../config.js?v=f46399b"></script>
+<script src="../wechat.js?v=3545471"></script>
+<script src="../config.js?v=3545471"></script>
 <script>
   (function () {
     var params = new URLSearchParams(location.search);
@@ -57,6 +57,24 @@
       title.textContent = row.name + ' invited you to Dayli';
       sub.textContent = 'A shared calendar for family and friends: see when each other is free, plan things in one tap.';
       actions.classList.remove('hidden');
+      // Invited to an entry: say which, and that signing up is how to answer.
+      return fetch(cfg.supabaseUrl + '/rest/v1/rpc/phone_invite_event_preview', {
+        method: 'POST',
+        headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ p_code: code })
+      }).then(function (r) { return r.ok ? r.json() : []; }).then(function (evs) {
+        var ev = evs && evs[0];
+        if (!ev) return;
+        var at = new Date(ev.starts_at), tz = ev.timezone || undefined, when;
+        try {
+          when = at.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz }).replace(',', '') +
+            (ev.all_day ? '' : ' at ' + at.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: tz }).replace(':00', '').replace(/\s/g, ''));
+        } catch (e) { when = at.toDateString(); }
+        title.textContent = row.name + ' invited you to \u201c' + ev.title + '\u201d';
+        sub.textContent = when + '. Sign up to Dayli to accept or decline, and it\u2019ll be on your calendar with any changes.';
+        document.getElementById('open').textContent = 'Sign up to reply';
+        document.title = 'You\u2019re invited to ' + ev.title;
+      });
     }).catch(function () {
       sub.textContent = 'A shared calendar for family and friends. Open Dayli to accept.';
       actions.classList.remove('hidden');
