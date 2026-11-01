@@ -811,7 +811,11 @@ window.DayliTickets = function (ctx) {
         rpc('organiser_ticket_types_save', { p_event: id, p_types: toTypes(p), p_settings: { absorb_fee: p.absorb, capacity: p.capacity } }).then(
           function () {
             toast(firstTime ? 'Tickets set up' : 'Saved');
-            eventScreen(id, { manual: '1' });
+            var next = function () {
+              eventScreen(id, { manual: '1' });
+            };
+            if (firstTime) offerPublish(id, next);
+            else next();
           },
           function (err) {
             ctx.setBusy(btn, false);
@@ -893,11 +897,138 @@ window.DayliTickets = function (ctx) {
 
   // --- The setup steps -------------------------------------------------------------------------
 
+  // After saving tickets on a draft: "Publish your event now?", with the card
+  // as people will see it and what's still missing. after() runs either way.
+  function offerPublish(id, after) {
+    Promise.all([
+      sb
+        .from('public_events')
+        .select('id, title, description, cover_image_path, starts_at, timezone, lat, lon, venue_name, status')
+        .eq('id', id)
+        .maybeSingle()
+        .then(function (r) {
+          return r.data;
+        }),
+      rpc('organiser_ticket_sales', { p_event: id }),
+      rpc('ticket_test_sales').catch(function () {
+        return false;
+      }),
+    ]).then(
+      function (r) {
+        var ev = r[0];
+        var s = r[1];
+        var test = r[2] === true;
+        if (!ev || ev.status === 'published') return after();
+        var types = (s.types || []).filter(function (t) {
+          return !t.hidden;
+        });
+        var prices = types.map(function (t) {
+          return t.price_pence;
+        });
+        var from = prices.length ? Math.min.apply(null, prices) : 0;
+        var paid = types.some(function (t) {
+          return t.price_pence > 0 || t.pay_what_you_like;
+        });
+        var when = '';
+        if (ev.starts_at) {
+          var d = new Date(ev.starts_at);
+          var z = ev.timezone || 'Europe/London';
+          try {
+            when = (
+              d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: z }).replace(',', '') +
+              ' · ' +
+              d.toLocaleTimeString('en-GB', { hour: 'numeric', minute: '2-digit', hour12: true, timeZone: z }).replace(':00', '').replace(/\s/g, '')
+            ).toUpperCase();
+          } catch (e) {
+            when = d.toDateString();
+          }
+        }
+        var words = String(ev.description || '').trim().split(/\s+/).filter(Boolean).length;
+        var items = [
+          [!!(ev.title && ev.cover_image_path && words >= 10), 'Title, picture and description'],
+          [!!(ev.starts_at && new Date(ev.starts_at) > new Date() && ev.lat != null), 'Date and place on the map'],
+          [types.length > 0, (types.length === 1 ? '1 kind of ticket, ' : types.length + ' kinds of ticket, ') + (from ? 'from ' + pounds(from).replace('.00', '') : 'free')],
+        ];
+        if (!ctx.isVerified()) items.push([false, 'Email confirmed']);
+        var noteText = !paid || s.stripe_ready
+          ? ''
+          : test
+            ? 'Test sales are on: people can get these tickets in the Dayli app and nothing is charged. Real payments start once your payouts are connected.'
+            : 'Payouts aren’t connected yet. People can see the event and ask to be told; paid tickets go on sale the moment you connect them.';
+        var cover = ev.cover_image_path && ctx.coverUrl ? ctx.coverUrl(ev.cover_image_path) : '';
+        var box = document.createElement('div');
+        box.className = 'pp-wrap';
+        box.innerHTML =
+          '<div class="pp-dim"></div><div class="pp-modal" role="dialog" aria-modal="true" aria-labelledby="pp-h">' +
+          '<div class="pp-kick">Tickets saved</div><h2 id="pp-h">Publish your event now?</h2>' +
+          '<p class="pp-lead">It goes into Discover for people nearby' + (types.length ? ', with tickets in the Dayli app.' : '.') + '</p>' +
+          '<div class="pp-card"><div class="pp-pic"' + (cover ? ' style="background-image: url(&quot;' + esc(cover) + '&quot;)"' : '') + '></div><div><div class="pp-when">' + esc(when) + '</div><div class="pp-title">' + esc(ev.title || 'Your event') + '</div><div class="pp-meta">' +
+          esc([ev.venue_name, from ? 'from ' + pounds(from).replace('.00', '') : types.length ? 'free' : '', s.capacity ? s.capacity + ' places' : ''].filter(Boolean).join(' · ')) +
+          '</div></div></div>' +
+          '<ul class="pp-chk">' +
+          items
+            .map(function (it) {
+              return '<li class="' + (it[0] ? 'ok' : '') + '"><i></i>' + esc(it[1]) + '</li>';
+            })
+            .join('') +
+          '</ul>' +
+          (noteText ? '<div class="pp-note">' + esc(noteText) + '</div>' : '') +
+          '<div class="notice error" id="pp-err" hidden></div>' +
+          '<div class="pp-acts"><button type="button" class="btn" id="pp-no">Not yet, keep as draft</button><button type="button" class="btn primary" id="pp-yes">Publish now</button></div></div>';
+        document.body.appendChild(box);
+        var close = function () {
+          box.remove();
+          document.removeEventListener('keydown', onKey);
+        };
+        var onKey = function (e) {
+          if (e.key === 'Escape') {
+            close();
+            after();
+          }
+        };
+        document.addEventListener('keydown', onKey);
+        $('#pp-no', box).onclick = function () {
+          close();
+          toast('Kept as a draft. Publish it from Events when you’re ready.');
+          after();
+        };
+        $('.pp-dim', box).onclick = $('#pp-no', box).onclick;
+        $('#pp-yes', box).onclick = function () {
+          if (!ctx.isVerified()) {
+            close();
+            toast('Confirm your email first, then publish.');
+            return ctx.go('#/verify');
+          }
+          var btn = this;
+          ctx.setBusy(btn, true, 'Publishing…');
+          rpc('public_event_set_status', { p_id: id, p_status: 'published' }).then(
+            function () {
+              close();
+              toast('Published. People can find it now.');
+              after();
+            },
+            function (err) {
+              ctx.setBusy(btn, false);
+              var e = $('#pp-err', box);
+              e.textContent = friendly(err);
+              e.hidden = false;
+            },
+          );
+        };
+        $('#pp-yes', box).focus();
+      },
+      function () {
+        after();
+      },
+    );
+  }
+
   function wizard(id, ev, s) {
     var w = {
       at: 0,
       mode: 'paid',
-      places: null,
+      // How many people can come, as the event form said.
+      places: s.capacity || null,
       noLimit: false,
       kinds: 'one',
       price: null,
@@ -936,7 +1067,6 @@ window.DayliTickets = function (ctx) {
         });
         p.main = rows.shift();
         p.others = rows;
-        p.capacity = places;
       } else if (w.early) {
         p.releasesOn = true;
         p.main = null;
@@ -945,6 +1075,8 @@ window.DayliTickets = function (ctx) {
           { id: null, name: 'Standard', price: w.price, quantity: places && w.ebQty ? Math.max(1, places - w.ebQty) : null, sold: 0, opens: '' },
         ];
       } else p.main = { id: null, name: 'General admission', price: w.price, quantity: places, sold: 0 };
+      // The event's own limit follows the answer (also what the event form shows).
+      p.capacity = places;
       if (w.code) p.others.push({ id: null, name: w.codeName || 'Guest list', price: 0, quantity: null, sold: 0, code: cleanCode(w.codeValue) });
       if (w.end) p.salesEnd = w.endAt;
       return p;
@@ -969,6 +1101,9 @@ window.DayliTickets = function (ctx) {
           '"' +
           (w.noLimit ? ' disabled' : '') +
           ' />' +
+          (s.capacity && !w.noLimit && Number(w.places) === Number(s.capacity)
+            ? '<p class="w-from">From your event. Change it here and the event changes too.</p>'
+            : '') +
           opt('data-w-nolimit', '1', w.noLimit, 'No limit', 'Keep selling until sales close', true) +
           (w.mode === 'paid'
             ? '<div class="lab" style="margin-top: 18px">Is there more than one kind of ticket?</div>' +
@@ -1264,7 +1399,9 @@ window.DayliTickets = function (ctx) {
         rpc('organiser_ticket_types_save', { p_event: id, p_types: toTypes(p), p_settings: { absorb_fee: p.absorb, capacity: p.capacity } }).then(
           function () {
             toast(s.event_status === 'published' && s.can_sell ? 'Tickets are on sale' : 'Tickets saved');
-            eventScreen(id, { manual: '1' });
+            offerPublish(id, function () {
+              eventScreen(id, { manual: '1' });
+            });
           },
           function (err) {
             ctx.setBusy(btn, false);
@@ -1407,8 +1544,15 @@ window.DayliTickets = function (ctx) {
 
   function adminMount(el) {
     el.innerHTML = '<p class="muted">Loading…</p>';
-    rpc('admin_tickets', {})
-      .then(function (d) {
+    Promise.all([
+      rpc('admin_tickets', {}),
+      rpc('ticket_test_sales').catch(function () {
+        return false;
+      }),
+    ])
+      .then(function (r) {
+        var d = r[0];
+        var testOn = r[1] === true;
         var t = d.totals || {};
         el.innerHTML =
           '<div class="grid g4">' +
@@ -1417,6 +1561,15 @@ window.DayliTickets = function (ctx) {
           ctx.kpi('Booking fees', pounds(t.fees_pence), '<span class="tag plain">Dayli’s, before Stripe’s fee</span>') +
           ctx.kpi('Fees this month', pounds(t.this_month_fees_pence), '') +
           '</div>' +
+          '<div class="card"><div class="row between"><div><h3>Test sales ' +
+          (testOn ? '<span class="tag warn">on</span>' : '<span class="tag plain">off</span>') +
+          '</h3><p class="sub">' +
+          (testOn
+            ? 'Until an organiser’s payouts are connected, paid tickets “sell” in the app straight away and nothing is charged. For trying it out with friends and family.'
+            : 'Paid tickets go on sale only once an organiser’s payouts are connected. Before that, people see the price and can ask to be told.') +
+          '</p></div><button type="button" class="btn" id="tk-test">' +
+          (testOn ? 'Turn test sales off' : 'Turn test sales on') +
+          '</button></div></div>' +
           '<div class="card"><h3>Booking fee</h3><p class="sub">Added on top of each paid order. Stripe’s card fee (about 1.5% + 20p) comes out of it.</p><form id="tk-fee" class="row"><label class="field" style="margin: 0"><span>Percent</span><input type="number" name="pct" step="0.1" min="0" max="50" value="' +
           esc(String(d.fee_percent)) +
           '" style="max-width: 120px" /></label><label class="field" style="margin: 0"><span>Plus (pence)</span><input type="number" name="fixed" min="0" max="1000" value="' +
@@ -1462,7 +1615,20 @@ window.DayliTickets = function (ctx) {
               '</table></div>'
             : '<p class="muted small">No organisers yet.</p>') +
           '</div>';
-        el.querySelector('#tk-open').onclick = function () {
+        el.querySelector('#tk-test').onclick = function () {
+          var on = !testOn;
+          if (!confirm(on ? 'Turn test sales on? Paid tickets will “sell” without payment until payouts are connected.' : 'Turn test sales off? Paid tickets wait for Stripe again. Test tickets already issued stay valid.')) return;
+          rpc('admin_ticket_test_sales_set', { p_on: on }).then(
+            function () {
+              toast(on ? 'Test sales on' : 'Test sales off');
+              adminMount(el);
+            },
+            function (err) {
+              toast(friendly(err));
+            },
+          );
+        };
+                el.querySelector('#tk-open').onclick = function () {
           var open = !d.open_to_all;
           if (!confirm(open ? 'Open ticket selling to every organiser? Everyone you haven’t stopped can sell straight away.' : 'Make ticket selling invitation only? Organisers who can sell now keep it; new ones wait for you.')) return;
           rpc('admin_ticket_open_save', { p_open: open }).then(

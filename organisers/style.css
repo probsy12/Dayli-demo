@@ -2328,3 +2328,132 @@ input.bigin,
     gap: 0;
   }
 }
+
+/* "Publish your event now?" after saving tickets (offerPublish in tickets.js) */
+.w-from {
+  color: var(--accent);
+  font-weight: 600;
+  font-size: 13.5px;
+  margin: 8px 0 0;
+}
+.pp-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.pp-dim {
+  position: absolute;
+  inset: 0;
+  background: rgba(20, 18, 15, 0.45);
+}
+.pp-modal {
+  position: relative;
+  width: 100%;
+  max-width: 460px;
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  background: var(--bg);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 30px 60px rgba(0, 0, 0, 0.25);
+}
+.pp-kick {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  color: var(--accent);
+  text-transform: uppercase;
+}
+.pp-modal h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 25px;
+  margin: 6px 0 4px;
+}
+.pp-lead {
+  color: var(--muted);
+  margin: 0 0 16px;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+.pp-card {
+  display: flex;
+  gap: 12px;
+  background: var(--surface);
+  border-radius: 14px;
+  padding: 10px;
+  box-shadow: var(--shadow);
+}
+.pp-pic {
+  width: 84px;
+  height: 84px;
+  border-radius: 10px;
+  flex: none;
+  background: radial-gradient(circle at 25% 35%, #f6c98b 0, #e58b4a 22%, transparent 23%),
+    radial-gradient(circle at 70% 60%, #2f6b4f 0, #1f4a36 30%, transparent 31%),
+    linear-gradient(135deg, #3b2a4a, #c4573a 55%, #f2b05e);
+  background-size: cover;
+  background-position: center;
+}
+.pp-when {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--accent);
+  letter-spacing: 0.05em;
+}
+.pp-title {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 700;
+  font-size: 17px;
+  margin: 3px 0;
+  overflow-wrap: anywhere;
+}
+.pp-meta {
+  font-size: 13px;
+  color: var(--muted);
+}
+.pp-chk {
+  list-style: none;
+  padding: 0;
+  margin: 16px 0;
+}
+.pp-chk li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  font-size: 14px;
+  padding: 5px 0;
+}
+.pp-chk i {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 2px solid #cfcabd;
+  box-sizing: border-box;
+  flex: none;
+}
+.pp-chk li.ok i {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+.pp-note {
+  background: var(--warn-bg);
+  color: var(--warn);
+  border-radius: 12px;
+  padding: 10px 12px;
+  font-size: 13px;
+  line-height: 1.45;
+  margin-bottom: 16px;
+}
+.pp-acts {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.pp-acts .btn {
+  flex: 1;
+  justify-content: center;
+}

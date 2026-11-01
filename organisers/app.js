@@ -484,6 +484,8 @@
     uid: uid,
     kpi: analytics.ui.kpi,
     go: go,
+    isVerified: isVerified,
+    coverUrl: coverUrl,
   });
   var admin = window.DayliAdmin(
     {
