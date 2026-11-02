@@ -96,6 +96,7 @@
   function render(html, narrow) {
     app.className = narrow ? 'narrow' : '';
     app.innerHTML = html;
+    smallCovers(app);
     window.scrollTo(0, 0);
   }
   function loading(message) {
@@ -127,6 +128,61 @@
   }
   function coverUrl(path) {
     return cfg.supabaseUrl + '/storage/v1/object/public/hero/' + path;
+  }
+  // The small copy saved next to a cover ("x/123.jpg" -> "x/123.thumb.jpg"), for lists.
+  function thumbPath(path) {
+    return path.replace(/\.[^./]+$/, '') + '.thumb.jpg';
+  }
+  // A cover never changes once uploaded (a new one gets a new name): kept a year.
+  var COVER_CACHE = '31536000';
+  /**
+   * A picture shrunk in the browser before upload, as a JPEG: `edge` pixels on
+   * its long side at most, or `shortEdge` on its short side (the small copy).
+   * Resolves null if the browser can't read it (the original is used instead).
+   */
+  function shrinkPicture(file, size, quality) {
+    function draw(src, w, h, done) {
+      var s = size.edge ? Math.min(1, size.edge / Math.max(w, h)) : Math.min(1, size.shortEdge / Math.min(w, h));
+      var canvas = document.createElement('canvas');
+      canvas.width = Math.max(1, Math.round(w * s));
+      canvas.height = Math.max(1, Math.round(h * s));
+      var ctx = canvas.getContext('2d');
+      if (!ctx) return done(null);
+      // Transparent PNGs go on white rather than black.
+      ctx.fillStyle = '#ffffff';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(src, 0, 0, canvas.width, canvas.height);
+      if (!canvas.toBlob) return done(null);
+      canvas.toBlob(function (blob) { done(blob || null); }, 'image/jpeg', quality);
+    }
+    return new Promise(function (resolve) {
+      try {
+        if (window.createImageBitmap) {
+          createImageBitmap(file, { imageOrientation: 'from-image' })
+            .then(function (bmp) { draw(bmp, bmp.width, bmp.height, resolve); })
+            .catch(function () { viaImg(); });
+        } else viaImg();
+      } catch (e) {
+        viaImg();
+      }
+      function viaImg() {
+        var url = URL.createObjectURL(file);
+        var img = new Image();
+        img.onload = function () {
+          draw(img, img.naturalWidth, img.naturalHeight, function (b) { URL.revokeObjectURL(url); resolve(b); });
+        };
+        img.onerror = function () { URL.revokeObjectURL(url); resolve(null); };
+        img.src = url;
+      }
+    });
+  }
+  // Lists show the small copy; a cover from before those existed shows the full one.
+  function smallCovers(root) {
+    Array.prototype.forEach.call((root || document).querySelectorAll('[data-cover-full]'), function (el) {
+      var test = new Image();
+      test.onerror = function () { el.style.backgroundImage = 'url("' + el.getAttribute('data-cover-full') + '")'; };
+      test.src = el.getAttribute('data-cover-thumb');
+    });
   }
   function categoryLabel(key) {
     for (var i = 0; i < CATEGORIES.length; i++)
@@ -1122,8 +1178,12 @@
     }
     rows.forEach(function (ev) {
       var cover = ev.cover_image_path
-        ? '<div class="cover" style="background-image: url(&quot;' +
+        ? '<div class="cover" data-cover-full="' +
           esc(coverUrl(ev.cover_image_path)) +
+          '" data-cover-thumb="' +
+          esc(coverUrl(thumbPath(ev.cover_image_path))) +
+          '" style="background-image: url(&quot;' +
+          esc(coverUrl(thumbPath(ev.cover_image_path))) +
           '&quot;)"></div>'
         : '<div class="cover">' + esc((ev.title || '?').trim().charAt(0).toUpperCase()) + '</div>';
       var link = SITE + '/e/' + ev.slug;
@@ -1665,8 +1725,9 @@
         this.value = '';
         return;
       }
-      if (file.size > 8 * 1024 * 1024) {
-        showError(err, 'That picture is over 8 MB. Choose a smaller one.');
+      // It's shrunk before upload, so a big camera photo is fine.
+      if (file.size > 25 * 1024 * 1024) {
+        showError(err, 'That picture is over 25 MB. Choose a smaller one.');
         this.value = '';
         return;
       }
@@ -1769,17 +1830,41 @@
       var upload = Promise.resolve($('[name=cover_image_path]').value || null);
       if (coverFile) {
         var ext = (coverFile.name.split('.').pop() || 'jpg').toLowerCase().replace(/[^a-z0-9]/g, '') || 'jpg';
-        var path = uid() + '/public-events/' + Date.now() + '.' + ext;
-        upload = sb.storage
-          .from('hero')
-          .upload(path, coverFile, { upsert: true, contentType: coverFile.type })
-          .then(function (res) {
-            if (res.error) throw new Error('We couldn’t upload the picture: ' + (res.error.message || 'try again.'));
-            return path;
-          });
+        var base = uid() + '/public-events/' + Date.now();
+        var file = coverFile;
+        // Shrunk here first: about 250 KB instead of a camera's few MB, plus a
+        // small copy for lists. If the browser can't, the original goes up.
+        upload = Promise.all([
+          shrinkPicture(file, { edge: 1600 }, 0.82),
+          shrinkPicture(file, { shortEdge: 480 }, 0.72),
+        ]).then(function (out) {
+          var full = out[0];
+          var thumb = out[1];
+          var path = base + (full ? '.jpg' : '.' + ext);
+          return sb.storage
+            .from('hero')
+            .upload(path, full || file, {
+              upsert: true,
+              contentType: full ? 'image/jpeg' : file.type,
+              cacheControl: COVER_CACHE,
+            })
+            .then(function (res) {
+              if (res.error) throw new Error('We couldn’t upload the picture: ' + (res.error.message || 'try again.'));
+              if (!thumb) return path;
+              return sb.storage
+                .from('hero')
+                .upload(thumbPath(path), thumb, { upsert: true, contentType: 'image/jpeg', cacheControl: COVER_CACHE })
+                .then(
+                  function () { return path; },
+                  function () { return path; },
+                );
+            });
+        });
       }
+      var savedCover = null;
       upload
         .then(function (coverPath) {
+          savedCover = coverPath;
           var payload = {
             title: title,
             category: v('category'),
@@ -1817,6 +1902,13 @@
           setBusy(button, false);
           state.events = null;
           state.overview = null;
+          // A replaced or removed cover (and its small copy) is tidied away.
+          if (ev.cover_image_path && ev.cover_image_path !== savedCover) {
+            sb.storage
+              .from('hero')
+              .remove([ev.cover_image_path, thumbPath(ev.cover_image_path)])
+              .catch(function () {});
+          }
           var id = (saved && saved.id) || ev.id;
           if (mode === 'dayli' && ev.ticketing !== 'dayli') {
             toast('Saved. Now the tickets.');

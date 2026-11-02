@@ -98,8 +98,16 @@
 
     var hero = el('hero');
     if (ev.cover_image_path) {
-      var img = cfg.supabaseUrl + '/storage/v1/object/public/hero/' + ev.cover_image_path;
-      hero.style.backgroundImage = 'url("' + img + '")';
+      var base = cfg.supabaseUrl + '/storage/v1/object/public/hero/';
+      var img = base + ev.cover_image_path;
+      // The small copy shows at once; the full picture replaces it when it's in.
+      var small = base + ev.cover_image_path.replace(/\.[^./]+$/, '') + '.thumb.jpg';
+      hero.style.backgroundImage = 'url("' + small + '")';
+      var full = new Image();
+      full.onload = function () {
+        hero.style.backgroundImage = 'url("' + img + '")';
+      };
+      full.src = img;
       setMeta('og:image', img);
     } else {
       hero.textContent = (ev.title || '?').trim().charAt(0).toUpperCase();
