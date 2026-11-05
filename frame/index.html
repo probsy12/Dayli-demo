@@ -139,12 +139,39 @@
   var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
 
   // ---------- pairing ----------
+  // While a code is up the page asks "has anyone entered it yet?". Quickly
+  // at first (someone is usually standing there with the app), then every
+  // 10 seconds, never while the page is hidden, and after an hour with no one
+  // pairing it stops until the screen is tapped: a page left open on its own
+  // should not keep calling Dayli all day.
+  var FAST_MS = 3000, SLOW_MS = 10000, FAST_FOR_MS = 2 * 60000, GIVE_UP_MS = 60 * 60000;
+  function whenVisible() {
+    if (!document.hidden) return Promise.resolve();
+    return new Promise(function (r) {
+      document.addEventListener('visibilitychange', function on() {
+        if (!document.hidden) { document.removeEventListener('visibilitychange', on); r(); }
+      });
+    });
+  }
+  function whenTapped() {
+    return new Promise(function (r) {
+      document.addEventListener('click', function on() { document.removeEventListener('click', on); r(); });
+    });
+  }
   var pairing = false;
   async function pair() {
     if (pairing) return;
     pairing = true;
     $('show').hidden = true; $('pair').hidden = false;
+    var since = Date.now();
     while (true) {
+      if (Date.now() - since > GIVE_UP_MS) {
+        $('code').textContent = '······';
+        $('pairNote').textContent = 'Tap to show a new code.';
+        await whenTapped();
+        since = Date.now();
+      }
+      await whenVisible();
       var started;
       try { started = await call({ action: 'start' }); } catch (e) { started = null; }
       if (!started || started.status !== 200) { $('code').textContent = '······'; $('pairNote').textContent = 'Can’t reach Dayli. Trying again…'; await wait(10000); continue; }
@@ -152,7 +179,8 @@
       $('code').textContent = code.slice(0, 3) + '-' + code.slice(3);
       $('pairNote').textContent = 'The code changes every 15 minutes.';
       while (true) {
-        await wait(3000);
+        await wait(Date.now() - since < FAST_FOR_MS ? FAST_MS : SLOW_MS);
+        await whenVisible();
         var r;
         try { r = await call({ action: 'claim', secret: secret }); } catch (e) { continue; }
         if (r.body.status === 'paired') { store.set(r.body.token); pairing = false; return show(); }
