@@ -60,6 +60,9 @@
     </div>
     <script>
       var q = new URLSearchParams(location.search);
+      // Back to the event the tickets are for, not the app's home screen.
+      var ev = q.get('event') || '';
+      if (/^[0-9a-f-]{36}$/i.test(ev)) document.getElementById('back').href = 'dayli://public-events/' + ev;
       if (q.get('cancelled')) {
         document.getElementById('icon').textContent = '↩️';
         document.getElementById('title').textContent = 'No payment taken';

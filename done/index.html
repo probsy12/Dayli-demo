@@ -61,6 +61,9 @@
     </div>
     <script>
       var q = new URLSearchParams(location.search);
+      // Back to the team the payment is for, not the app's home screen.
+      var team = q.get('team') || '';
+      if (/^[0-9a-f-]{36}$/i.test(team)) document.getElementById('back').href = 'dayli://team/' + team;
       var set = function (icon, title, text) {
         document.getElementById('icon').textContent = icon;
         document.getElementById('title').textContent = title;

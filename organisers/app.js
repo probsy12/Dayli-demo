@@ -201,6 +201,8 @@
       not_an_organiser: 'Set up your organiser profile first.',
       not_authenticated: 'You’ve been signed out. Please sign in again.',
       not_found: 'We couldn’t find that event. It may have been deleted.',
+      has_paid_tickets:
+        'People have paid for tickets. Cancel the event first so everyone is refunded, then you can delete it.',
       rate_limit: 'You’ve made a lot of events today. Try again tomorrow.',
       bad_status: 'That isn’t a status we know.',
       ticket_url_check: 'The ticket link must start with http:// or https://.',
