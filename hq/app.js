@@ -205,6 +205,7 @@
       not_found: 'We couldn’t find that event. It may have been deleted.',
       nudged_recently: 'You nudged them recently. You can nudge again 12 hours after the last time.',
       fixture_over: 'That one has already finished.',
+      not_on_dayli: 'They’re not on Dayli yet, so they can’t get a nudge. Send them the invite link.',
       has_paid_tickets:
         'People have paid for tickets. Cancel the event first so everyone is refunded, then you can delete it.',
       rate_limit: 'You’ve made a lot of events today. Try again tomorrow.',
