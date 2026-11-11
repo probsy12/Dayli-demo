@@ -2457,3 +2457,250 @@ input.bigin,
   flex: 1;
   justify-content: center;
 }
+
+/* Dayli HQ: Teams (teams.js) */
+.tm-crest {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 14px;
+  color: #fff;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 700;
+  object-fit: cover;
+  flex: none;
+}
+.tm-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 12px;
+}
+.tm-card {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  color: inherit;
+  text-decoration: none;
+}
+.tm-card:hover {
+  border-color: var(--accent);
+}
+.tm-head {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+.tm-head h1 {
+  margin: 0;
+}
+.tm-kick {
+  font-size: 11px;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+  color: var(--muted);
+}
+.tm-tabs {
+  display: flex;
+  gap: 24px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 16px;
+  overflow-x: auto;
+}
+.tm-tabs a {
+  padding: 10px 0;
+  font-weight: 700;
+  color: var(--muted);
+  text-decoration: none;
+  border-bottom: 3px solid transparent;
+  white-space: nowrap;
+}
+.tm-tabs a.on {
+  color: var(--ink);
+  border-bottom-color: var(--accent);
+}
+.tm-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 2px;
+}
+@media (max-width: 900px) {
+  .tm-tiles {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+.tm-tile .label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+}
+.tm-tile .num {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 26px;
+  font-weight: 700;
+  margin: 2px 0;
+}
+.tm-next {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  flex-wrap: wrap;
+  background: var(--accent-soft);
+  border-radius: 14px;
+  padding: 14px;
+  margin-bottom: 14px;
+  color: inherit;
+  text-decoration: none;
+}
+.tm-date {
+  width: 56px;
+  background: var(--surface);
+  border-radius: 12px;
+  text-align: center;
+  padding: 6px 0;
+  flex: none;
+}
+.tm-date .d {
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--danger);
+}
+.tm-date .n {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 22px;
+  font-weight: 700;
+}
+.tm-date .m {
+  font-size: 11px;
+  color: var(--muted);
+}
+.tm-big {
+  font-size: 17px;
+}
+.tm-avail {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  margin-left: auto;
+}
+.tm-bar {
+  display: flex;
+  width: 200px;
+  max-width: 100%;
+  height: 10px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--alt);
+  margin: 6px 0;
+}
+.tm-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+.tm-table th {
+  text-align: left;
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  padding: 8px 6px;
+  border-bottom: 1px solid var(--border);
+}
+.tm-table td {
+  padding: 9px 6px;
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+.tm-row {
+  cursor: pointer;
+}
+.tm-row:hover td {
+  background: var(--alt);
+}
+.tm-res {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 12px;
+  font-weight: 800;
+  vertical-align: middle;
+}
+.tm-res.w {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.tm-res.l {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.tm-res.d {
+  background: var(--alt);
+  color: var(--muted);
+}
+.tm-av {
+  display: inline-flex;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--alt);
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 800;
+  align-items: center;
+  justify-content: center;
+  margin-right: 4px;
+}
+.tm-tag {
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 6px;
+  padding: 2px 7px;
+  background: var(--alt);
+  color: var(--muted);
+}
+.tm-tag.paid {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.tm-tag.owed {
+  background: var(--orange-bg);
+  color: var(--orange);
+}
+.tm-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 14px 0 6px;
+}
+.tm-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.tm-grid label.wide {
+  grid-column: 1 / -1;
+}
+.tm-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  font-size: 14px;
+  margin-top: 8px;
+}
+.tm-score {
+  width: 64px;
+  margin-left: 6px;
+}
+.linkish.danger {
+  color: var(--danger);
+}
+.tm-table select {
+  width: auto;
+  min-width: 130px;
+}

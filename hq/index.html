@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Dayli for organisers</title>
+    <meta name="robots" content="noindex" />
+    <meta
+      name="description"
+      content="List your events on Dayli so people nearby can find them and add them to their calendars."
+    />
+    <link rel="stylesheet" href="style.css?v=f4e0f66" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-v2-32.png" /><link rel="icon" type="image/png" sizes="192x192" href="/favicon-v2-192.png" /><link rel="apple-touch-icon" href="/apple-touch-icon-v2.png" /></head>
+  <body class="auth">
+    <div class="shell">
+      <aside class="side" id="side" hidden>
+        <a class="brand" href="#/overview"
+          ><img src="../img/icon.svg" alt="" /> Dayli <span>organisers</span></a
+        >
+        <nav class="side-nav" id="nav">
+          <a href="#/teams" data-route="teams" hidden>Teams</a>
+          <a href="#/overview" data-route="overview">Overview</a>
+          <a href="#/events" data-route="events">Events</a>
+          <a href="#/analytics" data-route="analytics">Analytics</a>
+          <a href="#/payouts" data-route="payouts">Tickets &amp; payouts</a>
+          <a href="#/profile" data-route="profile">Profile</a>
+          <a href="#/admin" data-route="admin" class="admin-link" hidden>Admin</a>
+        </nav>
+        <div class="side-foot">
+          <div class="account" id="account"></div>
+          <button type="button" class="linkish" id="sign-out">Sign out</button>
+        </div>
+      </aside>
+      <div class="content">
+        <header class="topbar" id="topbar" hidden>
+          <a class="brand" href="#/overview"
+            ><img src="../img/icon.svg" alt="" /> Dayli <span>organisers</span></a
+          >
+          <button type="button" class="menu" id="menu" aria-label="Menu" aria-expanded="false">
+            <span></span><span></span><span></span>
+          </button>
+        </header>
+        <nav class="tabs-nav" id="tabs-nav" hidden>
+          <a href="#/teams" data-route="teams" hidden>Teams</a>
+          <a href="#/overview" data-route="overview">Overview</a>
+          <a href="#/events" data-route="events">Events</a>
+          <a href="#/analytics" data-route="analytics">Analytics</a>
+          <a href="#/payouts" data-route="payouts">Tickets &amp; payouts</a>
+          <a href="#/profile" data-route="profile">Profile</a>
+          <a href="#/admin" data-route="admin" class="admin-link" hidden>Admin</a>
+        </nav>
+        <main id="app">
+          <p class="muted">Loading…</p>
+        </main>
+      </div>
+    </div>
+    <div class="toast" id="toast" aria-live="polite"></div>
+    <script src="../config.js?v=f4e0f66"></script>
+    <script src="vendor/supabase.js?v=f4e0f66"></script>
+    <script src="ticket-stats.js?v=f4e0f66"></script>
+    <script src="analytics.js?v=f4e0f66"></script>
+    <script src="costs.js?v=f4e0f66"></script>
+    <script src="premium.js?v=f4e0f66"></script>
+    <script src="tickets.js?v=f4e0f66"></script>
+    <script src="admin.js?v=f4e0f66"></script>
+    <script src="teams.js?v=f4e0f66"></script>
+    <script src="app.js?v=f4e0f66"></script>
+  </body>
+</html>

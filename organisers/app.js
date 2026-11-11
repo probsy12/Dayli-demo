@@ -14,6 +14,8 @@
   var topbar = document.getElementById('topbar');
   var tabsNav = document.getElementById('tabs-nav');
   var SITE = 'https://daylicalendar.co.uk';
+  // Dayli HQ: the same site served at /hq/ (daylihq.co.uk later), with Teams.
+  var HQ = /^\/hq(\/|$)/.test(location.pathname);
   var APP_NOTE_KEY = 'dayli_organisers_app_note_seen';
 
   var sb = null;
@@ -372,7 +374,7 @@
   // Where a signed-in person should be: profile first, then a confirmed
   // email, then their events.
   function homeHash() {
-    if (!state.organiser) return state.admin ? '#/admin' : '#/profile';
+    if (!state.organiser) return HQ ? '#/teams' : state.admin ? '#/admin' : '#/profile';
     if (!isVerified()) return '#/verify';
     return '#/overview';
   }
@@ -393,7 +395,7 @@
     if (signedIn && account) {
       account.innerHTML =
         '<b>' +
-        esc(state.organiser ? state.organiser.name : 'New organiser') +
+        esc(state.organiser ? state.organiser.name : HQ ? 'Dayli HQ' : 'New organiser') +
         '</b><span>' +
         esc(email() || '') +
         (state.organiser ? (isVerified() ? ' · verified' : ' · not confirmed') : '') +
@@ -415,6 +417,7 @@
     sheet.className = 'menu-sheet';
     sheet.id = 'menu-sheet';
     sheet.innerHTML =
+      (HQ ? '<a href="#/teams">Teams</a>' : '') +
       '<a href="#/overview">Overview</a><a href="#/events">Events</a><a href="#/analytics">Analytics</a><a href="#/payouts">Tickets &amp; payouts</a><a href="#/profile">Profile</a>' +
       (state.admin ? '<a href="#/admin">Admin</a>' : '') +
       '<a href="#/events/new">+ New event</a><button type="button" class="linkish" id="menu-sign-out" style="padding: 12px">Sign out</button>';
@@ -478,6 +481,10 @@
         if (!state.organiser) return screenProfile(true);
         setShell(true, 'analytics');
         return analytics.screenAnalytics(parts[1] || null, query.tab, query.days);
+      case 'teams':
+        if (!HQ) return go(homeHash());
+        setShell(true, 'teams');
+        return teams.screen(parts, query);
       case 'admin':
         if (!state.admin) return go(homeHash());
         setShell(true, 'admin');
@@ -564,6 +571,33 @@
     },
     analytics.ui,
   );
+
+  var teams = window.DayliTeams({
+    sb: sb,
+    esc: esc,
+    $: $,
+    $$: $$,
+    rpc: rpc,
+    render: render,
+    loading: loading,
+    notice: notice,
+    toast: toast,
+    go: go,
+    friendly: friendly,
+    setBusy: setBusy,
+    SITE: SITE,
+  });
+
+  // HQ: its name, and Teams in the menus.
+  if (HQ) {
+    document.title = 'Dayli HQ';
+    Array.prototype.slice.call(document.querySelectorAll('.brand span')).forEach(function (el) {
+      el.textContent = 'HQ';
+    });
+    Array.prototype.slice.call(document.querySelectorAll('[data-route="teams"]')).forEach(function (el) {
+      el.hidden = false;
+    });
+  }
 
   // --- sign in / create account --------------------------------------------
 
