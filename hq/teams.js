@@ -297,22 +297,7 @@
           '<div class="row"><button class="btn" id="tm-invite">Copy invite link</button><a class="btn primary" href="' +
           teamUrl(cal, 'new') +
           '">+ Add fixture</a></div></div>' +
-          '<nav class="tm-tabs">' +
-          ['fixtures', 'squad', 'payments']
-            .map(function (k) {
-              return (
-                '<a href="' +
-                teamUrl(cal, k) +
-                '" class="' +
-                (k === tab ? 'on' : '') +
-                '">' +
-                k.charAt(0).toUpperCase() +
-                k.slice(1) +
-                '</a>'
-              );
-            })
-            .join('') +
-          '</nav><div class="tm-tiles">' +
+          '<div class="tm-tiles">' +
           tiles +
           '</div>' +
           body,

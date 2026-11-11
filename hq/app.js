@@ -374,7 +374,8 @@
   // Where a signed-in person should be: profile first, then a confirmed
   // email, then their events.
   function homeHash() {
-    if (!state.organiser) return HQ ? '#/teams' : state.admin ? '#/admin' : '#/profile';
+    if (HQ) return hq.homeHash();
+    if (!state.organiser) return state.admin ? '#/admin' : '#/profile';
     if (!isVerified()) return '#/verify';
     return '#/overview';
   }
@@ -391,6 +392,7 @@
       a.classList.toggle('on', a.dataset.route === current);
       if (a.dataset.route === 'admin') a.hidden = !state.admin;
     });
+    if (HQ && signedIn && hq.ready()) hq.drawMenus();
     var account = document.getElementById('account');
     if (signedIn && account) {
       account.innerHTML =
@@ -416,9 +418,9 @@
     var sheet = document.createElement('div');
     sheet.className = 'menu-sheet';
     sheet.id = 'menu-sheet';
-    sheet.innerHTML =
-      (HQ ? '<a href="#/teams">Teams</a>' : '') +
-      '<a href="#/overview">Overview</a><a href="#/events">Events</a><a href="#/analytics">Analytics</a><a href="#/payouts">Tickets &amp; payouts</a><a href="#/profile">Profile</a>' +
+    sheet.innerHTML = HQ
+      ? hq.menuSheet() + '<button type="button" class="linkish" id="menu-sign-out" style="padding: 12px">Sign out</button>'
+      : '<a href="#/overview">Overview</a><a href="#/events">Events</a><a href="#/analytics">Analytics</a><a href="#/payouts">Tickets &amp; payouts</a><a href="#/profile">Profile</a>' +
       (state.admin ? '<a href="#/admin">Admin</a>' : '') +
       '<a href="#/events/new">+ New event</a><button type="button" class="linkish" id="menu-sign-out" style="padding: 12px">Sign out</button>';
     document.body.appendChild(sheet);
@@ -464,6 +466,32 @@
           });
         };
       });
+    }
+    document.body.classList.remove('hq-bare');
+    if (HQ) {
+      if (!hq.ready()) {
+        loading();
+        return hq.load().then(route, function (err) {
+          render(notice('error', esc(friendly(err))), true);
+        });
+      }
+      var free = ['welcome', 'verify', 'profile', 'reset', 'admin'];
+      if (!hq.onboarded() && free.indexOf(parts[0]) < 0) return go('#/welcome');
+      if (parts[0] === 'welcome') {
+        setShell(true, 'welcome');
+        if (parts[1] === 'setup') return hq.screenSetup();
+        if (parts[1] === 'people') return hq.screenPeople();
+        return hq.screenWelcome();
+      }
+      if (parts[0] === 'settings') {
+        setShell(true, 'settings');
+        return hq.screenSettings();
+      }
+      if (parts[0] === 'games') {
+        setShell(true, 'games');
+        return hq.screenGames();
+      }
+      if (parts[0] === 'home' || (parts[0] === 'teams' && !parts[1])) return go(homeHash());
     }
     switch (parts[0]) {
       case 'sign-in':
@@ -588,11 +616,33 @@
     SITE: SITE,
   });
 
+  var hq = window.DayliHQ({
+    sb: sb,
+    esc: esc,
+    $: $,
+    $$: $$,
+    rpc: rpc,
+    render: render,
+    loading: loading,
+    notice: notice,
+    toast: toast,
+    go: go,
+    friendly: friendly,
+    setBusy: setBusy,
+    state: state,
+    SITE: SITE,
+    signOut: function () {
+      signOut();
+    },
+  });
+
   // HQ: its name, and Teams in the menus.
   if (HQ) {
     document.title = 'Dayli HQ';
+    document.body.classList.add('hq');
     Array.prototype.slice.call(document.querySelectorAll('.brand span')).forEach(function (el) {
       el.textContent = 'HQ';
+      el.classList.add('hq');
     });
     Array.prototype.slice.call(document.querySelectorAll('[data-route="teams"]')).forEach(function (el) {
       el.hidden = false;
@@ -2105,6 +2155,7 @@
         return go('#/reset');
       }
       if (event === 'SIGNED_OUT') {
+        hq.reset();
         state.organiser = undefined;
         state.events = null;
         state.overview = null;
@@ -2112,6 +2163,7 @@
         return;
       }
       if (event === 'SIGNED_IN' && uid() !== before) {
+        hq.reset();
         state.organiser = undefined;
         state.events = null;
         state.overview = null;
