@@ -106,7 +106,7 @@ window.DayliTickets = function (ctx) {
             '</div>' +
             '<div class="card"><h3>How it works</h3><p class="sub">Buyers pay on Stripe’s secure page in the Dayli app. A booking fee of ' +
             esc(fee(f)) +
-            ' is added on top of each paid order, so you receive the full ticket price (or you can choose to pay it yourself). Free tickets have no fee. Buyers get a ticket with a code for the door; you check them in from your phone. You can refund any order, and cancelling an event refunds everyone.</p></div>' +
+            ' is added on top of each paid order for Dayli (or you can choose to pay it yourself). Stripe’s card fee (from 1.5% + 20p) comes out of your sales, and the money goes straight to your own Stripe account. Free tickets have no fee. Buyers get a ticket with a code for the door; you check them in from your phone. You can refund any order (the booking fee isn’t refunded), and cancelling an event refunds everyone in full.</p></div>' +
             (o.can_sell_tickets
               ? '<div class="card"><h3>Your events</h3>' +
                 (events.length
@@ -852,7 +852,7 @@ window.DayliTickets = function (ctx) {
   function bindOrders(id, s, ev) {
     $$('[data-refund]').forEach(function (b) {
       b.onclick = function () {
-        if (!confirm('Refund this order in full? The buyer gets everything back, booking fee included, and their tickets stop working.')) return;
+        if (!confirm('Refund this order? The buyer gets their ticket money back and their tickets stop working. Dayli’s booking fee isn’t refunded (buyers are told before they pay); cancelling the event refunds everything.')) return;
         ctx.setBusy(b, true, '…');
         invoke('ticket-refund', { order_id: b.dataset.refund }).then(
           function () {

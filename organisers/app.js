@@ -651,9 +651,10 @@
           return showError(err, friendly(res.error));
         }
         if (!res.data || !res.data.session) {
-          // Confirmation by email is on: the code route proves the address.
+          // Confirmation by email is on: sign-up has already emailed the
+          // 6-digit code, so go straight to typing it in.
           state.pendingEmail = address;
-          state.codeSent = false;
+          state.codeSent = true;
           return go('#/verify');
         }
         state.session = res.data.session;

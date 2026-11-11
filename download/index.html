@@ -45,7 +45,6 @@
     <a class="btn primary" href="https://apps.apple.com/app/id6767814466" rel="noopener">
       <span data-en>Download on the App Store</span><span data-zh>在 App Store 下载</span>
     </a>
-    <p data-en style="margin-top:12px">In mainland China the App Store doesn't list Dayli. Sign in to the App Store with a Hong Kong, UK or other non-mainland Apple ID, then download it.</p>
     <p data-zh style="margin-top:12px">中国大陆的 App Store 暂时搜不到 Dayli。请在 App Store 登录香港、英国等非大陆地区的 Apple ID 后下载。</p>
   </div>
 
@@ -79,7 +78,11 @@
     var zh = params.get('lang') ? params.get('lang') === 'zh' : /^zh/i.test(navigator.language || '');
     function show(z) {
       document.documentElement.lang = z ? 'zh' : 'en';
-      document.getElementById('switch').textContent = z ? 'English' : '简体中文';
+      // The switch is only for Chinese readers (back to English); English
+      // readers see no Chinese. ?lang=zh still opens the Chinese page.
+      var sw = document.getElementById('switch');
+      sw.textContent = 'English';
+      sw.style.display = z ? '' : 'none';
     }
     show(zh);
     document.getElementById('switch').addEventListener('click', function (e) {
