@@ -214,7 +214,8 @@
         var id = c.slice(5);
         var base = '#/teams/' + id;
         out +=
-          link(base, 'fixtures', 'Fixtures & results', h === base || h === base + '/fixtures' || h.indexOf(base + '/fixture/') === 0 || h === base + '/new') +
+          link(base, 'home', 'Home', h === base) +
+          link(base + '/fixtures', 'fixtures', 'Fixtures & results', h === base + '/fixtures' || h.indexOf(base + '/fixture/') === 0 || h === base + '/new') +
           link(base + '/squad', 'squad', 'Squad', h === base + '/squad') +
           link(base + '/payments', 'money', 'Payments', h === base + '/payments');
       } else if (c === 'games') {

@@ -203,6 +203,8 @@
       not_an_organiser: 'Set up your organiser profile first.',
       not_authenticated: 'You’ve been signed out. Please sign in again.',
       not_found: 'We couldn’t find that event. It may have been deleted.',
+      nudged_recently: 'You nudged them recently. You can nudge again 12 hours after the last time.',
+      fixture_over: 'That one has already finished.',
       has_paid_tickets:
         'People have paid for tickets. Cancel the event first so everyone is refunded, then you can delete it.',
       rate_limit: 'You’ve made a lot of events today. Try again tomorrow.',

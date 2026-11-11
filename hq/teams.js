@@ -4,7 +4,8 @@
  * app (supabase/migrations/*team*), so a change here shows in the app at once
  * and the other way round. Only shown at /hq/ (window.DayliTeams in app.js).
  *   #/teams                         the teams I'm in
- *   #/teams/<calendar>[/<tab>]      fixtures | squad | payments
+ *   #/teams/<calendar>              home: the next match, results, money, getting started
+ *   #/teams/<calendar>/<tab>        fixtures | squad | payments
  *   #/teams/<calendar>/new          add a fixture, training or social
  *   #/teams/<calendar>/fixture/<id> who's coming, picking the team, the score
  */
@@ -234,6 +235,22 @@
         .then(function () {
           return loadTeam(cal);
         })
+        .then(function (d) {
+          // Home shows who hasn't answered for the next match, which only the
+          // fixture itself lists.
+          if (tab) return d;
+          var next = nextUp(d.team);
+          if (!next) return d;
+          return rpc('team_fixture', { p_event: next.event_id }).then(
+            function (f) {
+              d.next = f;
+              return d;
+            },
+            function () {
+              return d;
+            },
+          );
+        })
         .then(
           function (d) {
             if (d.team.my_role !== 'manager') {
@@ -244,7 +261,8 @@
                 ) + '<a class="btn" href="#/teams">Back to teams</a>',
               );
             }
-            drawTeam(d, tab || 'fixtures');
+            if (!tab) return drawHome(d);
+            drawTeam(d, tab);
           },
           function (err) {
             render(notice('error', esc(friendly(err))) + '<a class="btn" href="#/teams">Back to teams</a>');
@@ -338,6 +356,446 @@
           window.prompt('Copy this link:', text);
         },
       );
+    }
+
+    // --- home ------------------------------------------------------------------
+
+    function upcomingOf(t) {
+      return (t.fixtures || []).filter(function (f) {
+        return new Date(f.ends_at) > new Date();
+      });
+    }
+    function nextUp(t) {
+      var up = upcomingOf(t);
+      return (
+        up.filter(function (f) {
+          return f.kind === 'match';
+        })[0] || up[0]
+      );
+    }
+    function dateBlock(f) {
+      var d = new Date(f.starts_at);
+      return (
+        '<div class="th-dt"><div class="d">' +
+        esc(d.toLocaleDateString('en-GB', { weekday: 'short', timeZone: f.timezone || undefined }).toUpperCase()) +
+        '</div><div class="n">' +
+        esc(d.toLocaleDateString('en-GB', { day: 'numeric', timeZone: f.timezone || undefined })) +
+        '</div></div>'
+      );
+    }
+    function avatar(p, size) {
+      var s = size || 28;
+      return p.avatar_url
+        ? '<img class="th-av" style="width:' + s + 'px;height:' + s + 'px" src="' + esc(p.avatar_url) + '" alt="" title="' + esc(p.name) + '" />'
+        : '<span class="th-av" style="width:' +
+            s +
+            'px;height:' +
+            s +
+            'px;font-size:' +
+            Math.round(s * 0.38) +
+            'px" title="' +
+            esc(p.name) +
+            '">' +
+            esc(initials(p.name)) +
+            '</span>';
+    }
+    function scored(results) {
+      return (results || []).filter(function (r) {
+        return r.kind === 'match' && r.score_us != null && r.score_them != null;
+      });
+    }
+    function wdl(r) {
+      return r.score_us > r.score_them ? 'W' : r.score_us < r.score_them ? 'L' : 'D';
+    }
+    function formChips(list) {
+      return (
+        '<span class="th-form">' +
+        list
+          .map(function (r) {
+            var x = wdl(r);
+            return '<i class="f' + x.toLowerCase() + '" title="' + esc(fixtureName(r) + ' ' + r.score_us + '–' + r.score_them) + '">' + x + '</i>';
+          })
+          .join('') +
+        '</span>'
+      );
+    }
+    function ago(iso) {
+      var h = Math.max(1, Math.round((Date.now() - new Date(iso)) / 3600000));
+      return h < 24 ? h + (h === 1 ? ' hour' : ' hours') + ' ago' : Math.round(h / 24) + ' days ago';
+    }
+
+    function drawHome(d) {
+      var t = d.team;
+      var cal = t.calendar_id;
+      var me = (t.players || []).filter(function (p) {
+        return p.is_me;
+      })[0];
+      var hour = new Date().getHours();
+      var hello = (hour < 12 ? 'Morning' : hour < 18 ? 'Afternoon' : 'Evening') + (me ? ', ' + me.name.split(' ')[0] : '');
+      var upcoming = upcomingOf(t);
+      var next = nextUp(t);
+      var nf = d.next && next && d.next.event_id === next.event_id ? d.next : null;
+
+      // The next match (or whatever is next).
+      var hero = '';
+      var waiting = [];
+      if (next) {
+        var c = next.counts;
+        var total = c.available + c.maybe + c.cant + c.none;
+        if (nf) {
+          waiting = (nf.players || []).filter(function (p) {
+            return p.plays !== false && !p.status;
+          });
+        }
+        var nudgeable = waiting.filter(function (p) {
+          return p.user_id && !p.is_me;
+        }).length;
+        var recent = next.nudged_at && Date.now() - new Date(next.nudged_at) < 12 * 3600000;
+        var pct = total ? (c.available / total) * 100 : 0;
+        var pctM = total ? ((c.available + c.maybe) / total) * 100 : 0;
+        var tz = next.timezone || undefined;
+        var when = new Date(next.starts_at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: tz });
+        hero =
+          '<div class="th-hero" style="--team:' +
+          esc(t.color || '#6e56cf') +
+          '"><div class="grow"><div class="th-kick">' +
+          (next.kind === 'match' ? 'NEXT MATCH' : 'NEXT UP') +
+          ' · ' +
+          esc(daysAway(next.starts_at).toUpperCase()) +
+          '</div><h2>' +
+          esc(fixtureName(next)) +
+          '</h2><div class="muted">' +
+          esc(
+            [
+              when,
+              time(next.starts_at, next.timezone) + (next.kind === 'match' ? ' kick-off' : ''),
+              next.kind === 'match' ? (next.home ? 'Home' : 'Away') : KIND[next.kind],
+              next.competition ? next.competition.charAt(0).toUpperCase() + next.competition.slice(1) : null,
+              next.location,
+            ]
+              .filter(Boolean)
+              .join(' · '),
+          ) +
+          '</div><div class="th-counts"><div><b class="g">' +
+          c.available +
+          '</b><small>Can play</small></div><div><b class="y">' +
+          c.maybe +
+          '</b><small>Maybe</small></div><div><b>' +
+          c.none +
+          '</b><small>Not replied</small></div><div><b class="r">' +
+          c.cant +
+          '</b><small>Can’t</small></div></div><div class="th-acts"><a class="btn primary" href="' +
+          teamUrl(cal, 'fixture/' + next.event_id) +
+          '">' +
+          (next.kind === 'match' ? (next.sheet_sent ? 'Change the team' : 'Pick the team') : 'Who’s coming') +
+          '</a>' +
+          (nudgeable
+            ? '<button class="btn" id="th-nudge"' +
+              (recent ? ' disabled title="You can nudge again 12 hours after the last time."' : '') +
+              '>' +
+              (recent
+                ? 'Nudged ' + ago(next.nudged_at)
+                : nudgeable === waiting.length
+                  ? 'Nudge the ' + nudgeable
+                  : 'Nudge ' + nudgeable + ' on Dayli') +
+              '</button>'
+            : '') +
+          '<button class="btn" id="th-share">Share to WhatsApp</button>' +
+          (waiting.length
+            ? '<span class="th-wait">Not replied: ' +
+              waiting
+                .slice(0, 5)
+                .map(function (p) {
+                  return avatar(p, 26);
+                })
+                .join('') +
+              (waiting.length > 5 ? '<span class="muted small">+' + (waiting.length - 5) + '</span>' : '') +
+              '</span>'
+            : '') +
+          '</div></div><div class="th-ring" style="background:conic-gradient(var(--accent) 0 ' +
+          pct.toFixed(1) +
+          '%,#e3b34a ' +
+          pct.toFixed(1) +
+          '% ' +
+          pctM.toFixed(1) +
+          '%,var(--alt) ' +
+          pctM.toFixed(1) +
+          '%)"><div><b>' +
+          c.available +
+          '/' +
+          total +
+          '</b><small>can play</small></div></div></div>';
+      } else {
+        hero =
+          '<div class="th-hero th-empty"><div class="grow"><div class="th-kick">NOTHING PLANNED</div><h2>Add your next fixture</h2><div class="muted">It goes into every player’s Dayli calendar, and they can say whether they can play.</div><div class="th-acts"><a class="btn primary" href="' +
+          teamUrl(cal, 'new') +
+          '">+ Add fixture</a></div></div></div>';
+      }
+
+      // Last result, form, money (or the squad when payments aren't on).
+      var sc = scored(d.results);
+      var last = sc[0];
+      var lastUnscored = (d.results || []).filter(function (r) {
+        return r.kind === 'match' && (r.score_us == null || r.score_them == null);
+      })[0];
+      var tLast = last
+        ? '<div class="th-v ' +
+          wdl(last).toLowerCase() +
+          '">' +
+          last.score_us +
+          '–' +
+          last.score_them +
+          '</div><div class="small"><b>' +
+          (wdl(last) === 'W' ? 'Won ' : wdl(last) === 'L' ? 'Lost ' : 'Drew ') +
+          esc(fixtureName(last)) +
+          '</b><div class="muted">' +
+          esc(day(last.starts_at, last.timezone)) +
+          '</div></div>'
+        : lastUnscored
+          ? '<div class="small"><b>' +
+            esc(fixtureName(lastUnscored)) +
+            '</b><div class="muted">No score yet</div></div><a class="act" href="' +
+            teamUrl(cal, 'fixture/' + lastUnscored.event_id) +
+            '">Add score</a>'
+          : '<div class="small muted">No results yet. Add the score after a match and followers see it.</div>';
+      var w = 0,
+        dr = 0,
+        l = 0;
+      sc.forEach(function (r) {
+        var x = wdl(r);
+        if (x === 'W') w++;
+        else if (x === 'D') dr++;
+        else l++;
+      });
+      var tForm = sc.length
+        ? '<div class="th-formrow">' +
+          formChips(sc.slice(0, 5).reverse()) +
+          '</div><div class="small muted">Played ' +
+          sc.length +
+          ' · Won ' +
+          w +
+          ' · Drew ' +
+          dr +
+          ' · Lost ' +
+          l +
+          '</div>'
+        : '<div class="small muted">Your last five results show here.</div>';
+      var tiles =
+        '<div class="card th-tile"><div class="label">Last result</div><div class="th-tl">' +
+        tLast +
+        '</div></div><div class="card th-tile"><div class="label">Form · last 5</div>' +
+        tForm +
+        '</div>';
+      var owing = d.pay && d.pay.totals ? owingCount(d.pay) : 0;
+      if (d.pay && d.pay.totals) {
+        tiles +=
+          '<div class="card th-tile"><div class="label">Money</div><div class="th-tl"><div class="th-v o">' +
+          pounds(d.pay.totals.owed_pence) +
+          '</div><div class="small grow"><b>' +
+          (owing ? 'owed by ' + owing + (owing === 1 ? ' person' : ' people') : 'nobody owes anything') +
+          '</b><div class="muted">' +
+          pounds(d.pay.totals.collected_pence) +
+          ' in so far</div></div>' +
+          (owing
+            ? '<button class="act" id="th-remind">Remind</button>'
+            : '<a class="act" href="' + teamUrl(cal, 'payments') + '">Payments</a>') +
+          '</div></div>';
+      } else {
+        var onDayli = (t.players || []).filter(function (p) {
+          return p.user_id;
+        }).length;
+        tiles +=
+          '<div class="card th-tile"><div class="label">Squad</div><div class="th-tl"><div class="th-v">' +
+          (t.players || []).length +
+          '</div><div class="small grow"><b>in the squad</b><div class="muted">' +
+          onDayli +
+          ' on Dayli</div></div><a class="act" href="' +
+          teamUrl(cal, 'squad') +
+          '">Squad</a></div></div>';
+      }
+
+      // After that: the next few entries.
+      var after = upcoming
+        .filter(function (f) {
+          return !next || f.event_id !== next.event_id;
+        })
+        .slice(0, 4);
+      var afterHtml = after.length
+        ? after
+            .map(function (f) {
+              var c2 = f.counts;
+              var tot = c2.available + c2.maybe + c2.cant + c2.none;
+              return (
+                '<a class="th-row" href="' +
+                teamUrl(cal, 'fixture/' + f.event_id) +
+                '">' +
+                dateBlock(f) +
+                '<div class="grow"><b>' +
+                esc(fixtureName(f)) +
+                '</b><div class="small muted">' +
+                esc(
+                  [time(f.starts_at, f.timezone), f.kind === 'match' ? (f.home ? 'Home' : 'Away') : KIND[f.kind], f.location]
+                    .filter(Boolean)
+                    .join(' · '),
+                ) +
+                '</div></div>' +
+                (f.ask === false
+                  ? ''
+                  : '<div class="th-mini small muted">' +
+                    c2.available +
+                    ' can play · ' +
+                    c2.none +
+                    ' not replied' +
+                    countsBar(c2, tot) +
+                    '</div>') +
+                '</a>'
+              );
+            })
+            .join('')
+        : '<p class="muted small">Nothing else planned yet. <a href="' + teamUrl(cal, 'new') + '">Add a fixture</a>.</p>';
+
+      // Getting started.
+      var squadSize = (t.players || []).length;
+      var joined = (t.players || []).filter(function (p) {
+        return p.user_id;
+      }).length;
+      var steps = [
+        { done: true, text: 'Set up your team' },
+        {
+          done: upcoming.length > 0 || (d.results || []).length > 0,
+          text: 'Add your fixtures',
+          go: '<a href="' + teamUrl(cal, 'new') + '">Add one</a>',
+        },
+        {
+          done: squadSize > 1 && joined >= squadSize,
+          text: squadSize > 1 ? 'Invite the rest (' + joined + ' of ' + squadSize + ' in)' : 'Invite your squad',
+          go: '<button class="linkish" data-copy-invite>Copy link</button>',
+        },
+      ];
+      if (d.pay) {
+        steps.push({
+          done: !!(d.pay.payout && d.pay.payout.ready),
+          text: 'Collect subs by card',
+          go: '<a href="' + teamUrl(cal, 'payments') + '">Set up</a>',
+        });
+      }
+      var doneCount = steps.filter(function (x) {
+        return x.done;
+      }).length;
+      var started =
+        doneCount < steps.length
+          ? '<div class="card th-start"><h3>Getting started<span class="th-more muted">' +
+            doneCount +
+            ' of ' +
+            steps.length +
+            '</span></h3>' +
+            steps
+              .map(function (x) {
+                return (
+                  '<div class="th-todo' +
+                  (x.done ? ' done' : '') +
+                  '"><span class="th-ck">' +
+                  (x.done ? '✓' : '') +
+                  '</span><span class="grow">' +
+                  esc(x.text) +
+                  '</span>' +
+                  (x.done ? '' : x.go || '') +
+                  '</div>'
+                );
+              })
+              .join('') +
+            '</div>'
+          : '';
+
+      render(
+        '<div class="th-head"><div><div class="muted th-date">' +
+          esc(new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })) +
+          '</div><h1>' +
+          esc(hello) +
+          '</h1></div><div class="row"><button class="btn" data-copy-invite>Copy squad invite link</button><a class="btn primary" href="' +
+          teamUrl(cal, 'new') +
+          '">+ Add fixture</a></div></div>' +
+          hero +
+          '<div class="th-tiles">' +
+          tiles +
+          '</div><div class="th-bottom' +
+          (started ? '' : ' one') +
+          '"><div class="card"><h3>After that<a class="th-more" href="' +
+          teamUrl(cal, 'fixtures') +
+          '">All fixtures</a></h3>' +
+          afterHtml +
+          '</div>' +
+          started +
+          '</div>',
+      );
+
+      $$('[data-copy-invite]').forEach(function (b) {
+        b.onclick = function () {
+          if (!d.code) return toast('No invite link for this team yet.');
+          copy(SITE + '/join/' + d.code, 'Invite link copied. Send it to your players.');
+        };
+      });
+      if ($('#th-nudge'))
+        $('#th-nudge').onclick = function () {
+          var button = this;
+          setBusy(button, true);
+          rpc('team_nudge', { p_event: next.event_id }).then(
+            function (n) {
+              toast(n ? 'Nudged ' + n + (n === 1 ? ' player' : ' players') + '. They’ll get a notification.' : 'Everyone on Dayli has answered.');
+              button.textContent = 'Nudged just now';
+              button.disabled = true;
+            },
+            function (err) {
+              setBusy(button, false);
+              toast(friendly(err));
+            },
+          );
+        };
+      if ($('#th-share'))
+        $('#th-share').onclick = function () {
+          var f = next;
+          var text =
+            'Can you make ' +
+            (f.kind === 'match' ? fixtureName(f) : fixtureName(f).toLowerCase()) +
+            ' on ' +
+            day(f.starts_at, f.timezone) +
+            ' at ' +
+            time(f.starts_at, f.timezone) +
+            (f.location ? ' (' + f.location + ')' : '') +
+            '? Say yes, maybe or no in the Dayli app.' +
+            (d.code ? ' Not on Dayli yet? Join the team: ' + SITE + '/join/' + d.code : '');
+          window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+        };
+      if ($('#th-remind'))
+        $('#th-remind').onclick = function () {
+          var button = this;
+          var open = (d.pay.charges || []).filter(function (ch) {
+            return (
+              !ch.closed &&
+              (ch.dues || []).some(function (u) {
+                return u.status === 'owed';
+              })
+            );
+          });
+          setBusy(button, true);
+          Promise.all(
+            open.map(function (ch) {
+              return rpc('team_charge_remind', { p_charge: ch.id });
+            }),
+          ).then(
+            function (ns) {
+              var n = ns.reduce(function (a, b) {
+                return a + (b || 0);
+              }, 0);
+              setBusy(button, false);
+              toast(n ? 'Reminded ' + n + '. They get a notification with a pay button.' : 'Everyone who owes was reminded in the last 12 hours.');
+            },
+            function (err) {
+              setBusy(button, false);
+              toast(friendly(err));
+            },
+          );
+        };
     }
 
     // --- fixtures tab ---------------------------------------------------------
