@@ -374,6 +374,8 @@
     // --- welcome ---------------------------------------------------------------------
 
     var chosen = null; // the choice while going through the welcome steps
+    var TICK =
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
 
     function steps(n) {
       var names = ['What you run', 'Set it up', 'Bring people in'];
@@ -439,9 +441,7 @@
               '" data-run="' +
               r.key +
               '"><span class="hq-tick">' +
-              (on
-                ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>'
-                : '') +
+              (on ? TICK : '') +
               '</span><span class="hq-ic" style="background:' +
               r.bg +
               '"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="' +
@@ -487,7 +487,11 @@
           var i = chosen.indexOf(k);
           if (i >= 0) chosen.splice(i, 1);
           else chosen.push(k);
-          drawWelcome();
+          // Change the card in place: redrawing the page would jump the view.
+          var on = chosen.indexOf(k) >= 0;
+          b.classList.toggle('on', on);
+          b.querySelector('.hq-tick').innerHTML = on ? TICK : '';
+          picked();
         };
       });
       picked();
@@ -807,7 +811,7 @@
               var i = sel.indexOf(k);
               if (i >= 0) sel.splice(i, 1);
               else sel.push(k);
-              draw();
+              b.classList.toggle('on', sel.indexOf(k) >= 0); // in place, so the page doesn't jump
             };
           });
           $('#hq-signout').onclick = ctx.signOut;
