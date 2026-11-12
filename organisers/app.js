@@ -102,8 +102,13 @@
     smallCovers(app);
     window.scrollTo(0, 0);
   }
+  // Loading: the Dayli mark turning, as in the app.
   function loading(message) {
-    render('<p class="muted">' + esc(message || 'Loading…') + '</p>');
+    render(
+      '<div class="loading-screen" role="status" aria-label="Loading"><img class="spin-mark" src="../img/logo.svg" alt="" />' +
+        (message ? '<p class="muted">' + esc(message) + '</p>' : '') +
+        '</div>',
+    );
   }
   function notice(kind, html) {
     return '<div class="notice ' + kind + '">' + html + '</div>';

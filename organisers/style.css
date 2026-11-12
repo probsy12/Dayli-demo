@@ -5635,3 +5635,33 @@ select.ng-inp {
 html.hq .ng-time input {
   font-size: 22px !important;
 }
+
+/* Loading: the Dayli mark turning (the app's Spinner). */
+.loading-screen {
+  min-height: 55vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+}
+.spin-mark {
+  width: 72px;
+  height: 72px;
+  animation: dayli-turn 1.4s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+@keyframes dayli-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spin-mark {
+    animation: dayli-pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes dayli-pulse {
+    50% {
+      opacity: 0.45;
+    }
+  }
+}
