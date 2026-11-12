@@ -1072,8 +1072,8 @@
         d: '5',
         mins: 60,
         f: [
-          ['3x3', '3 v 3', 6],
           ['5', '5 v 5', 10],
+          ['3x3', '3 v 3', 6],
         ],
       },
       { k: 'netball', n: 'Netball', d: '7', mins: 60, f: [['7', '7-a-side', 14]] },
@@ -1085,8 +1085,8 @@
         d: 'doubles',
         mins: 60,
         f: [
-          ['singles', 'Singles', 2],
           ['doubles', 'Doubles', 4],
+          ['singles', 'Singles', 2],
         ],
       },
       {
@@ -1095,8 +1095,8 @@
         d: 'doubles',
         mins: 60,
         f: [
-          ['singles', 'Singles', 2],
           ['doubles', 'Doubles', 4],
+          ['singles', 'Singles', 2],
         ],
       },
       {
@@ -1150,67 +1150,91 @@
       );
     }
 
+    var SPORT_ICON = {
+      football: '<circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10z"/>',
+      basketball: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3v18M5.6 5.6c3 3 3 9.8 0 12.8M18.4 5.6c-3 3-3 9.8 0 12.8"/>',
+      netball: '<circle cx="12" cy="12" r="9"/><path d="M4 9c5 2 11 2 16 0M4 15c5-2 11-2 16 0M12 3c-3 5-3 13 0 18"/>',
+      hockey: '<path d="M14 3l-6 15a3 3 0 01-3 2H3"/><circle cx="18" cy="18" r="2.5"/>',
+      padel: '<rect x="6" y="2.5" width="11" height="12" rx="5.5"/><path d="M11.5 14.5V21M9 6h5M9 9h5M9 12h5"/>',
+      tennis: '<circle cx="12" cy="12" r="9"/><path d="M5 5.5c3.5 3.5 3.5 9.5 0 13M19 5.5c-3.5 3.5-3.5 9.5 0 13"/>',
+      badminton: '<path d="M12 21l-2-8h4z"/><path d="M10 13L6 4M14 13l4-9M12 13V3"/>',
+      volleyball: '<circle cx="12" cy="12" r="9"/><path d="M12 3c0 5 3 8 8 9M12 12c-4 3-8 3-9 2M12 12c1-4 4-7 6-7"/>',
+      board_games:
+        '<rect x="4" y="4" width="16" height="16" rx="3"/><circle cx="9" cy="9" r="1.2"/><circle cx="15" cy="15" r="1.2"/><circle cx="15" cy="9" r="1.2"/><circle cx="9" cy="15" r="1.2"/>',
+      other: '<circle cx="12" cy="12" r="9"/><path d="M8 12h8M12 8v8"/>',
+    };
+    function sportIcon(k, size) {
+      return (
+        '<svg width="' +
+        (size || 28) +
+        '" height="' +
+        (size || 28) +
+        '" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">' +
+        (SPORT_ICON[k] || SPORT_ICON.other) +
+        '</svg>'
+      );
+    }
+    // The next time a past game's weekday and time comes round (from tomorrow on).
+    function nextLike(iso, tz) {
+      var then = new Date(iso);
+      var hm = then.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', hourCycle: 'h23', timeZone: tz || undefined });
+      var wd = Number(
+        ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].indexOf(then.toLocaleDateString('en-GB', { weekday: 'short', timeZone: tz || undefined })),
+      );
+      var d = new Date();
+      d.setDate(d.getDate() + 1);
+      for (var i = 0; i < 7 && d.getDay() !== wd; i++) d.setDate(d.getDate() + 1);
+      return { day: ymdLocal(d), time: hm };
+    }
+
+    // Start a game: your recent games at the top (again, like last time: one
+    // tap fills everything in for next week), or start fresh with a sport
+    // tile, its format, and the details as rows you open to change.
     function screenNewGame() {
       loading();
       var me = state.session && state.session.user ? state.session.user.id : null;
-      ctx.sb
-        .from('calendars')
-        .select('id, name, owner_id')
-        .then(function (r) {
-          var teamIds = {};
-          (hq.teams || []).forEach(function (t) {
-            teamIds[t.calendar_id] = true;
-          });
-          var cals = (Array.isArray(r.data) ? r.data : [])
-            .filter(function (c) {
-              return (c.owner_id === me && !teamIds[c.id]) || teamIds[c.id];
-            })
-            .sort(function (a, b) {
-              return (teamIds[a.id] ? 1 : 0) - (teamIds[b.id] ? 1 : 0);
-            });
-          var tomorrow = new Date(Date.now() + 86400000);
-          var g = {
-            sport: 'football',
-            format: '5',
-            places: 10,
-            day: ymdLocal(tomorrow),
-            time: '19:00',
-            place: '',
-            weekly: false,
-            mins: 60,
-            cost: '',
-            title: '',
-            titleTouched: false,
-            cal: cals[0] ? cals[0].id : null,
-          };
-          drawNewGame(1, g, cals, teamIds);
+      Promise.all([
+        ctx.sb.from('calendars').select('id, name, owner_id'),
+        rpc('game_templates').catch(function () {
+          return [];
+        }),
+      ]).then(function (res) {
+        var teamIds = {};
+        (hq.teams || []).forEach(function (t) {
+          teamIds[t.calendar_id] = true;
         });
+        var cals = (Array.isArray(res[0].data) ? res[0].data : [])
+          .filter(function (c) {
+            return (c.owner_id === me && !teamIds[c.id]) || teamIds[c.id];
+          })
+          .sort(function (a, b) {
+            return (teamIds[a.id] ? 1 : 0) - (teamIds[b.id] ? 1 : 0);
+          });
+        var tomorrow = new Date(Date.now() + 86400000);
+        var g = {
+          sport: 'football',
+          format: '5',
+          places: 10,
+          day: ymdLocal(tomorrow),
+          time: '19:00',
+          place: '',
+          weekly: false,
+          mins: 60,
+          cost: '',
+          title: '',
+          titleTouched: false,
+          cal: cals[0] ? cals[0].id : null,
+          from: null,
+        };
+        drawNewGame(g, cals, teamIds, res[1] || [], null);
+      });
     }
 
-    function drawNewGame(step, g, cals, teamIds) {
+    function drawNewGame(g, cals, teamIds, templates, open) {
+      var keepY = window.scrollY;
       var s = gameSport(g.sport);
-      var today = new Date();
-      var days = [['today', 'Tonight']];
-      for (var i = 1; i <= 6; i++) {
-        var d = new Date(today.getTime() + i * 86400000);
-        days.push([
-          ymdLocal(d),
-          i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }),
-        ]);
-      }
-      var dayOn = g.day === ymdLocal(today) ? 'today' : g.day;
-      var dayKnown = days.some(function (x) {
-        return x[0] === dayOn;
-      });
-      days.push(['pick', 'Pick a day…']);
-      var times = ['18:00', '18:30', '19:00', '19:30', '20:00'].map(function (t) {
-        return [t, t];
-      });
-      var timeKnown = times.some(function (x) {
-        return x[0] === g.time;
-      });
-      times.push(['other', 'Other time…']);
-      var whatName = s.f ? (gameFormat(s, g.format) || [null, s.n])[1] : s.n;
+      var fmt = gameFormat(s, g.format);
+      var whatName = s.f ? (fmt || [null, s.n])[1] : s.n;
       if (!g.titleTouched) {
         g.title =
           g.sport === 'football'
@@ -1218,200 +1242,331 @@
             : g.sport === 'board_games'
               ? 'Board games night'
               : g.sport === 'other'
-                ? ''
-                : s.f
+                ? 'Game'
+                : s.f && s.f.length > 1
                   ? s.n + ' · ' + whatName
                   : s.n;
       }
+      var when = new Date(g.day + 'T' + g.time);
+      var whenText = isNaN(when.getTime())
+        ? 'Pick a day'
+        : when.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · ' + g.time;
+      var minsText = { 60: '1 hour', 90: '1½ hours', 120: '2 hours', 180: '3 hours' }[g.mins] || g.mins + ' minutes';
 
-      var head =
-        '<div class="ng-top"><a href="' +
-        (step === 1 ? '#/games' : '#') +
-        '" id="ng-back" class="ng-link">' +
-        (step === 1 ? 'Cancel' : '‹ Back') +
-        '</a><b>New game</b><span class="muted small">' +
-        step +
-        ' of 2</span></div>';
-      var body;
-      if (step === 1) {
-        body =
-          '<div class="ng-lbl">What are you playing?</div>' +
-          chips(
-            'sport',
-            GAME_SPORTS.map(function (x) {
-              return [x.k, x.n];
-            }),
-            g.sport,
-          ) +
+      function row(key, label, value, editor) {
+        return (
+          '<div class="ng-row' +
+          (open === key ? ' open' : '') +
+          '"><button type="button" class="ng-row-h" data-row="' +
+          key +
+          '"><span class="muted">' +
+          label +
+          '</span><b id="ng-v-' +
+          key +
+          '">' +
+          esc(value) +
+          '</b><i>' +
+          (open === key ? '⌃' : '›') +
+          '</i></button>' +
+          (open === key ? '<div class="ng-row-e">' + editor + '</div>' : '') +
+          '</div>'
+        );
+      }
+
+      var today = new Date();
+      var days = [['today', 'Tonight']];
+      for (var i = 1; i <= 6; i++) {
+        var d = new Date(today.getTime() + i * 86400000);
+        days.push([ymdLocal(d), i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })]);
+      }
+      var dayOn = g.day === ymdLocal(today) ? 'today' : g.day;
+      var dayKnown = days.some(function (x) {
+        return x[0] === dayOn;
+      });
+      days.push(['pick', 'Another day…']);
+      var times = ['18:00', '18:30', '19:00', '19:30', '20:00'].map(function (t) {
+        return [t, t];
+      });
+      var timeKnown = times.some(function (x) {
+        return x[0] === g.time;
+      });
+      times.push(['other', 'Other…']);
+
+      var tpls = (templates || [])
+        .map(function (t, i) {
+          var nx = nextLike(t.starts_at, t.timezone);
+          var nd = new Date(nx.day + 'T' + nx.time);
+          var on = g.from === i;
+          return (
+            '<button type="button" class="ng-tpl' +
+            (on ? ' on' : '') +
+            '" data-tpl="' +
+            i +
+            '"><span class="ng-tpl-ic">' +
+            sportIcon(t.sport, 26) +
+            '</span><span class="grow"><b>' +
+            esc(t.title) +
+            '</b><small>' +
+            esc(
+              [
+                nd.toLocaleDateString('en-GB', { weekday: 'short' }) + ' ' + nx.time,
+                t.location,
+                t.places + ' places',
+                t.cost,
+              ]
+                .filter(Boolean)
+                .join(' · '),
+            ) +
+            '</small><em>Next: ' +
+            esc(nd.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' })) +
+            '</em></span><i>›</i></button>'
+          );
+        })
+        .join('');
+
+      render(
+        '<div class="ng ng-start"><div class="ng-top"><a href="#/games" class="ng-link">Cancel</a><b>New game</b><span style="width:48px"></span></div>' +
+          '<h1 class="ng-h">Start a game</h1>' +
+          (tpls ? '<div class="ng-k">AGAIN, LIKE LAST TIME</div>' + tpls + '<div class="ng-k">OR START FRESH</div>' : '') +
+          '<div class="ng-tiles">' +
+          GAME_SPORTS.map(function (x) {
+            return (
+              '<button type="button" class="ng-tile' +
+              (x.k === g.sport ? ' on' : '') +
+              '" data-sport="' +
+              x.k +
+              '">' +
+              sportIcon(x.k, 28) +
+              '<span>' +
+              esc(x.n) +
+              '</span></button>'
+            );
+          }).join('') +
+          '</div>' +
           (s.f && s.f.length > 1
-            ? '<div class="ng-lbl">' +
-              (g.sport === 'football' || g.sport === 'netball' || g.sport === 'hockey' ? 'How many a side?' : 'Which game?') +
-              '</div>' +
-              chips(
-                'format',
-                s.f.map(function (x) {
-                  return [x[0], x[1]];
-                }),
-                g.format,
-              )
-            : '') +
-          '<div class="ng-lbl">When?</div>' +
-          chips('day', days, dayKnown ? dayOn : 'pick') +
-          '<input type="date" id="ng-date" class="ng-inp" value="' +
-          esc(g.day) +
-          '"' +
-          (dayKnown ? ' hidden' : '') +
-          ' />' +
-          chips('time', times, timeKnown ? g.time : 'other') +
-          '<input type="time" id="ng-time" class="ng-inp" value="' +
-          esc(g.time) +
-          '"' +
-          (timeKnown ? ' hidden' : '') +
-          ' />' +
-          '<div class="ng-lbl">Where?</div><input type="text" id="ng-place" class="ng-inp" maxlength="120" placeholder="Mabley Green, pitch 3" value="' +
-          esc(g.place) +
-          '" />' +
-          '<label class="ng-switch"><input type="checkbox" id="ng-weekly"' +
-          (g.weekly ? ' checked' : '') +
-          ' /><span></span>Every week</label>' +
-          '<p class="err" id="ng-err" hidden></p><button class="btn primary ng-go" id="ng-next">Next</button>';
-      } else {
-        var when = new Date(g.day + 'T' + g.time);
-        body =
-          '<div class="ng-lbl">Name</div><input type="text" id="ng-title" class="ng-inp" maxlength="80" placeholder="Thursday 5-a-side" value="' +
-          esc(g.title) +
-          '" />' +
-          '<div class="ng-lbl">How many can play?</div><div class="ng-step"><button type="button" data-n="-1">−</button><div><b id="ng-n">' +
-          g.places +
-          '</b><small id="ng-sides">' +
-          esc(sidesLabel(g.sport, g.places)) +
-          '</small></div><button type="button" data-n="1">+</button></div>' +
-          '<div class="ng-lbl">How long?</div>' +
-          chips(
-            'mins',
-            [
-              ['60', '1 hour'],
-              ['90', '1½ hours'],
-              ['120', '2 hours'],
-              ['180', '3 hours'],
-            ],
-            String(g.mins),
-          ) +
-          '<div class="ng-lbl">Cost each <span class="muted">(optional)</span></div><input type="text" id="ng-cost" class="ng-inp" maxlength="40" placeholder="£5" value="' +
-          esc(g.cost) +
-          '" /><p class="muted small ng-note">People pay you in cash, or by card once card payments are on.</p>' +
-          (cals.length > 1
-            ? '<div class="ng-lbl">On which calendar?</div><select id="ng-cal" class="ng-inp">' +
-              cals
-                .map(function (c) {
+            ? '<div class="ng-k">' +
+              (g.sport === 'football' || g.sport === 'hockey' || g.sport === 'netball' ? 'HOW MANY A SIDE?' : 'WHICH GAME?') +
+              '</div><div class="ng-seg">' +
+              s.f
+                .map(function (f) {
                   return (
-                    '<option value="' +
-                    esc(c.id) +
-                    '"' +
-                    (c.id === g.cal ? ' selected' : '') +
-                    '>' +
-                    esc(c.name) +
-                    (teamIds[c.id] ? ' (team: the squad is asked)' : '') +
-                    '</option>'
+                    '<button type="button" class="' +
+                    (f[0] === g.format ? 'on' : '') +
+                    '" data-format="' +
+                    f[0] +
+                    '">' +
+                    esc(g.sport === 'football' ? f[1].replace('-a-side', '') : f[1]) +
+                    '</button>'
                   );
                 })
                 .join('') +
-              '</select>'
+              '</div>'
             : '') +
-          '<div class="ng-sum"><span class="lbl">YOUR GAME</span><b id="ng-sum-t">' +
-          esc(g.title || whatName) +
-          '</b> · ' +
-          esc(
-            when.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) +
-              ', ' +
-              g.time,
+          '<div class="ng-rows">' +
+          row('name', 'Name', g.title, '<input type="text" id="ng-title" class="ng-inp" maxlength="80" value="' + esc(g.title) + '" />') +
+          row(
+            'when',
+            'When',
+            whenText,
+            chips('day', days, dayKnown ? dayOn : 'pick') +
+              '<input type="date" id="ng-date" class="ng-inp" value="' +
+              esc(g.day) +
+              '"' +
+              (dayKnown ? ' hidden' : '') +
+              ' />' +
+              chips('time', times, timeKnown ? g.time : 'other') +
+              '<input type="time" id="ng-time" class="ng-inp" value="' +
+              esc(g.time) +
+              '"' +
+              (timeKnown ? ' hidden' : '') +
+              ' />',
           ) +
-          '<div class="muted small">' +
-          esc([g.place, g.weekly ? 'weekly' : null, null].filter(Boolean).join(' · ')) +
-          '</div></div>' +
-          '<p class="err" id="ng-err" hidden></p><button class="btn primary ng-go" id="ng-create">Create the game</button>';
-      }
-      render('<div class="ng">' + head + '<div class="ng-body">' + body + '</div></div>');
+          row(
+            'where',
+            'Where',
+            g.place || 'Add a place',
+            '<input type="text" id="ng-place" class="ng-inp" maxlength="120" placeholder="Mabley Green, pitch 3" value="' + esc(g.place) + '" />',
+          ) +
+          row(
+            'places',
+            'Places',
+            g.places + ' · ' + sidesLabel(g.sport, g.places),
+            '<div class="ng-step"><button type="button" data-n="-1">−</button><div><b id="ng-n">' +
+              g.places +
+              '</b><small id="ng-sides">' +
+              esc(sidesLabel(g.sport, g.places)) +
+              '</small></div><button type="button" data-n="1">+</button></div>',
+          ) +
+          row(
+            'long',
+            'How long',
+            minsText,
+            chips(
+              'mins',
+              [
+                ['60', '1 hour'],
+                ['90', '1½ hours'],
+                ['120', '2 hours'],
+                ['180', '3 hours'],
+              ],
+              String(g.mins),
+            ),
+          ) +
+          row(
+            'cost',
+            'Cost',
+            g.cost ? g.cost + ' each' : 'Free, or say later',
+            '<input type="text" id="ng-cost" class="ng-inp" maxlength="40" placeholder="£5" value="' +
+              esc(g.cost) +
+              '" /><p class="muted small ng-note">People pay you in cash, or by card once card payments are on.</p>',
+          ) +
+          (cals.length > 1
+            ? row(
+                'cal',
+                'Calendar',
+                (
+                  cals.filter(function (c) {
+                    return c.id === g.cal;
+                  })[0] || { name: '' }
+                ).name,
+                '<select id="ng-cal" class="ng-inp">' +
+                  cals
+                    .map(function (c) {
+                      return (
+                        '<option value="' +
+                        esc(c.id) +
+                        '"' +
+                        (c.id === g.cal ? ' selected' : '') +
+                        '>' +
+                        esc(c.name) +
+                        (teamIds[c.id] ? ' (team: the squad is asked)' : '') +
+                        '</option>'
+                      );
+                    })
+                    .join('') +
+                  '</select>',
+              )
+            : '') +
+          '<label class="ng-row ng-switch-row"><span class="muted">Repeats</span><b>Every week</b><span class="ng-switch"><input type="checkbox" id="ng-weekly"' +
+          (g.weekly ? ' checked' : '') +
+          ' /><span></span></span></label></div>' +
+          '<p class="err" id="ng-err" hidden></p><button class="btn primary ng-go" id="ng-create">Create the game</button></div>',
+      );
+      window.scrollTo(0, keepY);
 
-      function showErr(t) {
-        var e = $('#ng-err');
-        e.textContent = t;
-        e.hidden = false;
+      function redraw(nextOpen) {
+        drawNewGame(g, cals, teamIds, templates, nextOpen);
       }
-      function readStep1() {
-        g.place = $('#ng-place').value.trim();
-        g.weekly = $('#ng-weekly').checked;
-        if (!$('#ng-date').hidden) g.day = $('#ng-date').value || g.day;
-        if (!$('#ng-time').hidden) g.time = $('#ng-time').value || g.time;
+      function setText(key, v) {
+        var el = document.getElementById('ng-v-' + key);
+        if (el) el.textContent = v;
       }
-      function readStep2() {
-        g.title = $('#ng-title').value.trim();
-        g.cost = $('#ng-cost').value.trim();
-        if ($('#ng-cal')) g.cal = $('#ng-cal').value;
-      }
+      $$('[data-tpl]').forEach(function (b) {
+        b.onclick = function () {
+          var t = templates[Number(b.dataset.tpl)];
+          var nx = nextLike(t.starts_at, t.timezone);
+          g.sport = gameSport(t.sport).k === t.sport ? t.sport : 'other';
+          g.format = t.format;
+          g.places = t.places;
+          g.day = nx.day;
+          g.time = nx.time;
+          g.place = t.location || '';
+          g.weekly = !!t.weekly;
+          g.mins = t.minutes || 60;
+          g.cost = t.cost || '';
+          g.title = t.title;
+          g.titleTouched = true;
+          if (t.calendar_id && cals.some(function (c) { return c.id === t.calendar_id; })) g.cal = t.calendar_id;
+          g.from = Number(b.dataset.tpl);
+          redraw(null);
+          toast('Filled in for next ' + new Date(nx.day + 'T' + nx.time).toLocaleDateString('en-GB', { weekday: 'long' }) + '. Check it and create.');
+        };
+      });
+      $$('[data-sport]').forEach(function (b) {
+        b.onclick = function () {
+          var ns = gameSport(b.dataset.sport);
+          g.sport = ns.k;
+          g.format = ns.d;
+          var f = gameFormat(ns, ns.d);
+          g.places = f ? f[2] : ns.places;
+          g.mins = ns.mins;
+          g.from = null;
+          // A past game's name goes with it, unless you typed your own.
+          if (!g.typed) g.titleTouched = false;
+          redraw(open);
+        };
+      });
+      $$('[data-format]').forEach(function (b) {
+        b.onclick = function () {
+          g.format = b.dataset.format;
+          var f = gameFormat(gameSport(g.sport), g.format);
+          if (f) g.places = f[2];
+          redraw(open);
+        };
+      });
+      $$('[data-row]').forEach(function (b) {
+        b.onclick = function () {
+          redraw(open === b.dataset.row ? null : b.dataset.row);
+        };
+      });
+      if ($('#ng-title'))
+        $('#ng-title').oninput = function () {
+          g.title = this.value;
+          g.titleTouched = true;
+          g.typed = true;
+          setText('name', this.value || ' ');
+        };
+      if ($('#ng-place'))
+        $('#ng-place').oninput = function () {
+          g.place = this.value.trim();
+          setText('where', g.place || 'Add a place');
+        };
+      if ($('#ng-cost'))
+        $('#ng-cost').oninput = function () {
+          g.cost = this.value.trim();
+          setText('cost', g.cost ? g.cost + ' each' : 'Free, or say later');
+        };
+      if ($('#ng-cal'))
+        $('#ng-cal').onchange = function () {
+          g.cal = this.value;
+          setText('cal', this.options[this.selectedIndex].text);
+        };
+      if ($('#ng-date'))
+        $('#ng-date').onchange = function () {
+          if (this.value) g.day = this.value;
+          redraw('when');
+        };
+      if ($('#ng-time'))
+        $('#ng-time').onchange = function () {
+          if (this.value) g.time = this.value;
+          redraw('when');
+        };
       $$('[data-chips]').forEach(function (box) {
         var name = box.dataset.chips;
         $$('.ng-chip', box).forEach(function (b) {
           b.onclick = function () {
             var v = b.dataset.v;
-            if (name === 'sport') {
-              readStep1();
-              var ns = gameSport(v);
-              g.sport = v;
-              g.format = ns.d;
-              var f = gameFormat(ns, ns.d);
-              g.places = f ? f[2] : ns.places;
-              g.mins = ns.mins;
-              return drawNewGame(1, g, cals, teamIds);
-            }
-            if (name === 'format') {
-              readStep1();
-              g.format = v;
-              var ff = gameFormat(gameSport(g.sport), v);
-              if (ff) g.places = ff[2];
-              return drawNewGame(1, g, cals, teamIds);
-            }
-            // The rest change in place: redrawing would jump the page.
-            $$('.ng-chip', box).forEach(function (x) {
-              x.classList.toggle('on', x === b);
-            });
             if (name === 'day') {
-              $('#ng-date').hidden = v !== 'pick';
-              if (v === 'today') g.day = ymdLocal(new Date());
-              else if (v !== 'pick') g.day = v;
-              else $('#ng-date').focus();
+              if (v === 'pick') {
+                $('#ng-date').hidden = false;
+                $('#ng-date').focus();
+                return;
+              }
+              g.day = v === 'today' ? ymdLocal(new Date()) : v;
             }
             if (name === 'time') {
-              $('#ng-time').hidden = v !== 'other';
-              if (v !== 'other') g.time = v;
-              else $('#ng-time').focus();
+              if (v === 'other') {
+                $('#ng-time').hidden = false;
+                $('#ng-time').focus();
+                return;
+              }
+              g.time = v;
             }
             if (name === 'mins') g.mins = Number(v);
+            redraw(open);
           };
         });
       });
-      $('#ng-back').onclick = function (e) {
-        if (step === 1) return;
-        e.preventDefault();
-        readStep2();
-        drawNewGame(1, g, cals, teamIds);
-      };
-
-      if (step === 1) {
-        $('#ng-next').onclick = function () {
-          readStep1();
-          var start = new Date(g.day + 'T' + g.time);
-          if (isNaN(start.getTime()) || start < new Date()) return showErr('Pick a day and time that’s still to come.');
-          drawNewGame(2, g, cals, teamIds);
-          window.scrollTo(0, 0);
-        };
-        return;
-      }
-
-      $('#ng-title').oninput = function () {
-        g.titleTouched = true;
-        $('#ng-sum-t').textContent = this.value.trim() || whatName;
-      };
       $$('[data-n]').forEach(function (b) {
         b.onclick = function () {
           var n = g.places + Number(b.dataset.n);
@@ -1419,20 +1574,36 @@
           g.places = n;
           $('#ng-n').textContent = n;
           $('#ng-sides').textContent = sidesLabel(g.sport, n);
+          setText('places', n + ' · ' + sidesLabel(g.sport, n));
         };
       });
+      $('#ng-weekly').onchange = function () {
+        g.weekly = this.checked;
+      };
       $('#ng-create').onclick = function () {
         var button = this;
-        readStep2();
-        var title = g.title || whatName;
-        if (!g.cal) return showErr('You need a calendar in Dayli first: open the Dayli app once.');
+        var err = $('#ng-err');
+        err.hidden = true;
+        var start = new Date(g.day + 'T' + g.time);
+        var why = !g.cal
+          ? 'You need a calendar in Dayli first: open the Dayli app once.'
+          : isNaN(start.getTime()) || start < new Date()
+            ? 'Pick a day and time that’s still to come.'
+            : !(g.title || '').trim()
+              ? 'Give the game a name.'
+              : null;
+        if (why) {
+          err.textContent = why;
+          err.hidden = false;
+          return;
+        }
         setBusy(button, true);
         rpc('game_create', {
           p_calendar: g.cal,
-          p_title: title,
+          p_title: g.title.trim(),
           p_sport: g.sport,
           p_format: g.format,
-          p_starts_at: new Date(g.day + 'T' + g.time).toISOString(),
+          p_starts_at: start.toISOString(),
           p_minutes: g.mins,
           p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London',
           p_location: g.place || null,
@@ -1445,7 +1616,8 @@
           },
           function (e) {
             setBusy(button, false);
-            showErr(friendly(e));
+            err.textContent = friendly(e);
+            err.hidden = false;
           },
         );
       };
