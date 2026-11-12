@@ -1284,13 +1284,6 @@
         return x[0] === dayOn;
       });
       days.push(['pick', 'Another day…']);
-      var times = ['18:00', '18:30', '19:00', '19:30', '20:00'].map(function (t) {
-        return [t, t];
-      });
-      var timeKnown = times.some(function (x) {
-        return x[0] === g.time;
-      });
-      times.push(['other', 'Other…']);
 
       var tpls = (templates || [])
         .map(function (t, i) {
@@ -1363,7 +1356,6 @@
               '</div>'
             : '') +
           '<div class="ng-rows">' +
-          row('name', 'Name', g.title, '<input type="text" id="ng-title" class="ng-inp" maxlength="80" value="' + esc(g.title) + '" />') +
           row(
             'when',
             'When',
@@ -1374,12 +1366,9 @@
               '"' +
               (dayKnown ? ' hidden' : '') +
               ' />' +
-              chips('time', times, timeKnown ? g.time : 'other') +
-              '<input type="time" id="ng-time" class="ng-inp" value="' +
+              '<label class="ng-time"><span class="muted">Kick-off</span><input type="time" id="ng-time" step="300" value="' +
               esc(g.time) +
-              '"' +
-              (timeKnown ? ' hidden' : '') +
-              ' />',
+              '" /></label>',
           ) +
           row(
             'where',
@@ -1420,33 +1409,6 @@
               esc(g.cost) +
               '" /><p class="muted small ng-note">People pay you in cash, or by card once card payments are on.</p>',
           ) +
-          (cals.length > 1
-            ? row(
-                'cal',
-                'Calendar',
-                (
-                  cals.filter(function (c) {
-                    return c.id === g.cal;
-                  })[0] || { name: '' }
-                ).name,
-                '<select id="ng-cal" class="ng-inp">' +
-                  cals
-                    .map(function (c) {
-                      return (
-                        '<option value="' +
-                        esc(c.id) +
-                        '"' +
-                        (c.id === g.cal ? ' selected' : '') +
-                        '>' +
-                        esc(c.name) +
-                        (teamIds[c.id] ? ' (team: the squad is asked)' : '') +
-                        '</option>'
-                      );
-                    })
-                    .join('') +
-                  '</select>',
-              )
-            : '') +
           '<label class="ng-row ng-switch-row"><span class="muted">Repeats</span><b>Every week</b><span class="ng-switch"><input type="checkbox" id="ng-weekly"' +
           (g.weekly ? ' checked' : '') +
           ' /><span></span></span></label></div>' +
@@ -1491,8 +1453,8 @@
           g.places = f ? f[2] : ns.places;
           g.mins = ns.mins;
           g.from = null;
-          // A past game's name goes with it, unless you typed your own.
-          if (!g.typed) g.titleTouched = false;
+          // A past game's name goes with it.
+          g.titleTouched = false;
           redraw(open);
         };
       });
@@ -1509,13 +1471,6 @@
           redraw(open === b.dataset.row ? null : b.dataset.row);
         };
       });
-      if ($('#ng-title'))
-        $('#ng-title').oninput = function () {
-          g.title = this.value;
-          g.titleTouched = true;
-          g.typed = true;
-          setText('name', this.value || ' ');
-        };
       if ($('#ng-place'))
         $('#ng-place').oninput = function () {
           g.place = this.value.trim();
@@ -1526,20 +1481,18 @@
           g.cost = this.value.trim();
           setText('cost', g.cost ? g.cost + ' each' : 'Free, or say later');
         };
-      if ($('#ng-cal'))
-        $('#ng-cal').onchange = function () {
-          g.cal = this.value;
-          setText('cal', this.options[this.selectedIndex].text);
-        };
       if ($('#ng-date'))
         $('#ng-date').onchange = function () {
           if (this.value) g.day = this.value;
           redraw('when');
         };
+      // The phone's own time picker: update the row as it turns, without redrawing (that would close it).
       if ($('#ng-time'))
-        $('#ng-time').onchange = function () {
-          if (this.value) g.time = this.value;
-          redraw('when');
+        $('#ng-time').oninput = $('#ng-time').onchange = function () {
+          if (!this.value) return;
+          g.time = this.value;
+          var w = new Date(g.day + 'T' + g.time);
+          if (!isNaN(w.getTime())) setText('when', w.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · ' + g.time);
         };
       $$('[data-chips]').forEach(function (box) {
         var name = box.dataset.chips;
@@ -1553,14 +1506,6 @@
                 return;
               }
               g.day = v === 'today' ? ymdLocal(new Date()) : v;
-            }
-            if (name === 'time') {
-              if (v === 'other') {
-                $('#ng-time').hidden = false;
-                $('#ng-time').focus();
-                return;
-              }
-              g.time = v;
             }
             if (name === 'mins') g.mins = Number(v);
             redraw(open);
@@ -1589,9 +1534,7 @@
           ? 'You need a calendar in Dayli first: open the Dayli app once.'
           : isNaN(start.getTime()) || start < new Date()
             ? 'Pick a day and time that’s still to come.'
-            : !(g.title || '').trim()
-              ? 'Give the game a name.'
-              : null;
+            : null;
         if (why) {
           err.textContent = why;
           err.hidden = false;
@@ -1600,7 +1543,7 @@
         setBusy(button, true);
         rpc('game_create', {
           p_calendar: g.cal,
-          p_title: g.title.trim(),
+          p_title: (g.title || '').trim() || 'Game',
           p_sport: g.sport,
           p_format: g.format,
           p_starts_at: start.toISOString(),

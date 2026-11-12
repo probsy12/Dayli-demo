@@ -1428,6 +1428,7 @@ tr.bad-row td {
   padding: 12px 14px;
   background: var(--surface);
   cursor: pointer;
+  white-space: nowrap;
 }
 .choice.on {
   border-color: var(--accent);
@@ -5596,4 +5597,41 @@ select.ng-inp {
   html.hq .btn {
     touch-action: manipulation;
   }
+}
+
+/* New game: the kick-off time opens the phone's own time picker. */
+.ng-time {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 8px 8px 8px 14px;
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.ng-time input {
+  -webkit-appearance: none;
+  appearance: none;
+  border: 0;
+  border-radius: 10px;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 22px;
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  padding: 10px 16px;
+  min-width: 120px;
+  min-height: 46px;
+  text-align: center;
+}
+.ng-time input::-webkit-date-and-time-value {
+  text-align: center;
+}
+html.hq .ng-time input {
+  font-size: 22px !important;
 }
