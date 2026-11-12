@@ -7,7 +7,7 @@
  *   #/welcome/people     3. bring people in (invite links)
  *   #/settings           what you run, account
  *   #/home               the first thing you run
- *   #/games              games you organise
+ *   #/games[/<id>]       social games: add players, Bibs v Colours, who's paid
  * Only at /hq/ (app.js). */
 (function () {
   'use strict';
@@ -41,7 +41,7 @@
       },
       {
         key: 'games',
-        title: 'Games',
+        title: 'Social games',
         text: 'Pick-up games anyone can join: one-off or every week, first come first served.',
         points: ['Share one link, spaces fill up', 'Waiting list, bibs and colours', 'Track who’s paid'],
         like: 'Like: Thursday five-a-side, Sunday basketball, padel doubles',
@@ -219,7 +219,7 @@
           link(base + '/squad', 'squad', 'Squad', h === base + '/squad') +
           link(base + '/payments', 'money', 'Payments', h === base + '/payments');
       } else if (c === 'games') {
-        out += link('#/games', 'ball', 'Games', /^#\/games/.test(h));
+        out += link('#/games', 'ball', 'Social games', /^#\/games/.test(h));
       } else if (c === 'events') {
         out +=
           link('#/overview', 'home', 'Overview', h === '#/overview') +
@@ -262,7 +262,7 @@
           (c === 'games' ? ' on' : '') +
           '" href="#/games">' +
           crest('G', '#3a61c9', 30) +
-          '<span>Your games<small>One-off and weekly</small></span></a>';
+          '<span>Social games<small>One-off and weekly</small></span></a>';
       if (runs('events'))
         out +=
           '<div class="hq-dd-lb">EVENTS</div><a class="hq-dd-it' +
@@ -277,7 +277,7 @@
     }
     function current(c) {
       if (!c) return { name: 'Dayli HQ', sub: 'Pick what you run', colour: '#2f6b4f' };
-      if (c === 'games') return { name: 'Your games', sub: 'One-off and weekly', colour: '#3a61c9' };
+      if (c === 'games') return { name: 'Social games', sub: 'One-off and weekly', colour: '#3a61c9' };
       if (c === 'events')
         return {
           name: state.organiser ? state.organiser.name : 'Your events',
@@ -305,7 +305,7 @@
       var r = missing[0];
       var lines = {
         teams: ['Running a full team too?', 'Fixtures, a squad and subs…'],
-        games: ['Run pick-up games too?', 'Five-a-side, a weekly kickabout…'],
+        games: ['Run social games too?', 'Five-a-side, padel, board games…'],
         events: ['Also run events?', 'Quiz night, tournament, fun day…'],
       }[r.key];
       return (
@@ -581,7 +581,7 @@
       }
       if (runs('games')) {
         sections +=
-          '<section class="hq-sec"><h2 class="hq-h2">Your games</h2><p class="hq-lead2">Pick-up games: one link in the group chat and the spaces fill up, first come first served.</p>' +
+          '<section class="hq-sec"><h2 class="hq-h2">Your social games</h2><p class="hq-lead2">Pick-up games: one link in the group chat and the spaces fill up, first come first served.</p>' +
           (games.length
             ? '<div class="hq-found">' +
               games
@@ -605,7 +605,7 @@
               '</div>'
             : notice(
                 'info',
-                'Start a game in the Dayli app (Events → Hosting → New game). It shows here straight away; starting games from HQ is coming next.',
+                'Start a game in the Dayli app (Events → Hosting → New game). It shows here straight away: add players, pick Bibs v Colours and tick who’s paid in Social games.',
               )) +
           '</section>';
       }
@@ -723,7 +723,7 @@
         rows +=
           '<div class="hq-tm">' +
           crest('G', '#3a61c9', 44) +
-          '<div class="grow"><b>Games</b><div class="muted small">Each game has its own link: share it from the game when you make one.</div></div></div>';
+          '<div class="grow"><b>Social games</b><div class="muted small">Each game has its own link: share it from the game when you make one.</div></div></div>';
       if (runs('events'))
         rows +=
           '<div class="hq-tm">' +
@@ -841,58 +841,485 @@
       });
     }
 
-    // --- games ---------------------------------------------------------------------------
+    // --- social games: add players, Bibs v Colours on the pitch, who's paid ----------
 
-    function screenGames() {
+    var SG_COL = ['#3a61c9', '#b4432f', '#2f6b4f', '#d9741c', '#6e56cf', '#1c7a8c', '#8a5a2b', '#c2417a'];
+    function sgAvatar(p, size) {
+      var s = size || 28;
+      var k = String(p.id || p.name || '');
+      var h = 0;
+      for (var i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0;
+      var ini = String(p.name || '?')
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map(function (w) {
+          return w.charAt(0).toUpperCase();
+        })
+        .join('');
+      return p.avatar_url
+        ? '<img class="th-av" style="width:' + s + 'px;height:' + s + 'px" src="' + esc(p.avatar_url) + '" alt="" />'
+        : '<span class="th-av" style="background:' +
+            SG_COL[h % SG_COL.length] +
+            ';width:' +
+            s +
+            'px;height:' +
+            s +
+            'px;font-size:' +
+            Math.round(s * 0.38) +
+            'px">' +
+            esc(ini) +
+            '</span>';
+    }
+    function sgShort(name) {
+      var w = String(name || '')
+        .split(/\s+/)
+        .filter(Boolean);
+      return w.length > 1 ? w[0] + ' ' + w[w.length - 1].charAt(0) + '.' : w[0] || '';
+    }
+    // "£5", "5 pounds", "£4.50 each" → pence; null when there's no price.
+    function sgPrice(cost) {
+      var m = /(\d+(?:\.\d{1,2})?)/.exec(String(cost || ''));
+      return m ? Math.round(parseFloat(m[1]) * 100) : null;
+    }
+    function sgPounds(p) {
+      var v = p / 100;
+      return '£' + (v % 1 ? v.toFixed(2) : v.toFixed(0));
+    }
+    // Where each player stands in their half: the keeper at the end, the rest
+    // in two rows towards halfway.
+    function sgHalf(n, top) {
+      var rest = n - 1;
+      var rows = rest > 1 ? [rest - Math.floor(rest / 2), Math.floor(rest / 2)] : rest === 1 ? [1] : [];
+      var spots = n > 0 ? [{ x: 50, y: top ? 9 : 91 }] : [];
+      var ys = top ? [25, 41] : [75, 59];
+      rows.forEach(function (cnt, r) {
+        for (var j = 0; j < cnt; j++) spots.push({ x: cnt === 1 ? 50 : 16 + (j * 68) / (cnt - 1), y: ys[r] });
+      });
+      return spots;
+    }
+
+    function screenGames(gameId) {
       loading();
       rpc('my_games').then(
         function (rows) {
           var mine = (rows || []).filter(function (g) {
             return g.is_organiser;
           });
-          render(
-            '<div class="page-head"><div><h1>Games</h1><p class="muted">Pick-up games you run. Share one link; spaces fill up first come first served.</p></div></div>' +
-              (mine.length
-                ? '<div class="card"><h3>Coming up</h3><div class="hq-games">' +
-                  mine
-                    .map(function (g) {
-                      var pct = Math.min(100, Math.round((g.taken / Math.max(g.places, 1)) * 100));
-                      return (
-                        '<div class="hq-game"><div class="grow"><b>' +
-                        esc(g.title) +
-                        '</b><div class="muted small">' +
-                        esc(
-                          new Date(g.starts_at).toLocaleString('en-GB', {
-                            weekday: 'short',
-                            day: 'numeric',
-                            month: 'short',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            timeZone: g.timezone || undefined,
-                          }) + (g.location ? ' · ' + g.location : ''),
-                        ) +
-                        '</div></div><div class="hq-fill"><span>' +
-                        g.taken +
-                        ' / ' +
-                        g.places +
-                        '</span><div class="hq-fillbar"><i style="width:' +
-                        pct +
-                        '%"></i></div></div></div>'
-                      );
-                    })
-                    .join('') +
-                  '</div></div>'
-                : notice('info', 'No games coming up. Start one in the Dayli app (Events → Hosting → New game).')) +
-              notice(
-                'info',
-                'Running games from HQ (spaces, waiting list, sides, who’s paid) is the next part being built. For now, manage them in the Dayli app.',
-              ),
+          var id = gameId || (mine[0] && mine[0].id);
+          if (!id) {
+            render(
+              '<div class="page-head"><div><h1>Social games</h1><p class="muted">5-a-side, padel, board games: add players, pick the teams, see who’s paid.</p></div></div>' +
+                notice(
+                  'info',
+                  'No games coming up. Start one in the Dayli app (Events → Hosting → New game); it shows here straight away.',
+                ),
+            );
+            return;
+          }
+          rpc('game_view', { p_game: id }).then(
+            function (g) {
+              if (!g || !g.is_organiser) {
+                return render(notice('info', 'Only the person running this game can manage it here.'));
+              }
+              drawGame(g, mine);
+            },
+            function (err) {
+              render(notice('error', esc(friendly(err))));
+            },
           );
         },
         function (err) {
           render(notice('error', esc(friendly(err))));
         },
       );
+    }
+
+    function drawGame(g, mine) {
+      var players = g.players || [];
+      var inn = players.filter(function (p) {
+        return p.status === 'in';
+      });
+      var waiting = players.filter(function (p) {
+        return p.status === 'waiting';
+      });
+      var side = {};
+      inn.forEach(function (p) {
+        side[p.id] = p.side || null;
+      });
+      var places = g.places;
+      var bibs = g.bibs && g.bibs < places ? g.bibs : Math.floor(places / 2);
+      var dirty = false;
+      var price = sgPrice(g.cost);
+      var link = SITE + '/g/?c=' + encodeURIComponent(g.code);
+      var when = new Date(g.starts_at).toLocaleDateString('en-GB', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        timeZone: g.timezone || undefined,
+      });
+      var at = new Date(g.starts_at).toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: g.timezone || undefined,
+      });
+
+      function draw() {
+        var bibsList = inn.filter(function (p) {
+          return side[p.id] === 'bibs';
+        });
+        var colsList = inn.filter(function (p) {
+          return side[p.id] === 'colours';
+        });
+        var none = inn.filter(function (p) {
+          return !side[p.id];
+        });
+        var paid = inn.filter(function (p) {
+          return p.paid;
+        });
+        var owing = inn.filter(function (p) {
+          return !p.paid;
+        });
+        var others = mine.filter(function (x) {
+          return x.id !== g.id;
+        });
+
+        function row(p) {
+          var s = side[p.id];
+          return (
+            '<div class="sg-it">' +
+            sgAvatar(p, 30) +
+            '<b class="grow">' +
+            esc(p.name) +
+            (p.guest ? ' <small class="muted">not on Dayli</small>' : '') +
+            '</b><button class="sg-tag ' +
+            (s || 'none') +
+            '" data-side="' +
+            esc(p.id) +
+            '" title="Swap side">' +
+            (s === 'bibs' ? 'BIBS' : s === 'colours' ? 'COLOURS' : 'NO SIDE') +
+            '</button><button class="sg-tick ' +
+            (p.paid || 'no') +
+            '" data-paid="' +
+            esc(p.id) +
+            '" title="' +
+            (p.paid === 'card' ? 'Paid by card' : p.paid ? 'Paid in cash: tap to undo' : 'Tap when they’ve paid') +
+            '">' +
+            (p.paid ? '✓' : '') +
+            '</button><button class="sg-x" data-out="' +
+            esc(p.id) +
+            '" title="Take them out">×</button></div>'
+          );
+        }
+        function shirts(list, top) {
+          var spots = sgHalf(list.length, top);
+          return list
+            .map(function (p, i) {
+              var s = spots[i];
+              return (
+                '<div class="sg-pp' +
+                (top ? ' b' : '') +
+                '" draggable="true" data-p="' +
+                esc(p.id) +
+                '" style="left:' +
+                s.x.toFixed(1) +
+                '%;top:' +
+                s.y.toFixed(1) +
+                '%" title="Tap to swap side">' +
+                sgAvatar(p, 40) +
+                '<b>' +
+                esc(sgShort(p.name)) +
+                '</b>' +
+                (p.paid || !price ? '' : '<i class="sg-owe">' + sgPounds(price) + '</i>') +
+                '</div>'
+              );
+            })
+            .join('');
+        }
+
+        render(
+          (others.length
+            ? '<div class="sg-games">' +
+              mine
+                .map(function (x) {
+                  return (
+                    '<a class="' +
+                    (x.id === g.id ? 'on' : '') +
+                    '" href="#/games/' +
+                    esc(x.id) +
+                    '">' +
+                    esc(
+                      new Date(x.starts_at).toLocaleDateString('en-GB', {
+                        weekday: 'short',
+                        day: 'numeric',
+                        month: 'short',
+                        timeZone: x.timezone || undefined,
+                      }),
+                    ) +
+                    ' · ' +
+                    esc(x.title) +
+                    '</a>'
+                  );
+                })
+                .join('') +
+              '</div>'
+            : '') +
+            '<div class="th-head"><div><div class="muted th-date">' +
+            esc([when, at, g.location, g.cost ? g.cost + ' each' : null].filter(Boolean).join(' · ')) +
+            '</div><h1>' +
+            esc(g.title) +
+            '</h1></div><div class="row"><button class="btn" id="sg-link">Share the link</button><button class="btn primary" id="sg-save"' +
+            (dirty ? '' : ' disabled') +
+            '>' +
+            (g.sides_set ? 'Save the teams' : 'Save and show the teams') +
+            '</button></div></div>' +
+            '<div class="sg-set"><b>Places</b><span class="sg-step"><button data-places="-1">−</button><span>' +
+            places +
+            '</span><button data-places="1">+</button></span><b>Sides</b><span class="sg-step"><button data-bibs="-1">−</button><span>' +
+            bibs +
+            ' v ' +
+            (places - bibs) +
+            '</span><button data-bibs="1">+</button></span><span class="muted small grow">One side can have one more. Change it any time.</span><button class="btn" id="sg-mix">Mix them up</button></div>' +
+            '<div class="sg-grid"><div class="card sg-list"><div class="sg-add"><input type="text" id="sg-name" maxlength="40" placeholder="Add a player by name" /><button class="btn primary" id="sg-add">Add</button></div>' +
+            (inn.length ? inn.map(row).join('') : '<p class="muted small">Nobody in yet. Add names, or share the link and people add themselves.</p>') +
+            (waiting.length
+              ? '<div class="sg-wait"><b>Waiting list · ' +
+                waiting.length +
+                '</b>' +
+                waiting
+                  .map(function (p) {
+                    return '<span>' + sgAvatar(p, 22) + esc(sgShort(p.name)) + '</span>';
+                  })
+                  .join('') +
+                '<small class="muted">They get a place if someone drops out, or add more places.</small></div>'
+              : '') +
+            '<div class="sg-pay"><b>' +
+            paid.length +
+            ' of ' +
+            inn.length +
+            ' paid</b><div class="tm-bar sg-bar"><span style="flex:' +
+            paid.length +
+            ';background:var(--accent)"></span><span style="flex:' +
+            Math.max(inn.length - paid.length, 0) +
+            ';background:var(--alt)"></span></div><span class="muted">' +
+            (price && owing.length ? sgPounds(price * owing.length) + ' to collect' : owing.length ? owing.length + ' to pay' : 'All paid') +
+            '</span>' +
+            (owing.length ? '<button class="act tp-nudge" id="sg-remind">Remind on WhatsApp</button>' : '') +
+            '</div></div>' +
+            '<div><div class="sg-pitch" data-half="pitch"><div class="ln box"></div><div class="ln half"></div><div class="ln circle"></div><div class="ln area top"></div><div class="ln area bottom"></div>' +
+            '<span class="sg-sl" style="top:10px">BIBS · ' +
+            bibsList.length +
+            '</span><span class="sg-sl" style="bottom:10px">COLOURS · ' +
+            colsList.length +
+            '</span>' +
+            shirts(bibsList, true) +
+            shirts(colsList, false) +
+            '</div>' +
+            (none.length
+              ? '<div class="sg-none" data-half="none"><b>No side yet</b>' +
+                none
+                  .map(function (p) {
+                    return '<span draggable="true" data-p="' + esc(p.id) + '">' + sgAvatar(p, 22) + esc(sgShort(p.name)) + '</span>';
+                  })
+                  .join('') +
+                '</div>'
+              : '') +
+            '<p class="muted small">Drag a player to the other half, or tap them to swap. ' +
+            (price ? 'An orange ' + sgPounds(price) + ' means they haven’t paid yet. ' : '') +
+            (dirty ? '<b class="ink">Save the teams so everyone sees them in Dayli.</b>' : g.sides_set ? 'Everyone sees these teams in Dayli.' : '') +
+            '</p></div></div>',
+        );
+        wire();
+      }
+
+      function swap(id) {
+        side[id] = side[id] === 'bibs' ? 'colours' : 'bibs';
+        dirty = true;
+        draw();
+      }
+      function mix() {
+        var ids = inn
+          .map(function (p) {
+            return p.id;
+          })
+          .sort(function () {
+            return Math.random() - 0.5;
+          });
+        var nb = Math.round((ids.length * bibs) / places);
+        ids.forEach(function (id, i) {
+          side[id] = i < nb ? 'bibs' : 'colours';
+        });
+        dirty = true;
+        draw();
+      }
+      function savePlaces(p, b, button) {
+        setBusy(button, true);
+        rpc('game_set_places', { p_game: g.id, p_places: p, p_bibs: b }).then(
+          function () {
+            screenGames(g.id);
+          },
+          function (err) {
+            setBusy(button, false);
+            toast(friendly(err));
+          },
+        );
+      }
+
+      function wire() {
+        $$('[data-side]').forEach(function (b) {
+          b.onclick = function () {
+            swap(b.dataset.side);
+          };
+        });
+        $$('.sg-pp').forEach(function (el) {
+          el.onclick = function () {
+            swap(el.dataset.p);
+          };
+        });
+        $$('[data-paid]').forEach(function (b) {
+          b.onclick = function () {
+            var p = inn.filter(function (x) {
+              return x.id === b.dataset.paid;
+            })[0];
+            if (!p || p.paid === 'card') return toast('Paid by card already.');
+            var to = p.paid ? null : 'cash';
+            rpc('game_mark_paid', { p_place: p.id, p_paid: to }).then(
+              function () {
+                p.paid = to;
+                draw();
+              },
+              function (err) {
+                toast(friendly(err));
+              },
+            );
+          };
+        });
+        $$('[data-out]').forEach(function (b) {
+          b.onclick = function () {
+            var p = inn.filter(function (x) {
+              return x.id === b.dataset.out;
+            })[0];
+            if (!p || !confirm('Take ' + p.name + ' out of the game?' + (waiting.length ? ' The first on the waiting list gets their place.' : ''))) return;
+            rpc('game_leave', { p_game: g.id, p_place: p.id }).then(
+              function () {
+                toast(p.name + ' is out');
+                screenGames(g.id);
+              },
+              function (err) {
+                toast(friendly(err));
+              },
+            );
+          };
+        });
+        function add() {
+          var name = $('#sg-name').value.trim();
+          if (!name) return;
+          var button = $('#sg-add');
+          setBusy(button, true);
+          rpc('game_add_name', { p_game: g.id, p_name: name }).then(
+            function (r) {
+              toast(r && r.status === 'waiting' ? name + ' is on the waiting list (the game is full)' : name + ' added');
+              screenGames(g.id);
+            },
+            function (err) {
+              setBusy(button, false);
+              toast(friendly(err));
+            },
+          );
+        }
+        $('#sg-add').onclick = add;
+        $('#sg-name').onkeydown = function (e) {
+          if (e.key === 'Enter') add();
+        };
+        $$('[data-places]').forEach(function (b) {
+          b.onclick = function () {
+            var p = places + Number(b.dataset.places);
+            if (p < 2 || p > 40) return;
+            savePlaces(p, Math.min(bibs, p - 1), b);
+          };
+        });
+        $$('[data-bibs]').forEach(function (b) {
+          b.onclick = function () {
+            var nb = bibs + Number(b.dataset.bibs);
+            if (nb < 1 || nb > places - 1) return;
+            savePlaces(places, nb, b);
+          };
+        });
+        $('#sg-mix').onclick = mix;
+        $('#sg-link').onclick = function () {
+          (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(
+            function () {
+              toast('Link copied. Paste it in your group chat.');
+            },
+            function () {
+              window.prompt('Copy this link:', link);
+            },
+          );
+        };
+        $('#sg-save').onclick = function () {
+          var button = this;
+          setBusy(button, true);
+          rpc('game_set_sides', { p_game: g.id, p_sides: side }).then(
+            function () {
+              toast('Teams saved. Everyone sees them in Dayli.');
+              screenGames(g.id);
+            },
+            function (err) {
+              setBusy(button, false);
+              toast(friendly(err));
+            },
+          );
+        };
+        if ($('#sg-remind'))
+          $('#sg-remind').onclick = function () {
+            var owe = inn
+              .filter(function (p) {
+                return !p.paid;
+              })
+              .map(function (p) {
+                return p.name.split(' ')[0];
+              });
+            var text =
+              g.title +
+              ' (' +
+              when +
+              ')' +
+              (price ? ': ' + sgPounds(price) + ' each' : '') +
+              '. Still to pay: ' +
+              owe.join(', ') +
+              '. Thanks!';
+            window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+          };
+        // Dragging shirts and names between the halves.
+        $$('[draggable="true"][data-p]').forEach(function (el) {
+          el.ondragstart = function (e) {
+            e.dataTransfer.setData('text/plain', el.dataset.p);
+          };
+        });
+        $$('[data-half]').forEach(function (z) {
+          z.ondragover = function (e) {
+            e.preventDefault();
+          };
+          z.ondrop = function (e) {
+            e.preventDefault();
+            e.stopPropagation();
+            var id = e.dataTransfer.getData('text/plain');
+            if (!(id in side)) return;
+            var to = null;
+            if (z.dataset.half === 'pitch') {
+              // The top half is bibs, the bottom colours.
+              var r = z.getBoundingClientRect();
+              to = e.clientY - r.top < r.height / 2 ? 'bibs' : 'colours';
+            }
+            if (side[id] === to) return;
+            side[id] = to;
+            dirty = true;
+            draw();
+          };
+        });
+      }
+
+      draw();
     }
 
     return {

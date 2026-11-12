@@ -492,7 +492,7 @@
       }
       if (parts[0] === 'games') {
         setShell(true, 'games');
-        return hq.screenGames();
+        return hq.screenGames(parts[1] || null);
       }
       if (parts[0] === 'home' || (parts[0] === 'teams' && !parts[1])) return go(homeHash());
     }
