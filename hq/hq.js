@@ -27,6 +27,24 @@
     var state = ctx.state;
     var SITE = ctx.SITE;
     var CTX_KEY = 'dayli_hq_context';
+    // An Edge Function; its own error code (e.g. 'already_paid') when it fails.
+    function invoke(name, body) {
+      return ctx.sb.functions.invoke(name, { body: body }).then(function (res) {
+        if (!res.error) return res.data;
+        var c = res.error.context;
+        if (c && typeof c.json === 'function') {
+          return c.json().then(
+            function (b) {
+              throw new Error((b && b.error) || res.error.message);
+            },
+            function () {
+              throw res.error;
+            },
+          );
+        }
+        throw res.error;
+      });
+    }
 
     var RUNS = [
       {
@@ -899,7 +917,30 @@
       return spots;
     }
 
-    function screenGames(gameId) {
+    function screenGames(gameId, query) {
+      loading();
+      // Back from Stripe's sign-up: check the account before showing the game.
+      var back =
+        query && query.stripe && gameId
+          ? invoke('game-pay', { action: 'status', game_id: gameId }).then(
+              function (r) {
+                toast(
+                  r && r.ready
+                    ? 'Card payments are ready. Set a price below.'
+                    : 'Stripe is still checking your details. Try again in a few minutes.',
+                );
+              },
+              function () {
+                return null;
+              },
+            )
+          : Promise.resolve();
+      back.then(function () {
+        loadGames(gameId);
+      });
+    }
+
+    function loadGames(gameId) {
       loading();
       rpc('my_games').then(
         function (rows) {
@@ -950,7 +991,7 @@
       var places = g.places;
       var bibs = g.bibs && g.bibs < places ? g.bibs : Math.floor(places / 2);
       var dirty = false;
-      var price = sgPrice(g.cost);
+      var price = g.price_pence || sgPrice(g.cost);
       var link = SITE + '/g/?c=' + encodeURIComponent(g.code);
       var when = new Date(g.starts_at).toLocaleDateString('en-GB', {
         weekday: 'long',
@@ -963,6 +1004,66 @@
         minute: '2-digit',
         timeZone: g.timezone || undefined,
       });
+
+      // Card payments (hidden until team payments are on): set up Stripe, then a price.
+      function cardBar() {
+        if (!g.payments_on) return '';
+        if (!g.card_ready) {
+          return (
+            '<div class="sg-card"><div class="grow"><b>Take card payments</b><div class="muted small">Players pay on the game’s link or in Dayli with Apple Pay, Google Pay or a card, whenever they like. They cover the card fee; the money goes to your own Stripe account.</div></div>' +
+            '<button class="btn primary" id="sg-connect">' +
+            (g.stripe_connected ? 'Finish setting up Stripe' : 'Set up card payments') +
+            '</button>' +
+            (g.stripe_connected ? '<button class="btn" id="sg-check">Check again</button>' : '') +
+            '</div>'
+          );
+        }
+        var p = g.price_pence;
+        return (
+          '<div class="sg-card"><b>Card payments</b><span class="sg-money">£<input type="text" id="sg-price" inputmode="decimal" maxlength="6" value="' +
+          (p ? (p / 100).toFixed(2) : '') +
+          '" placeholder="5.00" /></span><button class="btn" id="sg-price-save">' +
+          (p ? 'Change price' : 'Turn on') +
+          '</button><span class="muted small grow">' +
+          (g.pay_pence
+            ? 'Players pay ' +
+              sgPounds(g.pay_pence) +
+              ' by card (the card fee is on them), you get ' +
+              sgPounds(p) +
+              '. Tap a green tick to refund someone.'
+            : 'What each player pays you. They can pay on the link, any time.') +
+          '</span>' +
+          (p ? '<button class="btn" id="sg-price-off">Turn off</button>' : '') +
+          '</div>'
+        );
+      }
+      function refund(placeId, name, amount, button) {
+        if (!confirm('Give ' + name + ' all ' + sgPounds(amount) + ' back? It reaches their card in 5 to 10 days.')) return;
+        if (button) setBusy(button, true);
+        invoke('game-pay', { action: 'refund', place_id: placeId }).then(
+          function () {
+            toast(name + ' refunded');
+            loadGames(g.id);
+          },
+          function (err) {
+            if (button) setBusy(button, false);
+            toast(friendly(err));
+          },
+        );
+      }
+      function setPrice(pence, button) {
+        setBusy(button, true);
+        rpc('game_set_price', { p_game: g.id, p_price_pence: pence }).then(
+          function () {
+            toast(pence ? 'Players can pay by card on the link' : 'Card payments off for this game');
+            loadGames(g.id);
+          },
+          function (err) {
+            setBusy(button, false);
+            toast(friendly(err));
+          },
+        );
+      }
 
       function draw() {
         var bibsList = inn.filter(function (p) {
@@ -1003,7 +1104,7 @@
             '" data-paid="' +
             esc(p.id) +
             '" title="' +
-            (p.paid === 'card' ? 'Paid by card' : p.paid ? 'Paid in cash: tap to undo' : 'Tap when they’ve paid') +
+            (p.paid === 'card' ? 'Paid by card: tap to refund' : p.paid ? 'Paid in cash: tap to undo' : 'Tap when they’ve paid') +
             '">' +
             (p.paid ? '✓' : '') +
             '</button><button class="sg-x" data-out="' +
@@ -1080,6 +1181,7 @@
             ' v ' +
             (places - bibs) +
             '</span><button data-bibs="1">+</button></span><span class="muted small grow">One side can have one more. Change it any time.</span><button class="btn" id="sg-mix">Mix them up</button></div>' +
+            cardBar() +
             '<div class="sg-grid"><div class="card sg-list"><div class="sg-add"><input type="text" id="sg-name" maxlength="40" placeholder="Add a player by name" /><button class="btn primary" id="sg-add">Add</button></div>' +
             (inn.length ? inn.map(row).join('') : '<p class="muted small">Nobody in yet. Add names, or share the link and people add themselves.</p>') +
             (waiting.length
@@ -1093,6 +1195,27 @@
                   .join('') +
                 '<small class="muted">They get a place if someone drops out, or add more places.</small></div>'
               : '') +
+            ((g.left_paid || []).length
+              ? '<div class="sg-left"><b>Left after paying by card</b>' +
+                g.left_paid
+                  .map(function (p) {
+                    return (
+                      '<span>' +
+                      esc(p.name) +
+                      ' · ' +
+                      sgPounds(p.amount_pence) +
+                      ' <button class="act" data-refund="' +
+                      esc(p.id) +
+                      '" data-name="' +
+                      esc(p.name) +
+                      '" data-amount="' +
+                      Number(p.amount_pence) +
+                      '">Refund</button></span>'
+                    );
+                  })
+                  .join('') +
+                '</div>'
+              : '') +
             '<div class="sg-pay"><b>' +
             paid.length +
             ' of ' +
@@ -1103,6 +1226,7 @@
             Math.max(inn.length - paid.length, 0) +
             ';background:var(--alt)"></span></div><span class="muted">' +
             (price && owing.length ? sgPounds(price * owing.length) + ' to collect' : owing.length ? owing.length + ' to pay' : 'All paid') +
+            (g.pay_pence && owing.length ? ' · they can pay by card on the link' : '') +
             '</span>' +
             (owing.length ? '<button class="act tp-nudge" id="sg-remind">Remind on WhatsApp</button>' : '') +
             '</div></div>' +
@@ -1156,7 +1280,7 @@
         setBusy(button, true);
         rpc('game_set_places', { p_game: g.id, p_places: p, p_bibs: b }).then(
           function () {
-            screenGames(g.id);
+            loadGames(g.id);
           },
           function (err) {
             setBusy(button, false);
@@ -1181,7 +1305,8 @@
             var p = inn.filter(function (x) {
               return x.id === b.dataset.paid;
             })[0];
-            if (!p || p.paid === 'card') return toast('Paid by card already.');
+            if (!p) return;
+            if (p.paid === 'card') return refund(p.id, p.name, g.pay_pence || price, null);
             var to = p.paid ? null : 'cash';
             rpc('game_mark_paid', { p_place: p.id, p_paid: to }).then(
               function () {
@@ -1203,7 +1328,7 @@
             rpc('game_leave', { p_game: g.id, p_place: p.id }).then(
               function () {
                 toast(p.name + ' is out');
-                screenGames(g.id);
+                loadGames(g.id);
               },
               function (err) {
                 toast(friendly(err));
@@ -1219,7 +1344,7 @@
           rpc('game_add_name', { p_game: g.id, p_name: name }).then(
             function (r) {
               toast(r && r.status === 'waiting' ? name + ' is on the waiting list (the game is full)' : name + ' added');
-              screenGames(g.id);
+              loadGames(g.id);
             },
             function (err) {
               setBusy(button, false);
@@ -1246,6 +1371,39 @@
           };
         });
         $('#sg-mix').onclick = mix;
+        $$('[data-refund]').forEach(function (b) {
+          b.onclick = function () {
+            refund(b.dataset.refund, b.dataset.name, Number(b.dataset.amount), b);
+          };
+        });
+        if ($('#sg-connect'))
+          $('#sg-connect').onclick = function () {
+            var button = this;
+            setBusy(button, true);
+            invoke('game-pay', { action: 'connect', game_id: g.id, back: 'hq' }).then(
+              function (r) {
+                if (r && r.url) location.href = r.url;
+              },
+              function (err) {
+                setBusy(button, false);
+                toast(friendly(err));
+              },
+            );
+          };
+        if ($('#sg-check'))
+          $('#sg-check').onclick = function () {
+            screenGames(g.id, { stripe: '1' });
+          };
+        if ($('#sg-price-save'))
+          $('#sg-price-save').onclick = function () {
+            var v = parseFloat(String($('#sg-price').value).replace(/[£,\s]/g, ''));
+            if (!(v >= 1 && v <= 100)) return toast('Type a price between £1 and £100');
+            setPrice(Math.round(v * 100), this);
+          };
+        if ($('#sg-price-off'))
+          $('#sg-price-off').onclick = function () {
+            setPrice(null, this);
+          };
         $('#sg-link').onclick = function () {
           (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(
             function () {
@@ -1262,7 +1420,7 @@
           rpc('game_set_sides', { p_game: g.id, p_sides: side }).then(
             function () {
               toast('Teams saved. Everyone sees them in Dayli.');
-              screenGames(g.id);
+              loadGames(g.id);
             },
             function (err) {
               setBusy(button, false);
@@ -1287,6 +1445,7 @@
               (price ? ': ' + sgPounds(price) + ' each' : '') +
               '. Still to pay: ' +
               owe.join(', ') +
+              (g.pay_pence ? '. Pay by card here: ' + link : '') +
               '. Thanks!';
             window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
           };

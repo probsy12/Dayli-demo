@@ -48,6 +48,17 @@
     .stores { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
     .store { display: block; text-align: center; background: #111; color: #fff; border-radius: 12px; padding: 8px 10px; text-decoration: none; font-weight: 700; font-size: 16px; line-height: 1.2; }
     .store small { display: block; font-weight: 500; font-size: 11.5px; opacity: .85; }
+    .sides { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+    .side { border-radius: 14px; padding: 10px 12px; }
+    .side h3 { margin: 0 0 6px; font-size: 12px; font-weight: 800; letter-spacing: .6px; }
+    .side div { font-size: 15px; padding: 2px 0; }
+    .side.bibs { background: #fff3c4; color: #6b4a0c; }
+    .side.colours { background: #e3ebfb; color: #24427f; }
+    .side .me { font-weight: 800; }
+    .pay { text-align: left; }
+    .pay .row b { font-size: 18px; }
+    .paid { display: inline-flex; align-items: center; gap: 6px; background: var(--alt); color: var(--accent); font-weight: 800; border-radius: 999px; padding: 6px 14px; margin-top: 10px; font-size: 15px; }
+    @media (prefers-color-scheme: dark) { .side.bibs { background: #4a3d12; color: #f5dc8a; } .side.colours { background: #1f2c4a; color: #b9cbf2; } }
     .hidden { display: none !important; }
   </style>
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-v2-32.png" /><link rel="icon" type="image/png" sizes="192x192" href="/favicon-v2-192.png" /><link rel="apple-touch-icon" href="/apple-touch-icon-v2.png" /></head>
@@ -76,6 +87,12 @@
       <p class="fine" id="waiting" style="text-align:left"></p>
     </div>
 
+    <!-- Once the organiser has picked them. -->
+    <div class="card hidden" id="teams">
+      <div class="row"><b>The teams</b></div>
+      <div class="sides"><div class="side bibs" id="bibs"></div><div class="side colours" id="colours"></div></div>
+    </div>
+
     <!-- Not in yet: a name and I'm in. -->
     <div id="join" class="hidden">
       <label for="name">Your name</label>
@@ -93,6 +110,15 @@
         <div class="tick" id="tick"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg></div>
         <h1 id="mineTitle"></h1>
         <p class="line" id="mineLine"></p>
+        <span class="paid hidden" id="paidTag"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg><span id="paidText">Paid</span></span>
+      </div>
+      <!-- Pay now (any time): card, Apple Pay or Google Pay on Stripe's page. -->
+      <div class="card pay hidden" id="payBox">
+        <b id="payTitle" style="font-size:18px"></b>
+        <p class="fine" id="payFee" style="text-align:left;margin:2px 0 0"></p>
+        <button class="btn primary" id="payBtn"></button>
+        <p class="err hidden" id="payErr"></p>
+        <p class="fine" id="payFine"></p>
       </div>
     </div>
 
@@ -117,7 +143,7 @@
     </div>
   </div>
 </main>
-<script src="../config.js?v=19a9c36"></script>
+<script src="../config.js?v=936b37d"></script>
 <script>
   (function () {
     var cfg = window.DAYLI_CONFIG || {};
@@ -130,6 +156,7 @@
     var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     var storeKey = 'dayli.game.' + code;
     var game = null;
+    var mineNow = null;
 
     function token() {
       var t = null;
@@ -208,6 +235,15 @@
       }
       $('waiting').textContent = g.waiting ? g.waiting + ' on the waiting list. If someone drops out, the first in line gets the place.' : '';
       $('in').textContent = left ? "I'm in" : 'Join the waiting list';
+      var sides = g.sides;
+      show('teams', !!(sides && ((sides.bibs || []).length || (sides.colours || []).length)));
+      if (sides) {
+        [['bibs', 'BIBS'], ['colours', 'COLOURS']].forEach(function (x) {
+          var box = $(x[0]); box.innerHTML = '';
+          var h = document.createElement('h3'); h.textContent = x[1] + ' · ' + (sides[x[0]] || []).length; box.appendChild(h);
+          (sides[x[0]] || []).forEach(function (n) { var d = document.createElement('div'); d.textContent = n; box.appendChild(d); });
+        });
+      }
       show('loading', false); show('game', true);
     }
 
@@ -225,11 +261,32 @@
         $('mineLine').textContent = 'Get Dayli and you’ll be told the moment a place comes up.';
         $('tick').style.opacity = '.45';
       }
+      if (me.status === 'in' && me.side) $('mineLine').textContent += ' · You’re in ' + (me.side === 'bibs' ? 'Bibs' : 'Colours');
+      mineNow = me;
+      showPay(me);
       $('leave').textContent = me.status === 'in' ? "I can't make it any more" : 'Come off the waiting list';
       $('getTitle').textContent = me.status === 'in' ? "Get Dayli so you don't miss it" : 'Get Dayli to hear when a place comes up';
     }
 
+    function pounds(p) { var v = p / 100; return '£' + (v % 1 ? v.toFixed(2) : v.toFixed(0)); }
+
+    // Paid, or a Pay button for someone with a place (pay any time).
+    function showPay(me) {
+      var inn = me.status === 'in';
+      show('paidTag', inn && !!me.paid);
+      $('paidText').textContent = me.paid === 'card' ? 'Paid by card' : 'Paid';
+      var canPay = inn && !me.paid && game.pay_pence;
+      show('payBox', !!canPay);
+      if (!canPay) return;
+      var fee = game.pay_pence - (game.price_pence || game.pay_pence);
+      $('payTitle').textContent = pounds(game.pay_pence) + ' for your place';
+      $('payFee').textContent = fee > 0 ? 'Includes a ' + (fee < 100 ? fee + 'p' : pounds(fee)) + ' card fee, so ' + (game.organiser || 'the organiser') + ' gets ' + pounds(game.price_pence) + '.' : '';
+      $('payBtn').textContent = 'Pay ' + pounds(game.pay_pence) + ' now';
+      $('payFine').textContent = 'Card, Apple Pay or Google Pay, on Stripe’s secure page. Or pay ' + (game.organiser || 'the organiser') + ' in cash.';
+    }
+
     function showJoin() {
+      mineNow = null;
       show('mine', false); show('leaveBox', false);
       if (!game.upcoming) { $('closedText').textContent = 'This game has been played.'; show('closed', true); show('join', false); return; }
       if (!game.open) { $('closedText').textContent = 'Places are for the squad for now. Get Dayli to join the squad.'; show('closed', true); show('join', false); return; }
@@ -270,8 +327,37 @@
       }).then(function () { $('in').disabled = false; });
     });
 
+    $('payBtn').addEventListener('click', function () {
+      var t = saved();
+      if (!t) return;
+      show('payErr', false);
+      $('payBtn').disabled = true;
+      fetch(cfg.supabaseUrl + '/functions/v1/game-pay', {
+        method: 'POST',
+        headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'pay', code: code, token: t })
+      }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d || {} }; }); }).then(function (res) {
+        if (res.ok && res.d.url) { location.href = res.d.url; return; }
+        var m = res.d.error || '';
+        $('payErr').textContent = m === 'already_paid' ? 'You’ve already paid. Refresh to see it.'
+          : m === 'not_in' ? 'Only people with a place can pay.'
+          : m === 'rate_limited' ? 'Too many tries. Wait a few minutes and try again.'
+          : m === 'not_set_up' ? 'Card payments aren’t on for this game. Pay the organiser in cash.'
+          : 'That didn’t work. Try again in a moment.';
+        show('payErr', true);
+        $('payBtn').disabled = false;
+      }).catch(function () {
+        $('payErr').textContent = 'That didn’t work. Check your signal and try again.';
+        show('payErr', true);
+        $('payBtn').disabled = false;
+      });
+    });
+
     $('leave').addEventListener('click', function () {
-      if (!confirm('Give up your place? The first on the waiting list gets it.')) return;
+      var paidCard = mineNow && mineNow.paid === 'card';
+      if (!confirm(paidCard
+        ? 'Give up your place? You paid by card: ask ' + (game.organiser || 'the organiser') + ' if you want it back, they can refund you from Dayli.'
+        : 'Give up your place? The first on the waiting list gets it.')) return;
       var t = saved();
       rpc('game_leave_guest', { p_code: code, p_token: t }).then(function () {
         forget();
@@ -279,7 +365,17 @@
       }).catch(function () { alert('That didn’t work. Try again.'); });
     });
 
-    refresh().catch(function () {
+    // Back from Stripe: Stripe tells Dayli a moment later, so look again for a few seconds.
+    var tries = params.get('paid') ? 6 : 0;
+    function settle() {
+      if (!tries || !mineNow || mineNow.paid || mineNow.status !== 'in') return;
+      tries--;
+      $('payBtn').disabled = true;
+      $('payBtn').textContent = 'Payment received, just checking…';
+      setTimeout(function () { refresh().then(settle); }, 1500);
+    }
+
+    refresh().then(settle).catch(function () {
       show('loading', false);
       $('bad').querySelector('p').textContent = 'Couldn’t load the game. Check your signal and refresh.';
       show('bad', true);

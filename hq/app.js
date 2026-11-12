@@ -206,6 +206,11 @@
       nudged_recently: 'You nudged them recently. You can nudge again 12 hours after the last time.',
       fixture_over: 'That one has already finished.',
       not_on_dayli: 'They’re not on Dayli yet, so they can’t get a nudge. Send them the invite link.',
+      paid_by_card: 'They paid by card. Tap the tick to refund them instead.',
+      refund_first: 'Some players paid by card. Refund them in Social games first, then call the game off.',
+      bad_amount: 'Type a price between £1 and £100.',
+      stripe_failed: 'Stripe didn’t answer. Try again in a moment.',
+      stripe_not_configured: 'Card payments aren’t set up on Dayli yet.',
       has_paid_tickets:
         'People have paid for tickets. Cancel the event first so everyone is refunded, then you can delete it.',
       rate_limit: 'You’ve made a lot of events today. Try again tomorrow.',
@@ -492,7 +497,7 @@
       }
       if (parts[0] === 'games') {
         setShell(true, 'games');
-        return hq.screenGames(parts[1] || null);
+        return hq.screenGames(parts[1] || null, query);
       }
       if (parts[0] === 'home' || (parts[0] === 'teams' && !parts[1])) return go(homeHash());
     }

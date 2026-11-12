@@ -51,7 +51,7 @@
     </style>
   </head>
   <body>
-    <!-- Where Stripe sends people back to from team payments (team-pay):
+    <!-- Where Stripe sends people back to from team payments (team-pay) and games (game-pay):
          ?paid=1 after paying, ?cancelled=1, ?stripe=1 after setting up payments, ?retry=1. -->
     <div class="card">
       <div class="icon" id="icon">✅</div>
@@ -64,6 +64,9 @@
       // Back to the team the payment is for, not the app's home screen.
       var team = q.get('team') || '';
       if (/^[0-9a-f-]{36}$/i.test(team)) document.getElementById('back').href = 'dayli://team/' + team;
+      // Or to the social game it paid for (game-pay).
+      var game = q.get('game') || '';
+      if (/^[A-Z0-9]{4,12}$/.test(game)) document.getElementById('back').href = 'dayli://g/' + game;
       var set = function (icon, title, text) {
         document.getElementById('icon').textContent = icon;
         document.getElementById('title').textContent = title;

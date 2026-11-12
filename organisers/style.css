@@ -4809,3 +4809,49 @@ i.nr {
 .sg-step button {
   margin: 0;
 }
+
+/* --- HQ social games: card payments ---------------------------------------------------- */
+.sg-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  background: var(--accent-soft);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 10px 14px;
+  margin-bottom: 14px;
+}
+.sg-card .btn {
+  margin: 0;
+}
+.sg-money {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+}
+.sg-money input {
+  width: 80px;
+  margin: 0;
+  padding: 6px 8px;
+}
+.sg-left {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 10px;
+  padding: 10px;
+  border-radius: 12px;
+  background: var(--alt);
+  font-size: 13px;
+}
+.sg-left span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.sg-left .act {
+  margin: 0;
+}
