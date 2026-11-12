@@ -1,0 +1,416 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>A team on Dayli</title>
+  <style>
+    :root { --bg: #f6f5f1; --surface: #ffffff; --ink: #1c1a17; --muted: #847f74; --accent: #2f6b4f; --accent-ink: #fff; --border: #e6e3da; --alt: #edebe4; --danger: #b4432f; --orange: #d9741c; --orange-bg: #fff4e8; --soft: #e4efe8; --team: #2f6b4f; }
+    @media (prefers-color-scheme: dark) { :root { --bg: #171613; --surface: #201f1a; --ink: #f3f1ea; --muted: #a39e92; --accent: #7fbf9a; --accent-ink: #171613; --border: #353229; --alt: #2a2823; --danger: #e57366; --orange: #f0a35e; --orange-bg: #3a2c1c; --soft: #22342a; } }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font: 16px/1.45 -apple-system, "Segoe UI", Roboto, sans-serif; }
+    main { max-width: 480px; margin: 0 auto; padding: 18px 14px 56px; }
+    a { color: inherit; }
+    .serif { font-family: Georgia, "Times New Roman", serif; }
+    .muted { color: var(--muted); }
+    .hidden { display: none !important; }
+    .head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+    .crest { width: 48px; height: 48px; border-radius: 50%; flex: none; display: flex; align-items: center; justify-content: center; color: #fff; font: 700 16px Georgia, serif; background: var(--team); overflow: hidden; border: 2px solid var(--surface); box-shadow: 0 3px 10px rgba(0, 0, 0, .12); }
+    .crest img { width: 100%; height: 100%; object-fit: cover; background: #fff; }
+    .crest.sm { width: 36px; height: 36px; font-size: 13px; }
+    .grow { flex: 1; min-width: 0; }
+    .name { font: 700 21px/1.2 Georgia, serif; margin: 0; }
+    .sub { font-size: 13px; color: var(--muted); }
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; border-radius: 12px; padding: 11px 16px; font: inherit; font-size: 15px; font-weight: 700; border: 1px solid var(--border); background: var(--surface); color: var(--ink); text-decoration: none; cursor: pointer; }
+    .btn.p { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+    .btn.d { background: var(--ink); color: var(--bg); border-color: var(--ink); }
+    .btn:disabled { opacity: .6; }
+    .btn.wide { display: flex; width: 100%; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 14px; margin-bottom: 10px; }
+    .k { font-size: 11px; font-weight: 800; letter-spacing: .7px; color: var(--muted); text-transform: uppercase; }
+    .row { display: flex; align-items: center; gap: 8px; }
+    .between { justify-content: space-between; }
+    .pill { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; border-radius: 7px; color: #fff; font-size: 12px; font-weight: 800; flex: none; }
+    .W { background: #2f6b4f; } .D { background: #8a8475; } .L { background: #b4432f; }
+    .li { display: flex; align-items: center; gap: 10px; padding: 9px 0; border-bottom: 1px solid var(--alt); font-size: 14.5px; }
+    .li:last-child { border: 0; }
+    .date { width: 44px; text-align: center; flex: none; line-height: 1.05; }
+    .date b { display: block; font: 700 19px Georgia, serif; }
+    .date small { font-size: 10.5px; font-weight: 800; color: var(--muted); letter-spacing: .5px; }
+    .tag { font-size: 10.5px; font-weight: 800; border-radius: 7px; padding: 3px 7px; }
+    .t-next { background: var(--soft); color: var(--accent); }
+    .t-owe { background: var(--orange-bg); color: var(--orange); }
+    .score { font: 700 17px Georgia, serif; white-space: nowrap; }
+    .small { font-size: 12.5px; }
+    .next { background: var(--team); color: #fff; border: 0; padding: 16px; }
+    .next .k { color: rgba(255, 255, 255, .78); }
+    .next .tag { background: rgba(255, 255, 255, .18); color: #fff; }
+    .vs { display: grid; grid-template-columns: 1fr auto 1fr; align-items: center; gap: 8px; margin: 14px 0 6px; text-align: center; }
+    .vs .crest { margin: 0 auto 6px; width: 52px; height: 52px; }
+    .vs b { font-size: 13.5px; display: block; }
+    .opp { background: rgba(255, 255, 255, .22) !important; }
+    .big { font: 700 26px Georgia, serif; }
+    .links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+    .links a { padding: 7px 11px; font-size: 13.5px; }
+    .stores { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 10px; }
+    .store { display: block; text-align: center; background: #111; color: #fff; border-radius: 12px; padding: 8px 10px; text-decoration: none; font-weight: 700; font-size: 15px; line-height: 1.2; }
+    .store small { display: block; font-weight: 500; font-size: 11px; opacity: .85; }
+    .ask { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+    .ask .btn { padding: 13px 0; }
+    .ask .on-y { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); }
+    .ask .on-m { background: #b7791f; color: #fff; border-color: #b7791f; }
+    .ask .on-n { background: var(--danger); color: #fff; border-color: var(--danger); }
+    textarea { width: 100%; font: inherit; font-size: 14.5px; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--border); background: var(--surface); color: var(--ink); resize: none; margin-top: 10px; }
+    .owe { border: 2px solid var(--orange); }
+    .pitch { position: relative; aspect-ratio: 3 / 4; border-radius: 14px; background: repeating-linear-gradient(0deg, #3f8a5e 0 9%, #3a8057 9% 18%); overflow: hidden; margin-top: 10px; }
+    .pitch .ln { position: absolute; border: 2px solid rgba(255, 255, 255, .5); }
+    .shirt { position: absolute; transform: translate(-50%, -50%); display: flex; flex-direction: column; align-items: center; gap: 2px; }
+    .shirt span { width: 30px; height: 30px; border-radius: 50%; background: var(--team); border: 2px solid #fff; color: #fff; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 800; }
+    .shirt b { font-size: 10.5px; color: #fff; background: rgba(0, 0, 0, .5); border-radius: 5px; padding: 1px 5px; white-space: nowrap; }
+    .shirt.me span { background: #f5c518; color: #1c1a17; width: 36px; height: 36px; }
+    .shirt.me b { background: rgba(0, 0, 0, .8); }
+    .err { color: var(--danger); font-size: 14px; margin: 8px 0 0; }
+    .ok { color: var(--accent); font-weight: 700; font-size: 14px; }
+    .hi { padding: 2px 2px 12px; }
+    .hi h1 { font: 700 28px/1.15 Georgia, serif; margin: 0; }
+    .linkbtn { background: none; border: 0; color: var(--danger); font: inherit; font-weight: 700; font-size: 14.5px; cursor: pointer; display: block; margin: 8px auto; }
+  </style>
+<link rel="icon" type="image/png" sizes="32x32" href="/favicon-v2-32.png" /><link rel="icon" type="image/png" sizes="192x192" href="/favicon-v2-192.png" /><link rel="apple-touch-icon" href="/apple-touch-icon-v2.png" /></head>
+<body>
+<main>
+  <div id="loading"><p class="muted">Loading…</p></div>
+  <div id="bad" class="hidden">
+    <h1 class="serif">Hmm</h1>
+    <p class="muted" id="badText">This link doesn't match a team on Dayli. Ask whoever sent it for a new one.</p>
+    <a class="btn" href="../">What is Dayli?</a>
+  </div>
+
+  <!-- The team's public page (?s=address) -->
+  <div id="pub" class="hidden">
+    <div class="head"><div class="crest" id="pCrest"></div><div class="grow"><h1 class="name" id="pName"></h1><div class="sub" id="pSub"></div></div><a class="btn p" href="#get">Follow</a></div>
+    <div id="pNext"></div>
+    <div id="pLast"></div>
+    <div id="pComing"></div>
+    <div id="pResults"></div>
+    <div id="pAbout"></div>
+    <div class="card" id="get" style="text-align:center">
+      <b>Never miss a match</b>
+      <div class="muted small" style="margin-top:3px">Get Dayli and follow the team: fixtures in your calendar, scores as they come in.</div>
+      <div class="stores">
+        <a class="store" href="https://apps.apple.com/gb/app/dayli/id6767814466" rel="noopener"><small>Download for</small>iPhone</a>
+        <a class="store" href="https://play.google.com/store/apps/details?id=uk.co.dayli.app" rel="noopener"><small>Get it for</small>Android</a>
+      </div>
+      <p class="muted small" id="pSearch" style="margin:10px 0 0"></p>
+    </div>
+  </div>
+
+  <!-- A player's own page (?p=link) -->
+  <div id="me" class="hidden">
+    <div class="head"><div class="crest sm" id="mCrest"></div><b class="grow" id="mTeam" style="font-size:15px"></b><span class="muted small" id="mFor"></span></div>
+    <div id="mPaidNote" class="card hidden"><span class="ok">Payment received. Thanks!</span></div>
+    <div id="mMain"></div>
+    <div id="mOwed"></div>
+    <div id="mPaid"></div>
+    <p class="muted small" style="text-align:center;margin:12px 16px">Keep this link to yourself: it's just for you. Get Dayli to answer in one tap and hear when the team is picked.</p>
+  </div>
+</main>
+<script src="../config.js?v=0aef251"></script>
+<script>
+  (function () {
+    var cfg = window.DAYLI_CONFIG || {};
+    var q = new URLSearchParams(location.search);
+    var slug = (q.get('s') || '').toLowerCase().replace(/[^a-z0-9-]/g, '');
+    var token = (q.get('p') || '').toLowerCase().replace(/[^a-f0-9]/g, '');
+    var $ = function (id) { return document.getElementById(id); };
+    var show = function (id, on) { $(id).classList.toggle('hidden', !on); };
+    var DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+    var LONGDAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    var MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+    function esc(s) {
+      return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c];
+      });
+    }
+    function rpc(name, body) {
+      return fetch(cfg.supabaseUrl + '/rest/v1/rpc/' + name, {
+        method: 'POST',
+        headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      }).then(function (r) {
+        return r.text().then(function (t) {
+          var d = t ? JSON.parse(t) : null;
+          if (!r.ok) { var e = new Error((d && d.message) || 'failed'); throw e; }
+          return d;
+        });
+      });
+    }
+    function wall(iso, tz) {
+      var f = new Intl.DateTimeFormat('en-GB', { timeZone: tz || 'Europe/London', year: 'numeric', month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit', hourCycle: 'h23' });
+      var p = {};
+      f.formatToParts(new Date(iso)).forEach(function (x) { p[x.type] = x.value; });
+      var wd = new Date(Date.UTC(+p.year, +p.month - 1, +p.day)).getUTCDay();
+      return { wd: DAYS[wd], long: LONGDAYS[wd], day: +p.day, mon: MONTHS[+p.month - 1], time: p.hour + ':' + p.minute };
+    }
+    function pounds(p) { var v = p / 100; return '£' + (v % 1 ? v.toFixed(2) : v.toFixed(0)); }
+    function initials(n) {
+      var w = String(n || '').trim().split(/\s+/);
+      return ((w[0] || '').charAt(0) + (w[1] || '').charAt(0)).toUpperCase() || '?';
+    }
+    function teamColour(c) { return /^#[0-9a-f]{6}$/i.test(c || '') ? c : '#2f6b4f'; }
+    function crest(el, t) {
+      el.innerHTML = '';
+      if (t.badge) {
+        var img = document.createElement('img');
+        img.src = cfg.supabaseUrl + '/storage/v1/object/public/team-badges/' + t.badge;
+        img.alt = '';
+        el.appendChild(img);
+      } else {
+        el.textContent = initials(t.name);
+      }
+    }
+    function daysAway(iso) {
+      var d = Math.round((new Date(iso).setHours(0, 0, 0, 0) - new Date().setHours(0, 0, 0, 0)) / 86400000);
+      return d <= 0 ? 'today' : d === 1 ? 'tomorrow' : 'in ' + d + ' days';
+    }
+    function result(m) { return m.score_us > m.score_them ? 'W' : m.score_us < m.score_them ? 'L' : 'D'; }
+    function bad(text) {
+      show('loading', false);
+      if (text) $('badText').textContent = text;
+      show('bad', true);
+    }
+
+    // ---------------------------------------------------------------- public page
+    function fixRow(m, first) {
+      var w = wall(m.starts_at, m.timezone);
+      return '<div class="li"><div class="date"><small>' + w.wd.toUpperCase() + '</small><b>' + w.day + '</b><small>' + w.mon.toUpperCase() + '</small></div>' +
+        '<div class="grow"><b>v ' + esc(m.opponent) + '</b> <span class="muted">(' + (m.home ? 'H' : 'A') + ')</span>' +
+        '<div class="muted small">' + esc([w.time, m.location, m.competition === 'cup' ? 'Cup' : m.competition === 'friendly' ? 'Friendly' : null].filter(Boolean).join(' · ')) + '</div></div>' +
+        (first ? '<span class="tag t-next">NEXT</span>' : '') + '</div>';
+    }
+    function resRow(m) {
+      var w = wall(m.starts_at, m.timezone);
+      var r = result(m);
+      return '<div class="li"><span class="pill ' + r + '">' + r + '</span><div class="grow"><b>' + esc(m.opponent) + '</b> <span class="muted">(' + (m.home ? 'H' : 'A') + ')</span>' +
+        '<div class="muted small">' + w.day + ' ' + w.mon + '</div></div><span class="score">' + m.score_us + '–' + m.score_them + '</span></div>';
+    }
+    function drawPublic(t) {
+      document.documentElement.style.setProperty('--team', teamColour(t.color));
+      document.title = t.name + ' · Dayli';
+      crest($('pCrest'), t);
+      $('pName').textContent = t.name;
+      var rec = t.record || {};
+      $('pSub').textContent = [t.league, t.area, rec.played ? 'P' + rec.played + ' W' + rec.won + ' D' + rec.drawn + ' L' + rec.lost : null].filter(Boolean).join(' · ') ||
+        (t.sport ? t.sport.charAt(0).toUpperCase() + t.sport.slice(1) : '');
+      var matches = t.matches || [];
+      var results = t.results || [];
+      var form = results.slice(0, 5).map(function (m) { var r = result(m); return '<span class="pill ' + r + '">' + r + '</span>'; }).join('');
+
+      var n = matches[0];
+      if (n) {
+        var w = wall(n.starts_at, n.timezone);
+        var home = { name: t.name, us: true }, away = { name: n.opponent };
+        var left = n.home ? home : away, right = n.home ? away : home;
+        var side = function (x) {
+          return '<div><div class="crest' + (x.us ? '' : ' opp') + '">' + (x.us ? $('pCrest').innerHTML : esc(initials(x.name))) + '</div><b>' + esc(x.name) + '</b></div>';
+        };
+        var maps = n.location ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(n.location) : null;
+        $('pNext').innerHTML = '<div class="card next"><div class="row between"><span class="k">Next match · ' + daysAway(n.starts_at) + '</span><span class="tag">' + (n.home ? 'HOME' : 'AWAY') + '</span></div>' +
+          '<div class="vs">' + side(left) + '<div><div class="big">' + w.time + '</div><div class="small" style="opacity:.85">' + w.wd + ' ' + w.day + ' ' + w.mon + '</div></div>' + side(right) + '</div>' +
+          (n.location ? '<div class="row small" style="margin-top:10px;opacity:.92"><span class="grow">' + esc(n.location) + '</span><a href="' + maps + '" rel="noopener" style="text-decoration:underline">Directions</a></div>' : '') + '</div>';
+      } else {
+        $('pNext').innerHTML = '<div class="card"><span class="k">Next match</span><div class="muted" style="margin-top:4px">No matches in the diary yet.</div></div>';
+      }
+
+      var last = results[0];
+      $('pLast').innerHTML = last
+        ? '<div class="card"><div class="row between"><span class="k">Last result · ' + wall(last.starts_at, last.timezone).day + ' ' + wall(last.starts_at, last.timezone).mon + '</span><span class="row" style="gap:4px">' + form + '</span></div>' +
+          '<div class="row" style="justify-content:center;gap:14px;margin:12px 0 4px;text-align:center"><b class="grow" style="font-size:14px">' + esc(last.home ? t.name : last.opponent) + '</b><span class="serif score" style="font-size:32px">' +
+          (last.home ? last.score_us + '–' + last.score_them : last.score_them + '–' + last.score_us) + '</span><b class="grow" style="font-size:14px">' + esc(last.home ? last.opponent : t.name) + '</b></div></div>'
+        : '';
+      $('pComing').innerHTML = matches.length > 1
+        ? '<div class="card"><div class="k" style="margin-bottom:4px">Coming up</div>' + matches.slice(1, 6).map(function (m) { return fixRow(m, false); }).join('') + '</div>'
+        : '';
+      $('pResults').innerHTML = results.length > 1
+        ? '<div class="card"><div class="k" style="margin-bottom:4px">Results</div>' + results.slice(1).map(resRow).join('') + '</div>'
+        : '';
+      var links = (t.links || []).filter(function (l) { return l && /^https:\/\//i.test(l.url || ''); });
+      $('pAbout').innerHTML = t.about || links.length
+        ? '<div class="card"><div class="k" style="margin-bottom:6px">About the team</div>' + (t.about ? '<div style="font-size:14.5px;white-space:pre-line">' + esc(t.about) + '</div>' : '') +
+          (links.length ? '<div class="links">' + links.map(function (l) { return '<a class="btn" href="' + esc(l.url) + '" rel="noopener nofollow" target="_blank">' + esc(l.label || l.url.replace(/^https:\/\/(www\.)?/i, '').split('/')[0]) + '</a>'; }).join('') + '</div>' : '') + '</div>'
+        : '';
+      $('pSearch').textContent = 'In Dayli, search for "' + t.name + '" and tap Follow.';
+      show('loading', false);
+      show('pub', true);
+    }
+
+    // ---------------------------------------------------------------- player page
+    var page = null;
+    var noteFor = null;
+
+    // Where each shirt stands (as in the app and HQ): the keeper at the
+    // bottom, then each line from the back, left to right.
+    function spotsFor(shape) {
+      var lines = String(shape).split('-').map(Number).filter(function (n) { return n > 0; });
+      var spots = [{ x: 0.5, y: 0.89 }];
+      var last = lines.length - 1;
+      lines.forEach(function (n, i) {
+        var y = last === 0 ? 0.45 : 0.7 - (i * 0.54) / last;
+        for (var j = 0; j < n; j++) spots.push({ x: n === 1 ? 0.5 : 0.14 + (j * 0.72) / (n - 1), y: y });
+      });
+      return spots;
+    }
+    function pitchHtml(nx) {
+      var spots = nx.formation ? spotsFor(nx.formation) : null;
+      var starters = (nx.lineup || []).filter(function (p) { return p.slot === 'start'; });
+      var subs = (nx.lineup || []).filter(function (p) { return p.slot === 'sub'; });
+      var placed = spots ? starters.filter(function (p) { return p.pos && p.pos <= spots.length; }) : [];
+      var body;
+      if (spots && placed.length) {
+        body = '<div class="pitch"><div class="ln" style="left:5%;right:5%;top:4%;bottom:4%;border-radius:5px"></div><div class="ln" style="left:5%;right:5%;top:50%;height:0;border-width:2px 0 0"></div>' +
+          '<div class="ln" style="left:50%;top:50%;width:22%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%)"></div>' +
+          placed.map(function (p) {
+            var s = spots[p.pos - 1];
+            return '<div class="shirt' + (p.me ? ' me' : '') + '" style="left:' + (s.x * 100).toFixed(1) + '%;top:' + (s.y * 100).toFixed(1) + '%"><span>' + esc(initials(p.name)) + '</span><b>' + (p.me ? 'You' : esc(p.name)) + '</b></div>';
+          }).join('') + '</div>';
+      } else {
+        body = '<div style="margin-top:8px">' + starters.map(function (p) { return '<div class="li"><b>' + (p.me ? 'You' : esc(p.name)) + '</b></div>'; }).join('') + '</div>';
+      }
+      return '<div class="card"><div class="row between"><span class="k">The team' + (nx.formation ? ' · ' + esc(nx.formation) : '') + '</span>' +
+        (subs.length ? '<span class="muted small">Subs: ' + subs.map(function (p) { return p.me ? 'You' : esc(p.name); }).join(', ') + '</span>' : '') + '</div>' + body +
+        (nx.meet_at ? '<div class="small" style="margin-top:10px">Meet ' + wall(nx.meet_at, nx.timezone).time + (nx.location ? ' · ' + esc(nx.location) : '') + (nx.kit ? ' · ' + esc(nx.kit) : '') + '</div>' : '') + '</div>';
+    }
+    function whenLine(nx) {
+      var w = wall(nx.starts_at, nx.timezone);
+      return w.long + ' ' + w.day + ' ' + w.mon + ' · ' + w.time + (nx.kind === 'match' ? ' · ' + (nx.home ? 'Home' : 'Away') : '');
+    }
+    function nxTitle(nx) { return nx.kind === 'match' && nx.opponent ? 'v ' + nx.opponent : nx.title || (nx.kind === 'training' ? 'Training' : 'Team social'); }
+
+    function drawMe(d) {
+      page = d;
+      var t = d.team;
+      document.documentElement.style.setProperty('--team', teamColour(t.color));
+      document.title = t.name + ' · Dayli';
+      crest($('mCrest'), t);
+      $('mTeam').textContent = t.name;
+      var first = String(d.me.name || '').split(/\s+/)[0];
+      $('mFor').textContent = 'Just for ' + first;
+      var boss = (d.managers || [])[0] || 'The manager';
+      var nx = d.next;
+      var html = '';
+      if (!nx) {
+        html = '<div class="hi"><h1>Hi ' + esc(first) + '</h1><div class="muted">Nothing to answer right now. The next match shows here as soon as it’s in the diary.</div></div>';
+      } else if (nx.sent && nx.slot && nx.status !== 'cant') {
+        var where = nx.slot === 'start' ? 'You’re starting' : 'You’re on the bench';
+        html = '<div class="hi"><h1>' + where + '</h1><div class="muted">' + esc([d.me.position, whenLine(nx), nxTitle(nx)].filter(Boolean).join(' · ')) + '</div></div>' +
+          pitchHtml(nx) + '<button class="linkbtn" id="cantNow">Can’t make it any more?</button>';
+      } else {
+        var playQ = nx.kind === 'match' ? 'Can you play?' : 'Are you coming?';
+        var labels = nx.kind === 'match' ? ['Yes', 'Maybe', 'Can’t'] : ['Going', 'Maybe', 'Can’t go'];
+        var st = nx.status;
+        html = '<div class="hi"><h1>Hi ' + esc(first) + '</h1><div class="muted">' +
+          (nx.sent && st === 'available' ? 'The team’s been picked and you’re not in it this time.' : esc(boss) + (st ? ' has your answer. You can change it.' : ' needs to know.')) + '</div></div>' +
+          '<div class="card" style="padding:16px"><span class="k">' + esc(whenLine(nx)) + '</span><div class="serif" style="font-size:21px;font-weight:700;margin:4px 0 2px">' + esc(nxTitle(nx)) + '</div>' +
+          '<div class="muted small">' + esc([nx.location, nx.meet_at ? 'meet ' + wall(nx.meet_at, nx.timezone).time : null].filter(Boolean).join(' · ')) + '</div>' +
+          '<div style="font-weight:800;margin:14px 0 8px">' + playQ + '</div>' +
+          '<div class="ask"><button class="btn' + (st === 'available' ? ' on-y' : '') + '" data-st="available">' + labels[0] + '</button><button class="btn' + (st === 'maybe' ? ' on-m' : '') + '" data-st="maybe">' + labels[1] + '</button><button class="btn' + (st === 'cant' ? ' on-n' : '') + '" data-st="cant">' + labels[2] + '</button></div>' +
+          (st === 'maybe' || st === 'cant' || noteFor
+            ? '<textarea id="note" rows="2" maxlength="80" placeholder="Anything the managers should know? (only they see it)">' + esc(nx.note || '') + '</textarea><button class="btn" id="saveNote" style="margin-top:8px">Send note</button>'
+            : '') +
+          '<p class="err hidden" id="askErr"></p>' +
+          '<div class="muted small" style="margin-top:10px">' + nx.answered + ' of ' + nx.squad + ' have answered' + (nx.kind === 'match' ? ' · ' + nx.can + ' can play' : '') + '</div></div>';
+      }
+      $('mMain').innerHTML = html;
+
+      $('mOwed').innerHTML = (d.owed || []).map(function (o) {
+        return '<div class="card owe"><div class="row"><div class="grow"><b>' + esc(o.title) + ' · ' + pounds(o.price_pence) + '</b><div class="muted small">' + (o.fee_included ? 'Includes the card fee' : 'Paid to the team') + '</div></div><span class="tag t-owe">TO PAY</span></div>' +
+          (d.can_pay ? '<button class="btn d wide" style="margin-top:10px" data-pay="' + esc(o.id) + '">Pay ' + pounds(o.price_pence) + '</button><div class="muted small" style="text-align:center;margin-top:6px">Card, Apple Pay or Google Pay. Or pay ' + esc(boss) + ' in cash.</div>'
+            : '<div class="muted small" style="margin-top:8px">Pay ' + esc(boss) + ' in cash and they’ll tick you off.</div>') + '</div>';
+      }).join('') + '<p class="err hidden" id="payErr"></p>';
+      $('mPaid').innerHTML = (d.paid || []).length
+        ? '<div class="card"><div class="k" style="margin-bottom:4px">Paid</div>' + d.paid.map(function (p) {
+            return '<div class="li"><span class="pill W">✓</span><div class="grow"><b>' + esc(p.title) + '</b><div class="muted small">' + (p.how === 'cash' ? 'Cash' : 'Card') + '</div></div><b>' + pounds(p.price_pence) + '</b></div>';
+          }).join('') + '</div>'
+        : '';
+      wireMe();
+      show('loading', false);
+      show('me', true);
+    }
+
+    function reply(status, note) {
+      var nx = page.next;
+      return rpc('team_player_reply', { p_token: token, p_event: nx.event_id, p_status: status, p_note: note == null ? null : note })
+        .then(loadMe)
+        .catch(function () {
+          var e = $('askErr');
+          if (e) { e.textContent = 'That didn’t save. Check your signal and try again.'; show('askErr', true); }
+          else alert('That didn’t save. Try again.');
+        });
+    }
+    function wireMe() {
+      Array.prototype.forEach.call(document.querySelectorAll('[data-st]'), function (b) {
+        b.onclick = function () {
+          noteFor = b.dataset.st !== 'available';
+          reply(b.dataset.st, null);
+        };
+      });
+      if ($('saveNote')) $('saveNote').onclick = function () {
+        var st = page.next.status || 'maybe';
+        reply(st === 'available' ? 'maybe' : st, $('note').value);
+      };
+      if ($('cantNow')) $('cantNow').onclick = function () {
+        if (confirm('Tell the managers you can’t play? You’ll come out of the team.')) { noteFor = true; reply('cant', null); }
+      };
+      Array.prototype.forEach.call(document.querySelectorAll('[data-pay]'), function (b) {
+        b.onclick = function () {
+          b.disabled = true;
+          show('payErr', false);
+          fetch(cfg.supabaseUrl + '/functions/v1/team-pay', {
+            method: 'POST',
+            headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+            body: JSON.stringify({ action: 'pay', due_id: b.dataset.pay, token: token })
+          }).then(function (r) { return r.json(); }).then(function (res) {
+            if (res && res.url) { location.href = res.url; return; }
+            $('payErr').textContent = 'That didn’t work. It may already be paid: refresh to check.';
+            show('payErr', true);
+            b.disabled = false;
+          }).catch(function () {
+            $('payErr').textContent = 'That didn’t work. Check your signal and try again.';
+            show('payErr', true);
+            b.disabled = false;
+          });
+        };
+      });
+    }
+    function loadMe() {
+      return rpc('team_player_page', { p_token: token }).then(function (d) {
+        if (!d) return bad('This link doesn’t work any more. Ask your manager to send you a new one.');
+        drawMe(d);
+      });
+    }
+
+    var start;
+    if (token) {
+      start = loadMe().then(function () {
+        if (!q.get('paid')) return;
+        show('mPaidNote', true);
+        // Stripe tells Dayli a moment later: look again for a few seconds.
+        var tries = 5;
+        (function again() {
+          if (!page || !(page.owed || []).length || !tries--) return;
+          setTimeout(function () { loadMe().then(again); }, 1500);
+        })();
+      });
+    } else if (slug) {
+      start = rpc('team_page_public', { p_slug: slug }).then(function (t) {
+        if (!t) return bad('This link doesn’t match a team on Dayli. It may have changed: ask whoever sent it.');
+        drawPublic(t);
+      });
+    } else {
+      return bad();
+    }
+    start.catch(function () { bad('Couldn’t load the page. Check your signal and refresh.'); });
+  })();
+</script>
+</body>
+</html>

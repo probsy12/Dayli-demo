@@ -7,6 +7,8 @@
     if (join) { location.replace('/join/?code=' + encodeURIComponent(join[1])); return; }
     var game = p.match(/^\/g\/([A-Za-z0-9-]+)\/?$/);
     if (game) { location.replace('/g/?c=' + encodeURIComponent(game[1])); return; }
+    var team = p.match(/^\/t\/([a-z0-9-]+)\/?$/);
+    if (team) { location.replace('/t/?s=' + encodeURIComponent(team[1])); return; }
     var inv = p.match(/^\/invite\/([A-Za-z0-9-]+)\/?$/);
     if (inv) { location.replace('/invite/?code=' + encodeURIComponent(inv[1])); return; }
     var ev = p.match(/^\/e\/([a-z0-9-]+)\/?$/);

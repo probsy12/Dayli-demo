@@ -766,7 +766,7 @@
           esc(new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })) +
           '</div><h1>' +
           esc(hello) +
-          '</h1></div><div class="row"><button class="btn" data-copy-invite>Copy squad invite link</button><a class="btn primary" href="' +
+          '</h1></div><div class="row"><a class="btn" id="th-public" target="_blank" rel="noopener" hidden>Public page</a><button class="btn" data-copy-invite>Copy squad invite link</button><a class="btn primary" href="' +
           teamUrl(cal, 'new') +
           '">+ Add fixture</a></div></div>' +
           hero +
@@ -789,6 +789,19 @@
           copy(SITE + '/join/' + d.code, 'Invite link copied. Send it to your players.');
         };
       });
+      // The team's public page (fixtures and results for anyone), when it's open to followers.
+      rpc('team_slug', { p_calendar: cal }).then(
+        function (slug) {
+          var a = $('#th-public');
+          if (!slug || !a) return;
+          a.href = SITE + '/t/' + slug;
+          a.title = 'Fixtures and results for anyone: ' + SITE.replace(/^https:\/\//, '') + '/t/' + slug;
+          a.hidden = false;
+        },
+        function () {
+          return null;
+        },
+      );
       if ($('#th-nudge'))
         $('#th-nudge').onclick = function () {
           var button = this;
@@ -2104,7 +2117,8 @@
           (players.length === 1 ? ' person' : ' people') +
           ' · ' +
           onDayli +
-          ' on Dayli</div></div><div class="row"><button class="btn" data-copy-invite>Copy invite link</button><button class="btn primary" id="tq-add-open">+ Add player</button></div></div>' +
+          ' on Dayli</div></div><div class="row"><button class="btn" id="tq-links-open">Player links</button><button class="btn" data-copy-invite>Copy invite link</button><button class="btn primary" id="tq-add-open">+ Add player</button></div></div>' +
+          '<div class="card tq-links" id="tq-links" hidden></div>' +
           '<div class="tq-grid"><div class="card tq-list"><div class="tq-add" id="tq-add" hidden><input type="text" id="tq-new" placeholder="Their name" maxlength="60" /><button class="btn primary" id="tq-add-go">Add</button></div><input type="search" id="tq-search" placeholder="Search the squad" />' +
           '<div id="tq-rows">' +
           players.map(listRow).join('') +
@@ -2112,6 +2126,99 @@
           profile(chosen) +
           '</div>',
       );
+
+      // Each player's own page (daylicalendar.co.uk/t/?p=…): can you play, what
+      // they owe, the team once it's sent. For players without Dayli, mostly.
+      function drawLinks(rows) {
+        var box = $('#tq-links');
+        var teamName = t.name || 'the team';
+        box.innerHTML =
+          '<div class="tq-links-head"><div class="grow"><h3>Player links</h3><p class="muted small">Each player gets their own private page: they say if they can play, pay what they owe, and see the team once you send it. No app or sign-in needed. Send each person their own link; don’t post them in the group.</p></div><button class="act" id="tq-links-close">Close</button></div>' +
+          (rows.length
+            ? rows
+                .map(function (r) {
+                  var seen = r.last_seen_at
+                    ? 'Opened ' + new Date(r.last_seen_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })
+                    : 'Not opened yet';
+                  return (
+                    '<div class="tq-link"><b class="grow">' +
+                    esc(r.name) +
+                    ' <small class="muted">' +
+                    (r.on_dayli ? 'on Dayli' : 'not on Dayli') +
+                    ' · ' +
+                    seen +
+                    '</small></b><button class="act" data-link-copy="' +
+                    esc(r.player_id) +
+                    '">Copy link</button><button class="act tp-nudge" data-link-wa="' +
+                    esc(r.player_id) +
+                    '">WhatsApp</button><button class="act" data-link-new="' +
+                    esc(r.player_id) +
+                    '" title="Make a new link if this one has been passed around">New link</button></div>'
+                  );
+                })
+                .join('')
+            : '<p class="muted small">Add players first.</p>');
+        box.hidden = false;
+        var byId = {};
+        rows.forEach(function (r) {
+          byId[r.player_id] = r;
+        });
+        var url = function (r) {
+          return SITE + '/t/?p=' + r.token;
+        };
+        $('#tq-links-close').onclick = function () {
+          box.hidden = true;
+        };
+        $$('[data-link-copy]').forEach(function (b) {
+          b.onclick = function () {
+            copy(url(byId[b.dataset.linkCopy]), 'Link copied. Send it to ' + byId[b.dataset.linkCopy].name.split(' ')[0] + ' only.');
+          };
+        });
+        $$('[data-link-wa]').forEach(function (b) {
+          b.onclick = function () {
+            var r = byId[b.dataset.linkWa];
+            var text =
+              'Hi ' +
+              r.name.split(' ')[0] +
+              ', this is your own link for ' +
+              teamName +
+              ': say if you can play, pay match fees and see the team. It’s just for you, so please don’t share it. ' +
+              url(r);
+            window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
+          };
+        });
+        $$('[data-link-new]').forEach(function (b) {
+          b.onclick = function () {
+            var r = byId[b.dataset.linkNew];
+            if (!confirm('Make a new link for ' + r.name + '? The old one stops working.')) return;
+            rpc('team_player_link_reset', { p_player: r.player_id }).then(
+              function (tok) {
+                r.token = tok;
+                r.last_seen_at = null;
+                drawLinks(rows);
+                toast('New link made. Send it to ' + r.name.split(' ')[0] + '.');
+              },
+              function (err) {
+                toast(friendly(err));
+              },
+            );
+          };
+        });
+      }
+      $('#tq-links-open').onclick = function () {
+        var button = this;
+        setBusy(button, true);
+        rpc('team_player_links_list', { p_calendar: cal }).then(
+          function (rows) {
+            setBusy(button, false);
+            drawLinks(rows || []);
+          },
+          function (err) {
+            setBusy(button, false);
+            toast(friendly(err));
+          },
+        );
+      };
 
       $('#tq-search').oninput = function () {
         filter = this.value.trim().toLowerCase();
