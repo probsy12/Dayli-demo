@@ -1636,7 +1636,72 @@
         };
     }
 
+    // A game: Invites (playing, no reply, can't play), the Team sheet (the
+    // pitch) and Payments, with Share always there. Settings (places, sides,
+    // card payments) sit behind the gear.
+    var gameTab = 'invites';
+    var gameTabFor = null;
+
+    // A sheet from the bottom (a panel on wide screens). Returns close().
+    function sgSheet(html, cls) {
+      var dim = document.createElement('div');
+      dim.className = 'gs-dim';
+      var box = document.createElement('div');
+      box.className = 'gs-sheet ' + (cls || '');
+      box.innerHTML = '<div class="gs-grab"></div>' + html;
+      document.body.appendChild(dim);
+      document.body.appendChild(box);
+      function close() {
+        dim.remove();
+        box.remove();
+        document.removeEventListener('keydown', onKey);
+      }
+      function onKey(e) {
+        if (e.key === 'Escape') close();
+      }
+      dim.onclick = close;
+      document.addEventListener('keydown', onKey);
+      return { el: box, close: close };
+    }
+    // A short list of things to do with someone.
+    function sgActions(title, items) {
+      var s = sgSheet(
+        '<div class="gs-acts"><p class="muted small">' +
+          esc(title) +
+          '</p>' +
+          items
+            .map(function (x, i) {
+              return '<button type="button" class="gs-act' + (x[2] ? ' red' : '') + '" data-i="' + i + '">' + esc(x[0]) + '</button>';
+            })
+            .join('') +
+          '<button type="button" class="gs-act cancel" data-i="-1">Cancel</button></div>',
+        'gs-small',
+      );
+      $$('[data-i]', s.el).forEach(function (b) {
+        b.onclick = function () {
+          s.close();
+          var it = items[Number(b.dataset.i)];
+          if (it) it[1]();
+        };
+      });
+    }
+    function sgAgo(iso) {
+      if (!iso) return '';
+      var m = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
+      if (m < 1) return 'just now';
+      if (m < 60) return m + 'm ago';
+      if (m < 60 * 24) return Math.round(m / 60) + 'h ago';
+      return Math.round(m / 1440) + 'd ago';
+    }
+    function sgFirst(name) {
+      return String(name || '').split(/\s+/)[0] || name;
+    }
+
     function drawGame(g, mine) {
+      if (gameTabFor !== g.id) {
+        gameTabFor = g.id;
+        gameTab = 'invites';
+      }
       var players = g.players || [];
       var inn = players.filter(function (p) {
         return p.status === 'in';
@@ -1644,13 +1709,15 @@
       var waiting = players.filter(function (p) {
         return p.status === 'waiting';
       });
-      var side = {};
-      inn.forEach(function (p) {
-        side[p.id] = p.side || null;
+      var invites = g.invites || [];
+      var noReply = invites.filter(function (p) {
+        return p.status === 'invited';
+      });
+      var cant = invites.filter(function (p) {
+        return p.status === 'no';
       });
       var places = g.places;
       var bibs = g.bibs && g.bibs < places ? g.bibs : Math.floor(places / 2);
-      var dirty = false;
       var price = g.price_pence || sgPrice(g.cost);
       var link = SITE + '/g/?c=' + encodeURIComponent(g.code);
       var when = new Date(g.starts_at).toLocaleDateString('en-GB', {
@@ -1665,39 +1732,22 @@
         timeZone: g.timezone || undefined,
       });
 
-      // Card payments (hidden until team payments are on): set up Stripe, then a price.
-      function cardBar() {
-        if (!g.payments_on) return '';
-        if (!g.card_ready) {
-          return (
-            '<div class="sg-card"><div class="grow"><b>Take card payments</b><div class="muted small">Players pay on the game’s link or in Dayli with Apple Pay, Google Pay or a card, whenever they like. They cover the card fee; the money goes to your own Stripe account.</div></div>' +
-            '<button class="btn primary" id="sg-connect">' +
-            (g.stripe_connected ? 'Finish setting up Stripe' : 'Set up card payments') +
-            '</button>' +
-            (g.stripe_connected ? '<button class="btn" id="sg-check">Check again</button>' : '') +
-            '</div>'
-          );
-        }
-        var p = g.price_pence;
-        return (
-          '<div class="sg-card"><b>Card payments</b><span class="sg-money">£<input type="text" id="sg-price" inputmode="decimal" maxlength="6" value="' +
-          (p ? (p / 100).toFixed(2) : '') +
-          '" placeholder="5.00" /></span><button class="btn" id="sg-price-save">' +
-          (p ? 'Change price' : 'Turn on') +
-          '</button><span class="muted small grow">' +
-          (g.pay_pence
-            ? 'Players pay ' +
-              sgPounds(g.pay_pence) +
-              ' by card (the card fee is on them), you get ' +
-              sgPounds(p) +
-              '. Tap a green tick to refund someone.'
-            : 'What each player pays you. They can pay on the link, any time.') +
-          '</span>' +
-          (p ? '<button class="btn" id="sg-price-off">Turn off</button>' : '') +
-          '</div>'
-        );
-      }
-      // After a change: fetch the game again without the loading screen or a jump to the top.
+      // Sides: whoever has none yet goes into a free spot (bibs first).
+      var side = {};
+      var placed = 0;
+      inn.forEach(function (p) {
+        side[p.id] = p.side || null;
+      });
+      inn.forEach(function (p) {
+        if (side[p.id]) return;
+        var nb = inn.filter(function (x) {
+          return side[x.id] === 'bibs';
+        }).length;
+        side[p.id] = nb < bibs ? 'bibs' : 'colours';
+        placed++;
+      });
+      var dirty = placed > 0;
+
       function refreshGame() {
         rpc('game_view', { p_game: g.id }).then(
           function (ng) {
@@ -1711,370 +1761,452 @@
           },
         );
       }
-      function refund(placeId, name, amount, button) {
+      function move(p, to, done) {
+        rpc('game_move', { p_place: p.id, p_to: to }).then(
+          function () {
+            if (done) toast(done);
+            refreshGame();
+          },
+          function (err) {
+            toast(friendly(err));
+          },
+        );
+      }
+      function refund(placeId, name, amount) {
         if (!confirm('Give ' + name + ' all ' + sgPounds(amount) + ' back? It reaches their card in 5 to 10 days.')) return;
-        if (button) setBusy(button, true);
         invoke('game-pay', { action: 'refund', place_id: placeId }).then(
           function () {
             toast(name + ' refunded');
             refreshGame();
           },
           function (err) {
-            if (button) setBusy(button, false);
             toast(friendly(err));
           },
         );
       }
-      function setPrice(pence, button) {
-        setBusy(button, true);
-        rpc('game_set_price', { p_game: g.id, p_price_pence: pence }).then(
-          function () {
-            toast(pence ? 'Players can pay by card on the link' : 'Card payments off for this game');
-            refreshGame();
-          },
-          function (err) {
-            setBusy(button, false);
-            toast(friendly(err));
-          },
-        );
+      function share() {
+        var text =
+          g.title +
+          ', ' +
+          when +
+          ' ' +
+          at +
+          (g.location ? ' at ' + g.location : '') +
+          (price ? ', ' + sgPounds(price) + ' each' : '') +
+          '. Tap to say if you’re in: ' +
+          link;
+        if (navigator.share && /Mobi|Android|iPhone|iPad/.test(navigator.userAgent)) {
+          navigator.share({ text: text }).catch(function () {
+            return null;
+          });
+          return;
+        }
+        window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
       }
 
-      function draw() {
-        var keepY = window.scrollY;
-        var bibsList = inn.filter(function (p) {
+      // --- the three tabs ---
+      function item(p, sub) {
+        return (
+          '<button type="button" class="gi-it" data-who="' +
+          esc(p.id) +
+          '">' +
+          sgAvatar(p, 24) +
+          '<span><b>' +
+          esc(sgFirst(p.name)) +
+          '</b>' +
+          (sub ? '<small>' + esc(sub) + '</small>' : '') +
+          '</span></button>'
+        );
+      }
+      function col(cls, label, n, body, foot) {
+        return (
+          '<div class="gi-col ' +
+          cls +
+          '"><div class="gi-h"><b>' +
+          n +
+          '</b>' +
+          label +
+          '</div><div class="gi-body">' +
+          (body || '<p class="gi-empty">Nobody yet</p>') +
+          '</div>' +
+          (foot || '') +
+          '</div>'
+        );
+      }
+      function tabInvites() {
+        var pct = Math.min(100, Math.round((inn.length / places) * 100));
+        var full = inn.length >= places;
+        return (
+          '<div class="gi-top"><div class="grow"><b>' +
+          inn.length +
+          ' of ' +
+          places +
+          ' playing</b><div class="gi-bar"><i style="width:' +
+          pct +
+          '%"></i></div></div><button type="button" class="btn gi-add" id="gi-add">+ Add players</button></div>' +
+          '<div class="gi-cols">' +
+          col(
+            'yes',
+            'PLAYING',
+            inn.length,
+            inn
+              .map(function (p) {
+                return item(p, p.user_id && p.user_id === g.organiser_id ? 'You' : '');
+              })
+              .join('') +
+              (waiting.length
+                ? '<div class="gi-wl"><b>Waiting list · ' +
+                  waiting.length +
+                  '</b>' +
+                  waiting
+                    .map(function (p) {
+                      return item(p, 'said yes ' + sgAgo(p.at));
+                    })
+                    .join('') +
+                  '</div>'
+                : ''),
+            full && !waiting.length ? '<p class="gi-foot muted">Full</p>' : '',
+          ) +
+          col(
+            'pend',
+            'NO REPLY',
+            noReply.length,
+            noReply
+              .map(function (p) {
+                return item(p, p.guest ? 'WhatsApp' : 'Asked ' + sgAgo(p.at));
+              })
+              .join(''),
+            noReply.some(function (p) {
+              return !p.guest;
+            })
+              ? '<button type="button" class="gi-foot act" id="gi-nudge">Nudge all</button>'
+              : '',
+          ) +
+          col(
+            'no',
+            'CAN’T PLAY',
+            cant.length,
+            cant
+              .map(function (p) {
+                return item(p, sgAgo(p.at));
+              })
+              .join(''),
+          ) +
+          '</div><p class="muted small gi-help">Tap someone to move them. People who say yes on the link join your regulars.</p>'
+        );
+      }
+      function tabTeams() {
+        function half(top) {
+          var mine2 = inn.filter(function (p) {
+            return side[p.id] === (top ? 'bibs' : 'colours');
+          });
+          var cap = Math.max(top ? bibs : places - bibs, mine2.length);
+          var spots = sgHalf(cap, top);
+          return spots
+            .map(function (s, i) {
+              var p = mine2[i];
+              var pos = 'left:' + s.x.toFixed(1) + '%;top:' + s.y.toFixed(1) + '%';
+              if (!p) return '<div class="sg-free" style="' + pos + '">+</div>';
+              return (
+                '<button type="button" class="sg-pp' +
+                (top ? ' b' : '') +
+                '" data-p="' +
+                esc(p.id) +
+                '" style="' +
+                pos +
+                '">' +
+                sgAvatar(p, 38) +
+                '<b>' +
+                esc(sgShort(p.name)) +
+                '</b>' +
+                (p.paid || !price ? '' : '<i class="sg-owe">' + sgPounds(price) + '</i>') +
+                '</button>'
+              );
+            })
+            .join('');
+        }
+        var nb = inn.filter(function (p) {
           return side[p.id] === 'bibs';
-        });
-        var colsList = inn.filter(function (p) {
-          return side[p.id] === 'colours';
-        });
-        var none = inn.filter(function (p) {
-          return !side[p.id];
-        });
+        }).length;
+        return (
+          '<div class="sg-pitch gt-pitch"><div class="ln box"></div><div class="ln half"></div><div class="ln circle"></div><div class="ln area top"></div><div class="ln area bottom"></div>' +
+          '<span class="sg-sl" style="top:10px">BIBS · ' +
+          nb +
+          ' of ' +
+          bibs +
+          '</span><span class="sg-sl" style="bottom:10px">COLOURS · ' +
+          (inn.length - nb) +
+          ' of ' +
+          (places - bibs) +
+          '</span>' +
+          half(true) +
+          half(false) +
+          '</div><p class="muted small gt-help">' +
+          (inn.length ? 'Tap a player to swap sides. ' : 'When people say yes they take a spot here. ') +
+          (dirty ? '<b class="ink">Save the teams so everyone sees them.</b>' : g.sides_set ? 'Everyone sees these teams.' : '') +
+          '</p><div class="gt-btns"><button type="button" class="btn" id="gt-mix">Mix them up</button><button type="button" class="btn primary" id="gt-save"' +
+          (dirty ? '' : ' disabled') +
+          '>' +
+          (g.sides_set ? 'Save the teams' : 'Save and show the teams') +
+          '</button></div>'
+        );
+      }
+      function tabPay() {
         var paid = inn.filter(function (p) {
           return p.paid;
         });
         var owing = inn.filter(function (p) {
           return !p.paid;
         });
+        var pct = inn.length ? Math.round((paid.length / inn.length) * 100) : 0;
+        var left = g.left_paid || [];
+        return (
+          '<div class="gi-top"><div class="grow"><b>' +
+          (price ? sgPounds(price * paid.length) + ' of ' + sgPounds(price * inn.length) + ' paid' : paid.length + ' of ' + inn.length + ' paid') +
+          '</b><div class="gi-bar"><i style="width:' +
+          pct +
+          '%"></i></div></div></div>' +
+          '<div class="gi-cols two">' +
+          col(
+            'yes',
+            'PAID',
+            paid.length,
+            paid
+              .map(function (p) {
+                return item(p, p.paid === 'card' ? 'Card' : 'Cash');
+              })
+              .join('') +
+              (left.length
+                ? '<div class="gi-wl"><b>Left after paying</b>' +
+                  left
+                    .map(function (p) {
+                      return (
+                        '<button type="button" class="gi-it" data-refund="' +
+                        esc(p.id) +
+                        '" data-name="' +
+                        esc(p.name) +
+                        '" data-amount="' +
+                        Number(p.amount_pence) +
+                        '">' +
+                        sgAvatar(p, 24) +
+                        '<span><b>' +
+                        esc(sgFirst(p.name)) +
+                        '</b><small>Tap to refund ' +
+                        sgPounds(p.amount_pence) +
+                        '</small></span></button>'
+                      );
+                    })
+                    .join('') +
+                  '</div>'
+                : ''),
+          ) +
+          col(
+            'owe',
+            'NOT PAID',
+            owing.length,
+            owing
+              .map(function (p) {
+                return item(p, price ? sgPounds(price) : '');
+              })
+              .join(''),
+            owing.length ? '<button type="button" class="gi-foot act" id="gp-remind">Remind them</button>' : '',
+          ) +
+          '</div><p class="muted small gi-help">Tap a name to mark them paid or not paid. Card payments come in by themselves.' +
+          (g.payments_on && !g.price_pence ? ' <button type="button" class="linkish" id="gp-card">Take card payments</button>' : '') +
+          '</p>'
+        );
+      }
+
+      function draw() {
         var others = mine.filter(function (x) {
           return x.id !== g.id;
         });
-
-        function row(p) {
-          var s = side[p.id];
-          return (
-            '<div class="sg-it">' +
-            sgAvatar(p, 30) +
-            '<b class="grow">' +
-            esc(p.name) +
-            (p.guest ? ' <small class="muted">not on Dayli</small>' : '') +
-            '</b><button class="sg-tag ' +
-            (s || 'none') +
-            '" data-side="' +
-            esc(p.id) +
-            '" title="Swap side">' +
-            (s === 'bibs' ? 'BIBS' : s === 'colours' ? 'COLOURS' : 'NO SIDE') +
-            '</button><button class="sg-tick ' +
-            (p.paid || 'no') +
-            '" data-paid="' +
-            esc(p.id) +
-            '" title="' +
-            (p.paid === 'card' ? 'Paid by card: tap to refund' : p.paid ? 'Paid in cash: tap to undo' : 'Tap when they’ve paid') +
-            '">' +
-            (p.paid ? '✓' : '') +
-            '</button><button class="sg-x" data-out="' +
-            esc(p.id) +
-            '" title="Take them out">×</button></div>'
-          );
-        }
-        function shirts(list, top) {
-          var spots = sgHalf(list.length, top);
-          return list
-            .map(function (p, i) {
-              var s = spots[i];
-              return (
-                '<div class="sg-pp' +
-                (top ? ' b' : '') +
-                '" draggable="true" data-p="' +
-                esc(p.id) +
-                '" style="left:' +
-                s.x.toFixed(1) +
-                '%;top:' +
-                s.y.toFixed(1) +
-                '%" title="Tap to swap side">' +
-                sgAvatar(p, 40) +
-                '<b>' +
-                esc(sgShort(p.name)) +
-                '</b>' +
-                (p.paid || !price ? '' : '<i class="sg-owe">' + sgPounds(price) + '</i>') +
-                '</div>'
-              );
-            })
-            .join('');
-        }
-
+        var tabs = [
+          ['invites', 'Invites', ICON.squad],
+          ['teams', 'Team sheet', ICON.ball],
+          ['pay', 'Payments', '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h3"/>'],
+        ];
         render(
-          (others.length
-            ? '<div class="sg-games">' +
-              mine
-                .map(function (x) {
-                  return (
-                    '<a class="' +
-                    (x.id === g.id ? 'on' : '') +
-                    '" href="#/games/' +
-                    esc(x.id) +
-                    '">' +
-                    esc(
-                      new Date(x.starts_at).toLocaleDateString('en-GB', {
-                        weekday: 'short',
-                        day: 'numeric',
-                        month: 'short',
-                        timeZone: x.timezone || undefined,
-                      }),
-                    ) +
-                    ' · ' +
-                    esc(x.title) +
-                    '</a>'
-                  );
-                })
-                .join('') +
-              '</div>'
-            : '') +
-            '<div class="th-head"><div><div class="muted th-date">' +
-            esc([when, at, g.location, g.cost ? g.cost + ' each' : null].filter(Boolean).join(' · ')) +
-            '</div><h1>' +
-            esc(g.title) +
-            '</h1></div><div class="row"><a class="btn" href="#/games/new">+ New game</a><button class="btn" id="sg-link">Share the link</button><button class="btn primary" id="sg-save"' +
-            (dirty ? '' : ' disabled') +
-            '>' +
-            (g.sides_set ? 'Save the teams' : 'Save and show the teams') +
-            '</button></div></div>' +
-            '<div class="sg-set"><b>Places</b><span class="sg-step"><button data-places="-1">−</button><span>' +
-            places +
-            '</span><button data-places="1">+</button></span><b>Sides</b><span class="sg-step"><button data-bibs="-1">−</button><span>' +
-            bibs +
-            ' v ' +
-            (places - bibs) +
-            '</span><button data-bibs="1">+</button></span><span class="muted small grow">One side can have one more. Change it any time.</span><button class="btn" id="sg-mix">Mix them up</button></div>' +
-            cardBar() +
-            '<div class="sg-grid"><div class="card sg-list"><div class="sg-add"><input type="text" id="sg-name" maxlength="40" placeholder="Add a player by name" /><button class="btn primary" id="sg-add">Add</button></div>' +
-            (inn.length ? inn.map(row).join('') : '<p class="muted small">Nobody in yet. Add names, or share the link and people add themselves.</p>') +
-            (waiting.length
-              ? '<div class="sg-wait"><b>Waiting list · ' +
-                waiting.length +
-                '</b>' +
-                waiting
-                  .map(function (p) {
-                    return '<span>' + sgAvatar(p, 22) + esc(sgShort(p.name)) + '</span>';
-                  })
-                  .join('') +
-                '<small class="muted">They get a place if someone drops out, or add more places.</small></div>'
-              : '') +
-            ((g.left_paid || []).length
-              ? '<div class="sg-left"><b>Left after paying by card</b>' +
-                g.left_paid
-                  .map(function (p) {
+          '<div class="gm">' +
+            '<div class="gm-head"><div class="grow">' +
+            (others.length
+              ? '<label class="gm-pick"><select id="gm-pick" aria-label="Game">' +
+                mine
+                  .map(function (x) {
                     return (
-                      '<span>' +
-                      esc(p.name) +
+                      '<option value="' +
+                      esc(x.id) +
+                      '"' +
+                      (x.id === g.id ? ' selected' : '') +
+                      '>' +
+                      esc(
+                        new Date(x.starts_at).toLocaleDateString('en-GB', {
+                          weekday: 'short',
+                          day: 'numeric',
+                          month: 'short',
+                          timeZone: x.timezone || undefined,
+                        }),
+                      ) +
                       ' · ' +
-                      sgPounds(p.amount_pence) +
-                      ' <button class="act" data-refund="' +
-                      esc(p.id) +
-                      '" data-name="' +
-                      esc(p.name) +
-                      '" data-amount="' +
-                      Number(p.amount_pence) +
-                      '">Refund</button></span>'
+                      esc(x.title) +
+                      '</option>'
                     );
                   })
                   .join('') +
-                '</div>'
+                '</select></label>'
               : '') +
-            '<div class="sg-pay"><b>' +
-            paid.length +
-            ' of ' +
-            inn.length +
-            ' paid</b><div class="tm-bar sg-bar"><span style="flex:' +
-            paid.length +
-            ';background:var(--accent)"></span><span style="flex:' +
-            Math.max(inn.length - paid.length, 0) +
-            ';background:var(--alt)"></span></div><span class="muted">' +
-            (price && owing.length ? sgPounds(price * owing.length) + ' to collect' : owing.length ? owing.length + ' to pay' : 'All paid') +
-            (g.pay_pence && owing.length ? ' · they can pay by card on the link' : '') +
-            '</span>' +
-            (owing.length ? '<button class="act tp-nudge" id="sg-remind">Remind on WhatsApp</button>' : '') +
-            '</div></div>' +
-            '<div><div class="sg-pitch" data-half="pitch"><div class="ln box"></div><div class="ln half"></div><div class="ln circle"></div><div class="ln area top"></div><div class="ln area bottom"></div>' +
-            '<span class="sg-sl" style="top:10px">BIBS · ' +
-            bibsList.length +
-            '</span><span class="sg-sl" style="bottom:10px">COLOURS · ' +
-            colsList.length +
-            '</span>' +
-            shirts(bibsList, true) +
-            shirts(colsList, false) +
-            '</div>' +
-            (none.length
-              ? '<div class="sg-none" data-half="none"><b>No side yet</b>' +
-                none
-                  .map(function (p) {
-                    return '<span draggable="true" data-p="' + esc(p.id) + '">' + sgAvatar(p, 22) + esc(sgShort(p.name)) + '</span>';
-                  })
-                  .join('') +
-                '</div>'
-              : '') +
-            '<p class="muted small">Drag a player to the other half, or tap them to swap. ' +
-            (price ? 'An orange ' + sgPounds(price) + ' means they haven’t paid yet. ' : '') +
-            (dirty ? '<b class="ink">Save the teams so everyone sees them in Dayli.</b>' : g.sides_set ? 'Everyone sees these teams in Dayli.' : '') +
-            '</p></div></div>',
+            '<h1>' +
+            esc(g.title) +
+            '</h1><div class="muted gm-meta">' +
+            esc([when, at, g.location, g.cost ? g.cost + ' each' : null].filter(Boolean).join(' · ')) +
+            '</div></div><div class="gm-tools"><a class="gm-tool" href="#/games/new" title="New game" aria-label="New game">+</a><button type="button" class="gm-tool" id="gm-gear" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg></button></div></div>' +
+            '<nav class="gm-tabs">' +
+            tabs
+              .map(function (t) {
+                return (
+                  '<button type="button" class="' +
+                  (gameTab === t[0] ? 'on' : '') +
+                  '" data-tab="' +
+                  t[0] +
+                  '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+                  t[2] +
+                  '</svg><span>' +
+                  t[1] +
+                  '</span></button>'
+                );
+              })
+              .join('') +
+            '<button type="button" class="share" id="gm-share"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm5.3 14.2c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.5-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.5-.3.4c-.1.1-.2.3-.1.5.5.8 1 1.4 1.7 2 .8.7 1.5.9 1.7 1 .2.1.4.1.5-.1l.8-.9c.2-.2.3-.2.5-.1l1.9.9c.3.1.4.2.5.3 0 .2 0 .7-.2 1.3z"/></svg><span>Share</span></button></nav>' +
+            '<div class="gm-body">' +
+            (gameTab === 'teams' ? tabTeams() : gameTab === 'pay' ? tabPay() : tabInvites()) +
+            '</div></div>',
         );
-        window.scrollTo(0, keepY);
         wire();
       }
 
-      function swap(id) {
-        side[id] = side[id] === 'bibs' ? 'colours' : 'bibs';
-        dirty = true;
-        draw();
+      function find(id) {
+        return players.concat(invites).filter(function (x) {
+          return x.id === id;
+        })[0];
       }
-      function mix() {
-        var ids = inn
-          .map(function (p) {
-            return p.id;
-          })
-          .sort(function () {
-            return Math.random() - 0.5;
-          });
-        var nb = Math.round((ids.length * bibs) / places);
-        ids.forEach(function (id, i) {
-          side[id] = i < nb ? 'bibs' : 'colours';
+      function whoMenu(p) {
+        var first = sgFirst(p.name);
+        var me = p.user_id && p.user_id === g.organiser_id;
+        if (p.status === 'in') {
+          return sgActions(p.name + ' · playing', [
+            [me ? 'I can’t play' : first + ' can’t play', function () { move(p, 'no', p.name + ' can’t play'); }],
+            ['Take ' + (me ? 'me' : first) + ' out of the game', function () { move(p, 'out', p.name + ' is out'); }, true],
+          ]);
+        }
+        if (p.status === 'waiting') {
+          var full = inn.length >= places;
+          var n = inn.length + 1;
+          var b2 = Math.min(bibs, n - 1);
+          return sgActions(p.name + ' · on the waiting list', [
+            ['Put ' + first + ' in' + (full ? ' (makes it ' + Math.max(b2, n - b2) + ' v ' + Math.min(b2, n - b2) + ')' : ''), function () { move(p, 'in', first + ' is playing'); }],
+            ['Take ' + first + ' off the list', function () { move(p, 'out'); }, true],
+          ]);
+        }
+        if (p.status === 'invited') {
+          return sgActions(p.name + ' · no reply yet', [
+            [first + ' is playing', function () { move(p, 'in', first + ' is playing'); }],
+            [first + ' can’t play', function () { move(p, 'no'); }],
+            ['Remove the invite', function () { move(p, 'out'); }, true],
+          ]);
+        }
+        return sgActions(p.name + ' · can’t play', [
+          [first + ' is playing after all', function () { move(p, 'in', first + ' is playing'); }],
+          ['Remove from the list', function () { move(p, 'out'); }, true],
+        ]);
+      }
+      function payMenu(p) {
+        if (p.paid === 'card') return refund(p.id, p.name, g.pay_pence || price);
+        var to = p.paid ? null : 'cash';
+        if (!to && !confirm('Mark ' + p.name + ' as not paid?')) return;
+        p.paid = to;
+        draw();
+        rpc('game_mark_paid', { p_place: p.id, p_paid: to }).then(null, function (err) {
+          p.paid = to ? null : 'cash';
+          draw();
+          toast(friendly(err));
         });
-        dirty = true;
-        draw();
-      }
-      // The numbers change at once; it saves once the taps stop.
-      var savedPlaces = places;
-      var savedBibs = bibs;
-      var placesTimer = null;
-      function savePlaces(p, b) {
-        places = p;
-        bibs = b;
-        draw();
-        clearTimeout(placesTimer);
-        placesTimer = setTimeout(function () {
-          var wanted = places;
-          rpc('game_set_places', { p_game: g.id, p_places: places, p_bibs: bibs }).then(
-            function () {
-              var grew = wanted > savedPlaces;
-              savedPlaces = wanted;
-              savedBibs = bibs;
-              // More places lets people in off the waiting list: show who moved up.
-              if (grew && waiting.length && wanted === places) refreshGame();
-            },
-            function (err) {
-              places = savedPlaces;
-              bibs = savedBibs;
-              draw();
-              toast(friendly(err));
-            },
-          );
-        }, 600);
       }
 
       function wire() {
-        $$('[data-side]').forEach(function (b) {
+        $$('[data-tab]').forEach(function (b) {
           b.onclick = function () {
-            swap(b.dataset.side);
+            gameTab = b.dataset.tab;
+            draw();
+            window.scrollTo(0, 0);
           };
         });
-        $$('.sg-pp').forEach(function (el) {
-          el.onclick = function () {
-            swap(el.dataset.p);
+        $('#gm-share').onclick = share;
+        $('#gm-gear').onclick = settings;
+        if ($('#gm-pick'))
+          $('#gm-pick').onchange = function () {
+            go('#/games/' + this.value);
           };
-        });
-        $$('[data-paid]').forEach(function (b) {
+        $$('[data-who]').forEach(function (b) {
           b.onclick = function () {
-            var p = inn.filter(function (x) {
-              return x.id === b.dataset.paid;
-            })[0];
+            var p = find(b.dataset.who);
             if (!p) return;
-            if (p.paid === 'card') return refund(p.id, p.name, g.pay_pence || price, null);
-            var to = p.paid ? null : 'cash';
-            rpc('game_mark_paid', { p_place: p.id, p_paid: to }).then(
-              function () {
-                p.paid = to;
-                draw();
-              },
-              function (err) {
-                toast(friendly(err));
-              },
-            );
+            if (gameTab === 'pay') return payMenu(p);
+            whoMenu(p);
           };
         });
-        $$('[data-out]').forEach(function (b) {
-          b.onclick = function () {
-            var p = inn.filter(function (x) {
-              return x.id === b.dataset.out;
-            })[0];
-            if (!p || !confirm('Take ' + p.name + ' out of the game?' + (waiting.length ? ' The first on the waiting list gets their place.' : ''))) return;
-            rpc('game_leave', { p_game: g.id, p_place: p.id }).then(
-              function () {
-                toast(p.name + ' is out');
-                refreshGame();
-              },
-              function (err) {
-                toast(friendly(err));
-              },
-            );
-          };
-        });
-        function add() {
-          var name = $('#sg-name').value.trim();
-          if (!name) return;
-          var button = $('#sg-add');
-          setBusy(button, true);
-          rpc('game_add_name', { p_game: g.id, p_name: name }).then(
-            function (r) {
-              toast(r && r.status === 'waiting' ? name + ' is on the waiting list (the game is full)' : name + ' added');
-              refreshGame();
-            },
-            function (err) {
-              setBusy(button, false);
-              toast(friendly(err));
-            },
-          );
-        }
-        $('#sg-add').onclick = add;
-        $('#sg-name').onkeydown = function (e) {
-          if (e.key === 'Enter') add();
-        };
-        $$('[data-places]').forEach(function (b) {
-          b.onclick = function () {
-            var p = places + Number(b.dataset.places);
-            if (p < 2 || p > 40) return;
-            savePlaces(p, Math.min(bibs, p - 1));
-          };
-        });
-        $$('[data-bibs]').forEach(function (b) {
-          b.onclick = function () {
-            var nb = bibs + Number(b.dataset.bibs);
-            if (nb < 1 || nb > places - 1) return;
-            savePlaces(places, nb);
-          };
-        });
-        $('#sg-mix').onclick = mix;
         $$('[data-refund]').forEach(function (b) {
           b.onclick = function () {
-            refund(b.dataset.refund, b.dataset.name, Number(b.dataset.amount), b);
+            refund(b.dataset.refund, b.dataset.name, Number(b.dataset.amount));
           };
         });
-        if ($('#sg-connect'))
-          $('#sg-connect').onclick = function () {
+        if ($('#gi-add')) $('#gi-add').onclick = addPlayers;
+        if ($('#gi-nudge'))
+          $('#gi-nudge').onclick = function () {
+            var button = this;
+            setBusy(button, true, 'Nudging…');
+            rpc('game_nudge', { p_game: g.id }).then(
+              function (n) {
+                setBusy(button, false);
+                toast(n ? 'Nudged ' + n + ' on Dayli' + (noReply.some(function (p) { return p.guest; }) ? '. Share the link for the rest.' : '') : 'Nobody to nudge on Dayli. Share the link instead.');
+              },
+              function (err) {
+                setBusy(button, false);
+                toast(String(err && err.message).indexOf('rate_limited') >= 0 ? 'You nudged them recently. Try again in a few hours.' : friendly(err));
+              },
+            );
+          };
+        $$('.sg-pp[data-p]').forEach(function (el) {
+          el.onclick = function () {
+            var id = el.dataset.p;
+            side[id] = side[id] === 'bibs' ? 'colours' : 'bibs';
+            dirty = true;
+            draw();
+          };
+        });
+        if ($('#gt-mix'))
+          $('#gt-mix').onclick = function () {
+            var ids = inn
+              .map(function (p) {
+                return p.id;
+              })
+              .sort(function () {
+                return Math.random() - 0.5;
+              });
+            var nb = Math.round((ids.length * bibs) / places);
+            ids.forEach(function (id, i) {
+              side[id] = i < nb ? 'bibs' : 'colours';
+            });
+            dirty = true;
+            draw();
+          };
+        if ($('#gt-save'))
+          $('#gt-save').onclick = function () {
             var button = this;
             setBusy(button, true);
-            invoke('game-pay', { action: 'connect', game_id: g.id, back: 'hq' }).then(
-              function (r) {
-                if (r && r.url) location.href = r.url;
+            rpc('game_set_sides', { p_game: g.id, p_sides: side }).then(
+              function () {
+                toast('Teams saved. Everyone sees them in Dayli.');
+                refreshGame();
               },
               function (err) {
                 setBusy(button, false);
@@ -2082,52 +2214,14 @@
               },
             );
           };
-        if ($('#sg-check'))
-          $('#sg-check').onclick = function () {
-            screenGames(g.id, { stripe: '1' });
-          };
-        if ($('#sg-price-save'))
-          $('#sg-price-save').onclick = function () {
-            var v = parseFloat(String($('#sg-price').value).replace(/[£,\s]/g, ''));
-            if (!(v >= 1 && v <= 100)) return toast('Type a price between £1 and £100');
-            setPrice(Math.round(v * 100), this);
-          };
-        if ($('#sg-price-off'))
-          $('#sg-price-off').onclick = function () {
-            setPrice(null, this);
-          };
-        $('#sg-link').onclick = function () {
-          (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(
-            function () {
-              toast('Link copied. Paste it in your group chat.');
-            },
-            function () {
-              window.prompt('Copy this link:', link);
-            },
-          );
-        };
-        $('#sg-save').onclick = function () {
-          var button = this;
-          setBusy(button, true);
-          rpc('game_set_sides', { p_game: g.id, p_sides: side }).then(
-            function () {
-              toast('Teams saved. Everyone sees them in Dayli.');
-              refreshGame();
-            },
-            function (err) {
-              setBusy(button, false);
-              toast(friendly(err));
-            },
-          );
-        };
-        if ($('#sg-remind'))
-          $('#sg-remind').onclick = function () {
+        if ($('#gp-remind'))
+          $('#gp-remind').onclick = function () {
             var owe = inn
               .filter(function (p) {
                 return !p.paid;
               })
               .map(function (p) {
-                return p.name.split(' ')[0];
+                return sgFirst(p.name);
               });
             var text =
               g.title +
@@ -2141,33 +2235,286 @@
               '. Thanks!';
             window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
           };
-        // Dragging shirts and names between the halves.
-        $$('[draggable="true"][data-p]').forEach(function (el) {
-          el.ondragstart = function (e) {
-            e.dataTransfer.setData('text/plain', el.dataset.p);
+        if ($('#gp-card')) $('#gp-card').onclick = settings;
+      }
+
+      // --- Add players: your regulars to invite, or a new name straight in ---
+      function addPlayers() {
+        var s = sgSheet(
+          '<div class="gs-head"><b>Add players</b><button type="button" class="linkish" data-close>Close</button></div>' +
+            '<input type="text" id="ga-q" class="ng-inp" maxlength="40" placeholder="Search, or type a new name" autocomplete="off" />' +
+            '<div id="ga-new"></div><div class="gs-head small"><span class="muted">YOUR REGULARS</span><button type="button" class="linkish" id="ga-all" hidden>Select all</button></div>' +
+            '<div class="ga-list" id="ga-list"><div class="loading-screen small"><img class="spin-mark" src="../img/logo.svg" alt="" /></div></div>' +
+            '<button type="button" class="btn primary ga-go" id="ga-go" disabled>Invite</button>' +
+            '<p class="muted small ga-note">Dayli users get a notification. Anyone else: tap Share and send the link to your group.</p>',
+          'gs-tall',
+        );
+        var regs = [];
+        var picked = {};
+        var q = '';
+        function key(r) {
+          return r.user_id || 'n:' + String(r.name).toLowerCase();
+        }
+        function list() {
+          var shown = regs.filter(function (r) {
+            return !q || String(r.name).toLowerCase().indexOf(q.toLowerCase()) >= 0;
+          });
+          $('#ga-list', s.el).innerHTML = shown.length
+            ? shown
+                .map(function (r) {
+                  var k = key(r);
+                  return (
+                    '<button type="button" class="ga-row' +
+                    (picked[k] ? ' on' : '') +
+                    '" data-k="' +
+                    esc(k) +
+                    '"><span class="ga-ck"></span>' +
+                    sgAvatar({ id: k, name: r.name, avatar_url: r.avatar_url }, 34) +
+                    '<span class="grow"><b>' +
+                    esc(r.name) +
+                    '</b><small>' +
+                    (r.played ? 'Played ' + r.played + (r.played === 1 ? ' time' : ' times') : 'New regular') +
+                    '</small></span><em class="' +
+                    (r.user_id ? 'app' : '') +
+                    '">' +
+                    (r.user_id ? 'Dayli' : 'WhatsApp') +
+                    '</em></button>'
+                  );
+                })
+                .join('')
+            : '<p class="muted small">' +
+              (regs.length ? 'No regular called that.' : 'No regulars yet. Everyone who plays in your games (or says yes on the link) joins this list.') +
+              '</p>';
+          var exact = regs.some(function (r) {
+            return String(r.name).toLowerCase() === q.trim().toLowerCase();
+          });
+          $('#ga-new', s.el).innerHTML =
+            q.trim().length > 1 && !exact
+              ? '<button type="button" class="ga-newbtn" id="ga-name">+ Add “' + esc(q.trim()) + '” to Playing</button>'
+              : '';
+          var n = Object.keys(picked).length;
+          $('#ga-go', s.el).disabled = !n;
+          $('#ga-go', s.el).textContent = n ? 'Invite ' + n + (n === 1 ? ' player' : ' players') : 'Invite';
+          $('#ga-all', s.el).hidden = !regs.length;
+          $$('[data-k]', s.el).forEach(function (b) {
+            b.onclick = function () {
+              if (picked[b.dataset.k]) delete picked[b.dataset.k];
+              else picked[b.dataset.k] = true;
+              list();
+            };
+          });
+          if ($('#ga-name', s.el))
+            $('#ga-name', s.el).onclick = function () {
+              var name = q.trim();
+              var button = this;
+              setBusy(button, true);
+              rpc('game_add_name', { p_game: g.id, p_name: name }).then(
+                function (r) {
+                  s.close();
+                  toast(r && r.status === 'waiting' ? name + ' is on the waiting list (the game is full)' : name + ' is playing');
+                  refreshGame();
+                },
+                function (err) {
+                  setBusy(button, false);
+                  toast(friendly(err));
+                },
+              );
+            };
+        }
+        $('[data-close]', s.el).onclick = s.close;
+        $('#ga-q', s.el).oninput = function () {
+          q = this.value;
+          list();
+        };
+        $('#ga-all', s.el).onclick = function () {
+          regs.forEach(function (r) {
+            picked[key(r)] = true;
+          });
+          list();
+        };
+        $('#ga-go', s.el).onclick = function () {
+          var users = [];
+          var names = [];
+          regs.forEach(function (r) {
+            if (!picked[key(r)]) return;
+            if (r.user_id) users.push(r.user_id);
+            else names.push(r.name);
+          });
+          var button = this;
+          setBusy(button, true, 'Inviting…');
+          rpc('game_invite_people', { p_game: g.id, p_users: users, p_names: names }).then(
+            function (n) {
+              s.close();
+              toast(
+                (n ? 'Invited ' + n : 'Already invited') +
+                  (names.length ? '. Share the link so ' + names.map(sgFirst).slice(0, 3).join(', ') + (names.length > 3 ? ' and others' : '') + ' see it.' : ''),
+              );
+              gameTab = 'invites';
+              refreshGame();
+            },
+            function (err) {
+              setBusy(button, false);
+              toast(friendly(err));
+            },
+          );
+        };
+        rpc('game_regulars', { p_game: g.id }).then(
+          function (rows) {
+            regs = rows || [];
+            list();
+          },
+          function () {
+            regs = [];
+            list();
+          },
+        );
+      }
+
+      // --- Settings: places, sides, card payments ---
+      function settings() {
+        var p0 = places;
+        var b0 = bibs;
+        var s = sgSheet(
+          '<div class="gs-head"><b>Game settings</b><button type="button" class="linkish" data-close>Done</button></div>' +
+            '<div class="gs-row"><span><b>Places</b><small>How many can play</small></span><span class="sg-step"><button type="button" data-places="-1">−</button><span id="gs-n">' +
+            places +
+            '</span><button type="button" data-places="1">+</button></span></div>' +
+            '<div class="gs-row"><span><b>Sides</b><small>One side can have one more</small></span><span class="sg-step"><button type="button" data-bibs="-1">−</button><span id="gs-b">' +
+            bibs +
+            ' v ' +
+            (places - bibs) +
+            '</span><button type="button" data-bibs="1">+</button></span></div>' +
+            cardBar() +
+            '<button type="button" class="btn gs-wide" id="gs-link">Copy the game’s link</button>',
+          'gs-tall',
+        );
+        var timer = null;
+        function save() {
+          $('#gs-n', s.el).textContent = places;
+          $('#gs-b', s.el).textContent = bibs + ' v ' + (places - bibs);
+          clearTimeout(timer);
+          timer = setTimeout(function () {
+            rpc('game_set_places', { p_game: g.id, p_places: places, p_bibs: bibs }).then(null, function (err) {
+              places = p0;
+              bibs = b0;
+              $('#gs-n', s.el).textContent = places;
+              $('#gs-b', s.el).textContent = bibs + ' v ' + (places - bibs);
+              toast(friendly(err));
+            });
+          }, 500);
+        }
+        $$('[data-places]', s.el).forEach(function (b) {
+          b.onclick = function () {
+            var p = places + Number(b.dataset.places);
+            if (p < 2 || p > 40) return;
+            if (p < inn.length) return toast(inn.length + ' are playing: take someone out first.');
+            places = p;
+            bibs = Math.min(bibs, p - 1);
+            if (bibs < 1) bibs = 1;
+            save();
           };
         });
-        $$('[data-half]').forEach(function (z) {
-          z.ondragover = function (e) {
-            e.preventDefault();
-          };
-          z.ondrop = function (e) {
-            e.preventDefault();
-            e.stopPropagation();
-            var id = e.dataTransfer.getData('text/plain');
-            if (!(id in side)) return;
-            var to = null;
-            if (z.dataset.half === 'pitch') {
-              // The top half is bibs, the bottom colours.
-              var r = z.getBoundingClientRect();
-              to = e.clientY - r.top < r.height / 2 ? 'bibs' : 'colours';
-            }
-            if (side[id] === to) return;
-            side[id] = to;
-            dirty = true;
-            draw();
+        $$('[data-bibs]', s.el).forEach(function (b) {
+          b.onclick = function () {
+            var nb = bibs + Number(b.dataset.bibs);
+            if (nb < 1 || nb > places - 1) return;
+            bibs = nb;
+            save();
           };
         });
+        function done() {
+          clearTimeout(timer);
+          var changed = places !== p0 || bibs !== b0;
+          s.close();
+          if (!changed) return;
+          rpc('game_set_places', { p_game: g.id, p_places: places, p_bibs: bibs }).then(refreshGame, function (err) {
+            toast(friendly(err));
+            refreshGame();
+          });
+        }
+        $('[data-close]', s.el).onclick = done;
+        $('#gs-link', s.el).onclick = function () {
+          (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(
+            function () {
+              toast('Link copied. Paste it in your group chat.');
+            },
+            function () {
+              window.prompt('Copy this link:', link);
+            },
+          );
+        };
+        if ($('#sg-connect', s.el))
+          $('#sg-connect', s.el).onclick = function () {
+            var button = this;
+            setBusy(button, true);
+            invoke('game-pay', { action: 'connect', game_id: g.id, back: 'hq' }).then(
+              function (r) {
+                if (r && r.url) location.href = r.url;
+              },
+              function (err) {
+                setBusy(button, false);
+                toast(friendly(err));
+              },
+            );
+          };
+        if ($('#sg-check', s.el))
+          $('#sg-check', s.el).onclick = function () {
+            s.close();
+            screenGames(g.id, { stripe: '1' });
+          };
+        function setPrice(pence, button) {
+          setBusy(button, true);
+          rpc('game_set_price', { p_game: g.id, p_price_pence: pence }).then(
+            function () {
+              s.close();
+              toast(pence ? 'Players can pay by card on the link' : 'Card payments off for this game');
+              refreshGame();
+            },
+            function (err) {
+              setBusy(button, false);
+              toast(friendly(err));
+            },
+          );
+        }
+        if ($('#sg-price-save', s.el))
+          $('#sg-price-save', s.el).onclick = function () {
+            var v = parseFloat(String($('#sg-price', s.el).value).replace(/[£,\s]/g, ''));
+            if (!(v >= 1 && v <= 100)) return toast('Type a price between £1 and £100');
+            setPrice(Math.round(v * 100), this);
+          };
+        if ($('#sg-price-off', s.el))
+          $('#sg-price-off', s.el).onclick = function () {
+            setPrice(null, this);
+          };
+      }
+
+      // Card payments (hidden until team payments are on): set up Stripe, then a price.
+      function cardBar() {
+        if (!g.payments_on) return '';
+        if (!g.card_ready) {
+          return (
+            '<div class="sg-card"><div class="grow"><b>Take card payments</b><div class="muted small">Players pay on the game’s link or in Dayli with Apple Pay, Google Pay or a card, whenever they like. They cover the card fee; the money goes to your own Stripe account.</div></div>' +
+            '<button type="button" class="btn primary" id="sg-connect">' +
+            (g.stripe_connected ? 'Finish setting up Stripe' : 'Set up card payments') +
+            '</button>' +
+            (g.stripe_connected ? '<button type="button" class="btn" id="sg-check">Check again</button>' : '') +
+            '</div>'
+          );
+        }
+        var p = g.price_pence;
+        return (
+          '<div class="sg-card"><b>Card payments</b><span class="sg-money">£<input type="text" id="sg-price" inputmode="decimal" maxlength="6" value="' +
+          (p ? (p / 100).toFixed(2) : '') +
+          '" placeholder="5.00" /></span><button type="button" class="btn" id="sg-price-save">' +
+          (p ? 'Change price' : 'Turn on') +
+          '</button><span class="muted small grow">' +
+          (g.pay_pence
+            ? 'Players pay ' + sgPounds(g.pay_pence) + ' by card (the card fee is on them), you get ' + sgPounds(p) + '.'
+            : 'What each player pays you. They can pay on the link, any time.') +
+          '</span>' +
+          (p ? '<button type="button" class="btn" id="sg-price-off">Turn off</button>' : '') +
+          '</div>'
+        );
       }
 
       draw();

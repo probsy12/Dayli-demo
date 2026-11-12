@@ -98,6 +98,8 @@
       <label for="name">Your name</label>
       <input id="name" autocomplete="name" maxlength="40" placeholder="Chris Taylor" />
       <button class="btn primary" id="in">I'm in</button>
+      <button class="btn outline" id="out">Can't make it</button>
+      <p class="fine hidden" id="saidNo"></p>
       <p class="err hidden" id="joinErr"></p>
       <p class="fine">Or <a id="getLink" href="#get">get Dayli</a> and take your place in the app.</p>
     </div>
@@ -143,7 +145,7 @@
     </div>
   </div>
 </main>
-<script src="../config.js?v=fae4916"></script>
+<script src="../config.js?v=6419fdb"></script>
 <script>
   (function () {
     var cfg = window.DAYLI_CONFIG || {};
@@ -286,8 +288,19 @@
       $('payFine').textContent = 'Card, Apple Pay or Google Pay, on Stripe’s secure page. Or pay ' + (game.organiser || 'the organiser') + ' in cash.';
     }
 
+    // Said they can't make it: the organiser sees it; they can still change their mind.
+    function showSaidNo(me) {
+      showJoin();
+      if (me.name && !$('name').value) $('name').value = me.name;
+      $('saidNo').textContent = 'You said you can’t make it. ' + (game.organiser || 'The organiser') + ' can see that. Changed your mind? Tap I’m in.';
+      show('saidNo', true);
+      show('out', false);
+    }
+
     function showJoin() {
       mineNow = null;
+      show('saidNo', false);
+      show('out', true);
       show('mine', false); show('leaveBox', false);
       if (!game.upcoming) { $('closedText').textContent = 'This game has been played.'; show('closed', true); show('join', false); return; }
       if (!game.open) { $('closedText').textContent = 'Places are for the squad for now. Get Dayli to join the squad.'; show('closed', true); show('join', false); return; }
@@ -301,7 +314,8 @@
         var t = saved();
         if (!t) { showJoin(); return; }
         return rpc('game_guest_status', { p_code: code, p_token: t }).then(function (me) {
-          if (me && me.status && me.status !== 'out') showMine(me);
+          if (me && me.status === 'no') showSaidNo(me);
+          else if (me && me.status && me.status !== 'out') showMine(me);
           else { forget(); showJoin(); }
         });
       });
@@ -318,7 +332,7 @@
       $('in').disabled = true;
       rpc('game_join_guest', { p_code: code, p_name: name, p_token: t }).then(function (me) {
         keep(t);
-        return rpc('game_public', { p_code: code }).then(function (g) { if (g) render(g); showMine(me); });
+        return rpc('game_public', { p_code: code }).then(function (g) { if (g) render(g); show('saidNo', false); showMine(me); });
       }).catch(function (e) {
         var m = String(e.code || e.message || '');
         $('joinErr').textContent = m.indexOf('not_open') >= 0 ? 'Places aren’t open on the link right now.'
@@ -326,6 +340,24 @@
           : 'That didn’t work. Check your signal and try again.';
         show('joinErr', true);
       }).then(function () { $('in').disabled = false; });
+    });
+
+    $('out').addEventListener('click', function () {
+      var name = $('name').value.trim();
+      show('joinErr', false);
+      if (name.length < 2) { $('joinErr').textContent = 'Type your name so ' + (game.organiser || 'the organiser') + ' knows who can’t make it.'; show('joinErr', true); return; }
+      var t = token();
+      $('out').disabled = true;
+      rpc('game_decline_guest', { p_code: code, p_name: name, p_token: t }).then(function (me) {
+        keep(t);
+        showSaidNo(me);
+      }).catch(function (e) {
+        var m = String(e.code || e.message || '');
+        $('joinErr').textContent = m.indexOf('rate_limited') >= 0 ? 'Lots of people at once. Try again in a few minutes.'
+          : m.indexOf('game_over') >= 0 ? 'This game has been played.'
+          : 'That didn’t work. Check your signal and try again.';
+        show('joinErr', true);
+      }).then(function () { $('out').disabled = false; });
     });
 
     $('payBtn').addEventListener('click', function () {
@@ -361,7 +393,6 @@
         : 'Give up your place? The first on the waiting list gets it.')) return;
       var t = saved();
       rpc('game_leave_guest', { p_code: code, p_token: t }).then(function () {
-        forget();
         return refresh();
       }).catch(function () { alert('That didn’t work. Try again.'); });
     });
