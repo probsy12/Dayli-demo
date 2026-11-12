@@ -1327,9 +1327,11 @@
           (picking ? 'Click to put in or take out of the team. Drag to another column to change the answer.' : 'Drag to another column to change the answer.') +
           '">' +
           avatar(p, 24) +
-          '<span class="grow">' +
-          esc(p.name) +
-          (p.position ? ' <small class="muted">' + esc(p.position) + '</small>' : '') +
+          '<span class="grow" title="' +
+          esc(p.name + (p.position ? ' · ' + p.position : '')) +
+          '">' +
+          esc(shortName(p.name)) +
+          (p.position ? ' <small class="muted">' + esc(posShort(p.position)) + '</small>' : '') +
           '</span>' +
           tag(p) +
           '</div>' +
@@ -1751,6 +1753,12 @@
       }
 
       draw();
+    }
+    // "Midfielder" → "MID" for the narrow pick-the-team columns.
+    function posShort(pos) {
+      var known = { goalkeeper: 'GK', defender: 'DEF', midfielder: 'MID', forward: 'FWD' };
+      var k = String(pos || '').toLowerCase();
+      return known[k] || (pos.length > 4 ? pos.slice(0, 3).toUpperCase() : pos);
     }
     function shortName(name) {
       var w = String(name || '').split(/\s+/).filter(Boolean);
