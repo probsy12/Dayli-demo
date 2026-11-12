@@ -205,6 +205,8 @@ p {
 }
 .menu span {
   display: block;
+  /* Safari draws the lines at no width without this (a button as a flex box). */
+  width: 22px;
   height: 2px;
   background: var(--ink);
   border-radius: 2px;
@@ -4890,4 +4892,68 @@ i.nr {
 .tq-link .act,
 .tq-links-head .act {
   margin: 0;
+}
+
+/* --- HQ on phones: the switcher at the start of the tabs; New game -------------------- */
+.hq-tsw {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 4px 10px 4px 4px;
+  margin: 0 4px 0 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+  flex: none;
+}
+.hq-tsw span {
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sg-new {
+  max-width: 640px;
+}
+.sg-new input,
+.sg-new select {
+  width: 100%;
+}
+.sg-new-row {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+.sg-new-check {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin: 12px 0;
+  font-size: 14px;
+}
+.sg-new-check input {
+  width: auto;
+  margin: 0;
+}
+.hq-dd-add + .hq-dd-add {
+  border-top: 0;
+  margin-top: 0;
+}
+.menu-sheet {
+  overflow-y: auto;
+}
+.menu-sheet a svg {
+  width: 18px;
+  height: 18px;
+  flex: none;
+}
+.menu-sheet a {
+  display: flex;
+  align-items: center;
+  gap: 10px;
 }

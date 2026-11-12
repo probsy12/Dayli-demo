@@ -291,6 +291,14 @@
           esc(state.organiser ? state.organiser.name : 'Your events') +
           '<small>Events and tickets</small></span></a>';
       if (runs('teams')) out += '<a class="hq-dd-add" href="#/welcome/setup">+ Add a team</a>';
+      if (runs('games')) out += '<a class="hq-dd-add" href="#/games/new">+ New social game</a>';
+      if (runs('events')) out += '<a class="hq-dd-add" href="#/events/new">+ New event</a>';
+      if (
+        RUNS.some(function (r) {
+          return !runs(r.key);
+        })
+      )
+        out += '<a class="hq-dd-add" href="#/settings">Run something else too…</a>';
       return out;
     }
     function current(c) {
@@ -361,7 +369,17 @@
         '</div>';
       nav.innerHTML = menuLinks(c);
       nav.classList.add('hq-nav');
-      tabs.innerHTML = menuLinks(c);
+      tabs.innerHTML =
+        '<button type="button" class="hq-tsw" id="hq-tsw">' +
+        crest(cur.name, cur.colour, 22) +
+        '<span>' +
+        esc(cur.name) +
+        '</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 10l5 5 5-5"/></svg></button>' +
+        menuLinks(c);
+      document.getElementById('hq-tsw').onclick = function () {
+        var m = document.getElementById('menu');
+        if (m) m.click();
+      };
       var up = document.getElementById('hq-upsell');
       if (!up) {
         up = document.createElement('div');
@@ -918,6 +936,7 @@
     }
 
     function screenGames(gameId, query) {
+      if (gameId === 'new') return screenNewGame();
       loading();
       // Back from Stripe's sign-up: check the account before showing the game.
       var back =
@@ -951,10 +970,8 @@
           if (!id) {
             render(
               '<div class="page-head"><div><h1>Social games</h1><p class="muted">5-a-side, padel, board games: add players, pick the teams, see who’s paid.</p></div></div>' +
-                notice(
-                  'info',
-                  'No games coming up. Start one in the Dayli app (Events → Hosting → New game); it shows here straight away.',
-                ),
+                notice('info', 'No games coming up. Start one here or in the Dayli app (Events → Hosting → New game).') +
+                '<a class="btn primary" href="#/games/new">+ New game</a>',
             );
             return;
           }
@@ -974,6 +991,122 @@
           render(notice('error', esc(friendly(err))));
         },
       );
+    }
+
+    // A new social game: the same as New game in the app (game_create). It goes
+    // on your own calendar, or a team's you manage, and you take the first place.
+    function screenNewGame() {
+      loading();
+      var me = state.session && state.session.user ? state.session.user.id : null;
+      ctx.sb
+        .from('calendars')
+        .select('id, name, owner_id')
+        .then(function (r) {
+          var teamIds = {};
+          (hq.teams || []).forEach(function (t) {
+            teamIds[t.calendar_id] = true;
+          });
+          var cals = (r.data || [])
+            .filter(function (c) {
+              return (c.owner_id === me && !teamIds[c.id]) || teamIds[c.id];
+            })
+            .sort(function (a, b) {
+              return (teamIds[a.id] ? 1 : 0) - (teamIds[b.id] ? 1 : 0);
+            });
+          drawNewGame(cals, teamIds);
+        });
+    }
+    function drawNewGame(cals, teamIds) {
+      var d = new Date(Date.now() + 86400000 * 7);
+      var day = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+      var sports = [
+        ['football', 'Football'],
+        ['padel', 'Padel'],
+        ['tennis', 'Tennis'],
+        ['basketball', 'Basketball'],
+        ['netball', 'Netball'],
+        ['badminton', 'Badminton'],
+        ['boardgames', 'Board games'],
+        ['other', 'Something else'],
+      ];
+      render(
+        '<a class="muted small" href="#/games">‹ Social games</a><div class="page-head"><div><h1>New social game</h1><p class="muted">First come, first served: people take a place with the link, then there’s a waiting list.</p></div></div>' +
+          '<div class="card sg-new"><label class="field-label" for="ng-title">Name</label><input type="text" id="ng-title" maxlength="80" value="5-a-side" />' +
+          '<div class="sg-new-row"><div><label class="field-label" for="ng-sport">What</label><select id="ng-sport">' +
+          sports
+            .map(function (x) {
+              return '<option value="' + x[0] + '">' + x[1] + '</option>';
+            })
+            .join('') +
+          '</select></div><div id="ng-format-box"><label class="field-label" for="ng-format">Format</label><select id="ng-format"><option value="5">5-a-side</option><option value="6">6-a-side</option><option value="7">7-a-side</option><option value="11">11-a-side</option></select></div></div>' +
+          '<div class="sg-new-row"><div><label class="field-label" for="ng-date">Day</label><input type="date" id="ng-date" value="' +
+          day +
+          '" /></div><div><label class="field-label" for="ng-time">Starts</label><input type="time" id="ng-time" value="19:00" /></div><div><label class="field-label" for="ng-len">How long</label><select id="ng-len"><option value="60">1 hour</option><option value="90">1½ hours</option><option value="120">2 hours</option><option value="180">3 hours</option></select></div></div>' +
+          '<label class="field-label" for="ng-place">Where</label><input type="text" id="ng-place" maxlength="120" placeholder="Mabley Green, pitch 3" />' +
+          '<div class="sg-new-row"><div><label class="field-label" for="ng-places">Places</label><input type="number" id="ng-places" min="2" max="40" value="10" /></div><div><label class="field-label" for="ng-cost">Cost (optional)</label><input type="text" id="ng-cost" maxlength="40" placeholder="£5 each" /></div></div>' +
+          (cals.length > 1
+            ? '<label class="field-label" for="ng-cal">On which calendar</label><select id="ng-cal">' +
+              cals
+                .map(function (c) {
+                  return '<option value="' + esc(c.id) + '">' + esc(c.name) + (teamIds[c.id] ? ' (team: the squad is asked)' : '') + '</option>';
+                })
+                .join('') +
+              '</select>'
+            : '') +
+          '<label class="sg-new-check"><input type="checkbox" id="ng-weekly" /> Every week (it sets itself up again once it’s been played)</label>' +
+          '<p class="err" id="ng-err" hidden></p><div class="row"><button class="btn primary" id="ng-go">Create the game</button><a class="btn" href="#/games">Cancel</a></div></div>',
+      );
+      $('#ng-sport').onchange = function () {
+        $('#ng-format-box').hidden = this.value !== 'football';
+      };
+      $('#ng-go').onclick = function () {
+        var button = this;
+        var err = $('#ng-err');
+        err.hidden = true;
+        var title = $('#ng-title').value.trim();
+        var start = new Date($('#ng-date').value + 'T' + ($('#ng-time').value || '19:00'));
+        var places = parseInt($('#ng-places').value, 10);
+        var cal = $('#ng-cal') ? $('#ng-cal').value : cals[0] && cals[0].id;
+        var why = !title
+          ? 'Give the game a name.'
+          : isNaN(start.getTime()) || start < new Date()
+            ? 'Pick a day and time that’s still to come.'
+            : !(places >= 2 && places <= 40)
+              ? 'Places can be 2 to 40.'
+              : !cal
+                ? 'You need a calendar in Dayli first: open the Dayli app once.'
+                : null;
+        if (why) {
+          err.textContent = why;
+          err.hidden = false;
+          return;
+        }
+        setBusy(button, true);
+        var sport = $('#ng-sport').value;
+        rpc('game_create', {
+          p_calendar: cal,
+          p_title: title,
+          p_sport: sport,
+          p_format: sport === 'football' ? $('#ng-format').value : null,
+          p_starts_at: start.toISOString(),
+          p_minutes: parseInt($('#ng-len').value, 10),
+          p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London',
+          p_location: $('#ng-place').value.trim() || null,
+          p_places: places,
+          p_cost: $('#ng-cost').value.trim() || null,
+          p_weekly: $('#ng-weekly').checked,
+        }).then(
+          function (id) {
+            toast('Game made. Share the link and people can take a place.');
+            go('#/games/' + id);
+          },
+          function (e) {
+            setBusy(button, false);
+            err.textContent = friendly(e);
+            err.hidden = false;
+          },
+        );
+      };
     }
 
     function drawGame(g, mine) {
@@ -1169,7 +1302,7 @@
             esc([when, at, g.location, g.cost ? g.cost + ' each' : null].filter(Boolean).join(' · ')) +
             '</div><h1>' +
             esc(g.title) +
-            '</h1></div><div class="row"><button class="btn" id="sg-link">Share the link</button><button class="btn primary" id="sg-save"' +
+            '</h1></div><div class="row"><a class="btn" href="#/games/new">+ New game</a><button class="btn" id="sg-link">Share the link</button><button class="btn primary" id="sg-save"' +
             (dirty ? '' : ' disabled') +
             '>' +
             (g.sides_set ? 'Save the teams' : 'Save and show the teams') +
