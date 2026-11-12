@@ -16,6 +16,7 @@
   var SITE = 'https://daylicalendar.co.uk';
   // Dayli HQ: the same site served at /hq/ (daylihq.co.uk later), with Teams.
   var HQ = /^\/hq(\/|$)/.test(location.pathname);
+  if (HQ) document.documentElement.classList.add('hq');
   var APP_NOTE_KEY = 'dayli_organisers_app_note_seen';
 
   var sb = null;
@@ -660,6 +661,7 @@
   // --- sign in / create account --------------------------------------------
 
   function screenSignIn(mode) {
+    if (HQ && !state.classicSignIn) return screenSignInHQ();
     render(
       '<h1>Dayli for organisers</h1>' +
         '<p class="muted">List your events so people nearby can find them, say they’re going and keep them in their calendars.</p>' +
@@ -816,6 +818,43 @@
     }
   }
 
+  // Dayli HQ: one thing per screen, big buttons. A new email gets an account.
+  function screenSignInHQ() {
+    render(
+      '<div class="hq-auth"><div class="hq-auth-logo"><img src="../img/icon.svg" alt="" />Dayli <span>HQ</span></div>' +
+        '<h1>Run your team, games and events</h1><p class="muted">Same account as the Dayli app. New? It makes one for you.</p>' +
+        '<form id="hq-auth" novalidate><input type="email" name="email" class="hq-auth-inp" autocomplete="email" placeholder="you@example.com" />' +
+        '<div class="notice error" id="err" hidden></div><button class="btn primary hq-auth-go" type="submit">Send me a code</button></form>' +
+        '<p class="muted small">No password: we email you a 6-digit code.</p><button type="button" class="linkish small" id="hq-pw">Use a password instead</button></div>',
+      true,
+    );
+    var err = $('#err');
+    $('#hq-pw').onclick = function () {
+      state.classicSignIn = true;
+      screenSignIn('signin');
+    };
+    $('#hq-auth').onsubmit = function (e) {
+      e.preventDefault();
+      err.hidden = true;
+      var address = $('[name=email]').value.trim();
+      if (!/^\S+@\S+\.\S+$/.test(address)) return showError(err, 'Enter your email address.');
+      var button = $('.hq-auth-go');
+      setBusy(button, true, 'Sending…');
+      sendCode(address, true).then(
+        function () {
+          setBusy(button, false);
+          state.pendingEmail = address;
+          state.codeSent = true;
+          go('#/verify');
+        },
+        function (ex) {
+          setBusy(button, false);
+          showError(err, friendly(ex));
+        },
+      );
+    };
+  }
+
   function sendCode(address, create) {
     return sb.auth
       .signInWithOtp({ email: address, options: { shouldCreateUser: Boolean(create) } })
@@ -831,10 +870,14 @@
     if (!address) return go('#/sign-in');
     var sent = state.codeSent && state.pendingEmail === address;
     render(
-      '<h1>Confirm your email</h1>' +
-        '<p class="muted">Before an event goes live we check the address is yours, so people know who’s behind it. We email a 6-digit code to <b>' +
-        esc(address) +
-        '</b>; type it in here. The email is called “Your Dayli code”.</p>' +
+      (HQ
+        ? '<div class="hq-auth hq-auth-code"><h1>Check your email</h1><p class="muted">We sent a 6-digit code to <b>' +
+          esc(address) +
+          '</b>. The email is called “Your Dayli code”.</p>'
+        : '<h1>Confirm your email</h1>' +
+          '<p class="muted">Before an event goes live we check the address is yours, so people know who’s behind it. We email a 6-digit code to <b>' +
+          esc(address) +
+          '</b>; type it in here. The email is called “Your Dayli code”.</p>') +
         '<div class="card">' +
         '<div id="step-send"' +
         (sent ? ' hidden' : '') +
@@ -849,7 +892,8 @@
         '<button type="button" class="linkish" id="resend">Send a new code</button>' +
         (state.session ? '<a href="#/overview">Later</a>' : '<a href="#/sign-in">Back</a>') +
         '</div></form></div>' +
-        (isVerified() ? notice('info', 'Your email is already confirmed.') : ''),
+        (isVerified() ? notice('info', 'Your email is already confirmed.') : '') +
+        (HQ ? '</div>' : ''),
       true,
     );
     var err = $('#err');
@@ -902,6 +946,8 @@
         })
         .then(function () {
           setBusy(button, false);
+          // HQ: straight on to what you run (an organiser profile is only for events).
+          if (HQ) return go(homeHash());
           if (!state.organiser) {
             toast('Email confirmed. Now tell people who you are.');
             return go('#/profile');

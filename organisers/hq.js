@@ -225,7 +225,7 @@
         '</a>'
       );
     }
-    function menuLinks(c) {
+    function menuLinks(c, bare) {
       var h = location.hash.split('?')[0];
       var out = '';
       if (c && c.indexOf('team:') === 0) {
@@ -246,8 +246,38 @@
           link('#/payouts', 'ticket', 'Tickets & payouts', /^#\/(payouts|tickets|checkin)/.test(h)) +
           link('#/profile', 'person', 'Profile', h === '#/profile');
       }
+      if (bare) return out;
       out += '<div class="hq-navgap"></div>' + link('#/settings', 'gear', 'Settings', h === '#/settings');
       if (state.admin) out += link('#/admin', 'shield', 'Admin', /^#\/admin/.test(h));
+      return out;
+    }
+    // Phones: what you run along the bottom, and More (the menu) last.
+    function bottomBar(c) {
+      var h = location.hash.split('?')[0];
+      var item = function (href, icon, label, on) {
+        return (
+          '<a href="' +
+          href +
+          '" class="' +
+          (on ? 'on' : '') +
+          '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+          ICON[icon] +
+          '</svg><span>' +
+          label +
+          '</span></a>'
+        );
+      };
+      var out = '';
+      if (runs('teams')) {
+        var team = c && c.indexOf('team:') === 0 ? c.slice(5) : hq.teams[0] && hq.teams[0].calendar_id;
+        out += item(team ? '#/teams/' + team : '#/welcome/setup', 'squad', 'Team', c && c.indexOf('team:') === 0);
+      }
+      if (runs('games')) out += item('#/games', 'ball', 'Games', c === 'games');
+      if (runs('events')) out += item('#/overview', 'ticket', 'Events', c === 'events');
+      out +=
+        '<button type="button" id="hq-more" class="' +
+        (/^#\/(settings|admin)/.test(h) ? 'on' : '') +
+        '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>More</span></button>';
       return out;
     }
     function switcherItems(c) {
@@ -369,14 +399,18 @@
         '</div>';
       nav.innerHTML = menuLinks(c);
       nav.classList.add('hq-nav');
-      tabs.innerHTML =
-        '<button type="button" class="hq-tsw" id="hq-tsw">' +
-        crest(cur.name, cur.colour, 22) +
-        '<span>' +
-        esc(cur.name) +
-        '</span><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 10l5 5 5-5"/></svg></button>' +
-        menuLinks(c);
-      document.getElementById('hq-tsw').onclick = function () {
+      // Phones: the tabs carry a team's own pages; the bottom bar does the rest.
+      tabs.innerHTML = c && c.indexOf('team:') === 0 ? menuLinks(c, true) : '';
+      tabs.classList.toggle('hq-empty-tabs', !(c && c.indexOf('team:') === 0));
+      var bar = document.getElementById('hq-bottom');
+      if (!bar) {
+        bar = document.createElement('nav');
+        bar.id = 'hq-bottom';
+        bar.className = 'hq-bottom';
+        document.body.appendChild(bar);
+      }
+      bar.innerHTML = bottomBar(c);
+      document.getElementById('hq-more').onclick = function () {
         var m = document.getElementById('menu');
         if (m) m.click();
       };
@@ -938,6 +972,17 @@
     function screenGames(gameId, query) {
       if (gameId === 'new') return screenNewGame();
       loading();
+      if (query && query.made && gameId) {
+        return rpc('game_view', { p_game: gameId }).then(
+          function (g) {
+            if (!g) return loadGames(gameId);
+            drawGameMade(g);
+          },
+          function () {
+            loadGames(gameId);
+          },
+        );
+      }
       // Back from Stripe's sign-up: check the account before showing the game.
       var back =
         query && query.stripe && gameId
@@ -969,9 +1014,18 @@
           var id = gameId || (mine[0] && mine[0].id);
           if (!id) {
             render(
-              '<div class="page-head"><div><h1>Social games</h1><p class="muted">5-a-side, padel, board games: add players, pick the teams, see who’s paid.</p></div></div>' +
-                notice('info', 'No games coming up. Start one here or in the Dayli app (Events → Hosting → New game).') +
-                '<a class="btn primary" href="#/games/new">+ New game</a>',
+              '<div class="ng ng-empty"><div class="ng-art"><svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#3a61c9" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10z"/></svg></div>' +
+                '<h1>Your first game</h1><p class="muted">Make it in a minute, share the link, and people take a place.</p><div class="ng-how">' +
+                [
+                  ['Pick a day, time and place', 'Weekly if it’s every Thursday'],
+                  ['Share the link on WhatsApp', 'No app needed to take a place'],
+                  ['See who’s in, pick sides, who’s paid', 'A waiting list fills any gaps'],
+                ]
+                  .map(function (x, i) {
+                    return '<div><i>' + (i + 1) + '</i><span><b>' + x[0] + '</b><small>' + x[1] + '</small></span></div>';
+                  })
+                  .join('') +
+                '</div><a class="btn primary ng-go" href="#/games/new">+ Start a game</a></div>',
             );
             return;
           }
@@ -993,8 +1047,109 @@
       );
     }
 
-    // A new social game: the same as New game in the app (game_create). It goes
-    // on your own calendar, or a team's you manage, and you take the first place.
+    // --- a new social game (game_create) -------------------------------------------------
+    // Two short steps for a phone: what (the sport, then its format, which sets
+    // how many can play), when and where; then places, length, cost and a
+    // summary. It goes on your own calendar, or a team's you manage, and you
+    // take the first place.
+    var GAME_SPORTS = [
+      {
+        k: 'football',
+        n: 'Football',
+        d: '5',
+        mins: 60,
+        f: [
+          ['5', '5-a-side', 10],
+          ['6', '6-a-side', 12],
+          ['7', '7-a-side', 14],
+          ['8', '8-a-side', 16],
+          ['11', '11-a-side', 22],
+        ],
+      },
+      {
+        k: 'basketball',
+        n: 'Basketball',
+        d: '5',
+        mins: 60,
+        f: [
+          ['3x3', '3 v 3', 6],
+          ['5', '5 v 5', 10],
+        ],
+      },
+      { k: 'netball', n: 'Netball', d: '7', mins: 60, f: [['7', '7-a-side', 14]] },
+      { k: 'hockey', n: 'Hockey', d: '7', mins: 60, f: [['7', '7-a-side', 14], ['11', '11-a-side', 22]] },
+      { k: 'padel', n: 'Padel', d: 'doubles', mins: 90, f: [['doubles', 'Doubles', 4]] },
+      {
+        k: 'tennis',
+        n: 'Tennis',
+        d: 'doubles',
+        mins: 60,
+        f: [
+          ['singles', 'Singles', 2],
+          ['doubles', 'Doubles', 4],
+        ],
+      },
+      {
+        k: 'badminton',
+        n: 'Badminton',
+        d: 'doubles',
+        mins: 60,
+        f: [
+          ['singles', 'Singles', 2],
+          ['doubles', 'Doubles', 4],
+        ],
+      },
+      {
+        k: 'volleyball',
+        n: 'Volleyball',
+        d: '6',
+        mins: 90,
+        f: [
+          ['6', '6-a-side', 12],
+          ['beach', 'Beach 2 v 2', 4],
+        ],
+      },
+      { k: 'board_games', n: 'Board games', d: null, mins: 180, places: 6 },
+      { k: 'other', n: 'Something else', d: null, mins: 60, places: 10 },
+    ];
+    function gameSport(k) {
+      return (
+        GAME_SPORTS.filter(function (s) {
+          return s.k === k;
+        })[0] || GAME_SPORTS[0]
+      );
+    }
+    function gameFormat(s, f) {
+      return (
+        (s.f || []).filter(function (x) {
+          return x[0] === f;
+        })[0] || null
+      );
+    }
+    // "5 v 5", "5 v 6", "2 v 2" for games with sides; otherwise "6 players".
+    function sidesLabel(sportKey, places) {
+      var s = gameSport(sportKey);
+      if (!s.f) return places + ' players';
+      var a = Math.floor(places / 2);
+      return a + ' v ' + (places - a);
+    }
+    function ymdLocal(d) {
+      return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
+    }
+    function chips(name, items, on) {
+      return (
+        '<div class="ng-chips" data-chips="' +
+        name +
+        '">' +
+        items
+          .map(function (x) {
+            return '<button type="button" class="ng-chip' + (x[0] === on ? ' on' : '') + '" data-v="' + esc(x[0]) + '">' + esc(x[1]) + '</button>';
+          })
+          .join('') +
+        '</div>'
+      );
+    }
+
     function screenNewGame() {
       loading();
       var me = state.session && state.session.user ? state.session.user.id : null;
@@ -1006,107 +1161,364 @@
           (hq.teams || []).forEach(function (t) {
             teamIds[t.calendar_id] = true;
           });
-          var cals = (r.data || [])
+          var cals = (Array.isArray(r.data) ? r.data : [])
             .filter(function (c) {
               return (c.owner_id === me && !teamIds[c.id]) || teamIds[c.id];
             })
             .sort(function (a, b) {
               return (teamIds[a.id] ? 1 : 0) - (teamIds[b.id] ? 1 : 0);
             });
-          drawNewGame(cals, teamIds);
+          var tomorrow = new Date(Date.now() + 86400000);
+          var g = {
+            sport: 'football',
+            format: '5',
+            places: 10,
+            day: ymdLocal(tomorrow),
+            time: '19:00',
+            place: '',
+            weekly: false,
+            mins: 60,
+            cost: '',
+            title: '',
+            titleTouched: false,
+            cal: cals[0] ? cals[0].id : null,
+          };
+          drawNewGame(1, g, cals, teamIds);
         });
     }
-    function drawNewGame(cals, teamIds) {
-      var d = new Date(Date.now() + 86400000 * 7);
-      var day = d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2);
-      var sports = [
-        ['football', 'Football'],
-        ['padel', 'Padel'],
-        ['tennis', 'Tennis'],
-        ['basketball', 'Basketball'],
-        ['netball', 'Netball'],
-        ['badminton', 'Badminton'],
-        ['boardgames', 'Board games'],
-        ['other', 'Something else'],
-      ];
-      render(
-        '<a class="muted small" href="#/games">‹ Social games</a><div class="page-head"><div><h1>New social game</h1><p class="muted">First come, first served: people take a place with the link, then there’s a waiting list.</p></div></div>' +
-          '<div class="card sg-new"><label class="field-label" for="ng-title">Name</label><input type="text" id="ng-title" maxlength="80" value="5-a-side" />' +
-          '<div class="sg-new-row"><div><label class="field-label" for="ng-sport">What</label><select id="ng-sport">' +
-          sports
-            .map(function (x) {
-              return '<option value="' + x[0] + '">' + x[1] + '</option>';
-            })
-            .join('') +
-          '</select></div><div id="ng-format-box"><label class="field-label" for="ng-format">Format</label><select id="ng-format"><option value="5">5-a-side</option><option value="6">6-a-side</option><option value="7">7-a-side</option><option value="11">11-a-side</option></select></div></div>' +
-          '<div class="sg-new-row"><div><label class="field-label" for="ng-date">Day</label><input type="date" id="ng-date" value="' +
-          day +
-          '" /></div><div><label class="field-label" for="ng-time">Starts</label><input type="time" id="ng-time" value="19:00" /></div><div><label class="field-label" for="ng-len">How long</label><select id="ng-len"><option value="60">1 hour</option><option value="90">1½ hours</option><option value="120">2 hours</option><option value="180">3 hours</option></select></div></div>' +
-          '<label class="field-label" for="ng-place">Where</label><input type="text" id="ng-place" maxlength="120" placeholder="Mabley Green, pitch 3" />' +
-          '<div class="sg-new-row"><div><label class="field-label" for="ng-places">Places</label><input type="number" id="ng-places" min="2" max="40" value="10" /></div><div><label class="field-label" for="ng-cost">Cost (optional)</label><input type="text" id="ng-cost" maxlength="40" placeholder="£5 each" /></div></div>' +
+
+    function drawNewGame(step, g, cals, teamIds) {
+      var s = gameSport(g.sport);
+      var today = new Date();
+      var days = [['today', 'Tonight']];
+      for (var i = 1; i <= 6; i++) {
+        var d = new Date(today.getTime() + i * 86400000);
+        days.push([
+          ymdLocal(d),
+          i === 1 ? 'Tomorrow' : d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }),
+        ]);
+      }
+      var dayOn = g.day === ymdLocal(today) ? 'today' : g.day;
+      var dayKnown = days.some(function (x) {
+        return x[0] === dayOn;
+      });
+      days.push(['pick', 'Pick a day…']);
+      var times = ['18:00', '18:30', '19:00', '19:30', '20:00'].map(function (t) {
+        return [t, t];
+      });
+      var timeKnown = times.some(function (x) {
+        return x[0] === g.time;
+      });
+      times.push(['other', 'Other time…']);
+      var whatName = s.f ? (gameFormat(s, g.format) || [null, s.n])[1] : s.n;
+      if (!g.titleTouched) {
+        g.title =
+          g.sport === 'football'
+            ? whatName
+            : g.sport === 'board_games'
+              ? 'Board games night'
+              : g.sport === 'other'
+                ? ''
+                : s.f
+                  ? s.n + ' · ' + whatName
+                  : s.n;
+      }
+
+      var head =
+        '<div class="ng-top"><a href="' +
+        (step === 1 ? '#/games' : '#') +
+        '" id="ng-back" class="ng-link">' +
+        (step === 1 ? 'Cancel' : '‹ Back') +
+        '</a><b>New game</b><span class="muted small">' +
+        step +
+        ' of 2</span></div>';
+      var body;
+      if (step === 1) {
+        body =
+          '<div class="ng-lbl">What are you playing?</div>' +
+          chips(
+            'sport',
+            GAME_SPORTS.map(function (x) {
+              return [x.k, x.n];
+            }),
+            g.sport,
+          ) +
+          (s.f && s.f.length > 1
+            ? '<div class="ng-lbl">' +
+              (g.sport === 'football' || g.sport === 'netball' || g.sport === 'hockey' ? 'How many a side?' : 'Which game?') +
+              '</div>' +
+              chips(
+                'format',
+                s.f.map(function (x) {
+                  return [x[0], x[1]];
+                }),
+                g.format,
+              )
+            : '') +
+          '<div class="ng-lbl">When?</div>' +
+          chips('day', days, dayKnown ? dayOn : 'pick') +
+          '<input type="date" id="ng-date" class="ng-inp" value="' +
+          esc(g.day) +
+          '"' +
+          (dayKnown ? ' hidden' : '') +
+          ' />' +
+          chips('time', times, timeKnown ? g.time : 'other') +
+          '<input type="time" id="ng-time" class="ng-inp" value="' +
+          esc(g.time) +
+          '"' +
+          (timeKnown ? ' hidden' : '') +
+          ' />' +
+          '<div class="ng-lbl">Where?</div><input type="text" id="ng-place" class="ng-inp" maxlength="120" placeholder="Mabley Green, pitch 3" value="' +
+          esc(g.place) +
+          '" />' +
+          '<label class="ng-switch"><input type="checkbox" id="ng-weekly"' +
+          (g.weekly ? ' checked' : '') +
+          ' /><span></span>Every week</label>' +
+          '<p class="err" id="ng-err" hidden></p><button class="btn primary ng-go" id="ng-next">Next</button>';
+      } else {
+        var when = new Date(g.day + 'T' + g.time);
+        body =
+          '<div class="ng-lbl">Name</div><input type="text" id="ng-title" class="ng-inp" maxlength="80" placeholder="Thursday 5-a-side" value="' +
+          esc(g.title) +
+          '" />' +
+          '<div class="ng-lbl">How many can play?</div><div class="ng-step"><button type="button" data-n="-1">−</button><div><b id="ng-n">' +
+          g.places +
+          '</b><small id="ng-sides">' +
+          esc(sidesLabel(g.sport, g.places)) +
+          '</small></div><button type="button" data-n="1">+</button></div>' +
+          '<div class="ng-lbl">How long?</div>' +
+          chips(
+            'mins',
+            [
+              ['60', '1 hour'],
+              ['90', '1½ hours'],
+              ['120', '2 hours'],
+              ['180', '3 hours'],
+            ],
+            String(g.mins),
+          ) +
+          '<div class="ng-lbl">Cost each <span class="muted">(optional)</span></div><input type="text" id="ng-cost" class="ng-inp" maxlength="40" placeholder="£5" value="' +
+          esc(g.cost) +
+          '" /><p class="muted small ng-note">People pay you in cash, or by card once card payments are on.</p>' +
           (cals.length > 1
-            ? '<label class="field-label" for="ng-cal">On which calendar</label><select id="ng-cal">' +
+            ? '<div class="ng-lbl">On which calendar?</div><select id="ng-cal" class="ng-inp">' +
               cals
                 .map(function (c) {
-                  return '<option value="' + esc(c.id) + '">' + esc(c.name) + (teamIds[c.id] ? ' (team: the squad is asked)' : '') + '</option>';
+                  return (
+                    '<option value="' +
+                    esc(c.id) +
+                    '"' +
+                    (c.id === g.cal ? ' selected' : '') +
+                    '>' +
+                    esc(c.name) +
+                    (teamIds[c.id] ? ' (team: the squad is asked)' : '') +
+                    '</option>'
+                  );
                 })
                 .join('') +
               '</select>'
             : '') +
-          '<label class="sg-new-check"><input type="checkbox" id="ng-weekly" /> Every week (it sets itself up again once it’s been played)</label>' +
-          '<p class="err" id="ng-err" hidden></p><div class="row"><button class="btn primary" id="ng-go">Create the game</button><a class="btn" href="#/games">Cancel</a></div></div>',
-      );
-      $('#ng-sport').onchange = function () {
-        $('#ng-format-box').hidden = this.value !== 'football';
+          '<div class="ng-sum"><span class="lbl">YOUR GAME</span><b id="ng-sum-t">' +
+          esc(g.title || whatName) +
+          '</b> · ' +
+          esc(
+            when.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) +
+              ', ' +
+              g.time,
+          ) +
+          '<div class="muted small">' +
+          esc([g.place, g.weekly ? 'weekly' : null, null].filter(Boolean).join(' · ')) +
+          '</div></div>' +
+          '<p class="err" id="ng-err" hidden></p><button class="btn primary ng-go" id="ng-create">Create the game</button>';
+      }
+      render('<div class="ng">' + head + '<div class="ng-body">' + body + '</div></div>');
+
+      function showErr(t) {
+        var e = $('#ng-err');
+        e.textContent = t;
+        e.hidden = false;
+      }
+      function readStep1() {
+        g.place = $('#ng-place').value.trim();
+        g.weekly = $('#ng-weekly').checked;
+        if (!$('#ng-date').hidden) g.day = $('#ng-date').value || g.day;
+        if (!$('#ng-time').hidden) g.time = $('#ng-time').value || g.time;
+      }
+      function readStep2() {
+        g.title = $('#ng-title').value.trim();
+        g.cost = $('#ng-cost').value.trim();
+        if ($('#ng-cal')) g.cal = $('#ng-cal').value;
+      }
+      $$('[data-chips]').forEach(function (box) {
+        var name = box.dataset.chips;
+        $$('.ng-chip', box).forEach(function (b) {
+          b.onclick = function () {
+            var v = b.dataset.v;
+            if (name === 'sport') {
+              readStep1();
+              var ns = gameSport(v);
+              g.sport = v;
+              g.format = ns.d;
+              var f = gameFormat(ns, ns.d);
+              g.places = f ? f[2] : ns.places;
+              g.mins = ns.mins;
+              return drawNewGame(1, g, cals, teamIds);
+            }
+            if (name === 'format') {
+              readStep1();
+              g.format = v;
+              var ff = gameFormat(gameSport(g.sport), v);
+              if (ff) g.places = ff[2];
+              return drawNewGame(1, g, cals, teamIds);
+            }
+            // The rest change in place: redrawing would jump the page.
+            $$('.ng-chip', box).forEach(function (x) {
+              x.classList.toggle('on', x === b);
+            });
+            if (name === 'day') {
+              $('#ng-date').hidden = v !== 'pick';
+              if (v === 'today') g.day = ymdLocal(new Date());
+              else if (v !== 'pick') g.day = v;
+              else $('#ng-date').focus();
+            }
+            if (name === 'time') {
+              $('#ng-time').hidden = v !== 'other';
+              if (v !== 'other') g.time = v;
+              else $('#ng-time').focus();
+            }
+            if (name === 'mins') g.mins = Number(v);
+          };
+        });
+      });
+      $('#ng-back').onclick = function (e) {
+        if (step === 1) return;
+        e.preventDefault();
+        readStep2();
+        drawNewGame(1, g, cals, teamIds);
       };
-      $('#ng-go').onclick = function () {
+
+      if (step === 1) {
+        $('#ng-next').onclick = function () {
+          readStep1();
+          var start = new Date(g.day + 'T' + g.time);
+          if (isNaN(start.getTime()) || start < new Date()) return showErr('Pick a day and time that’s still to come.');
+          drawNewGame(2, g, cals, teamIds);
+          window.scrollTo(0, 0);
+        };
+        return;
+      }
+
+      $('#ng-title').oninput = function () {
+        g.titleTouched = true;
+        $('#ng-sum-t').textContent = this.value.trim() || whatName;
+      };
+      $$('[data-n]').forEach(function (b) {
+        b.onclick = function () {
+          var n = g.places + Number(b.dataset.n);
+          if (n < 2 || n > 40) return;
+          g.places = n;
+          $('#ng-n').textContent = n;
+          $('#ng-sides').textContent = sidesLabel(g.sport, n);
+        };
+      });
+      $('#ng-create').onclick = function () {
         var button = this;
-        var err = $('#ng-err');
-        err.hidden = true;
-        var title = $('#ng-title').value.trim();
-        var start = new Date($('#ng-date').value + 'T' + ($('#ng-time').value || '19:00'));
-        var places = parseInt($('#ng-places').value, 10);
-        var cal = $('#ng-cal') ? $('#ng-cal').value : cals[0] && cals[0].id;
-        var why = !title
-          ? 'Give the game a name.'
-          : isNaN(start.getTime()) || start < new Date()
-            ? 'Pick a day and time that’s still to come.'
-            : !(places >= 2 && places <= 40)
-              ? 'Places can be 2 to 40.'
-              : !cal
-                ? 'You need a calendar in Dayli first: open the Dayli app once.'
-                : null;
-        if (why) {
-          err.textContent = why;
-          err.hidden = false;
-          return;
-        }
+        readStep2();
+        var title = g.title || whatName;
+        if (!g.cal) return showErr('You need a calendar in Dayli first: open the Dayli app once.');
         setBusy(button, true);
-        var sport = $('#ng-sport').value;
         rpc('game_create', {
-          p_calendar: cal,
+          p_calendar: g.cal,
           p_title: title,
-          p_sport: sport,
-          p_format: sport === 'football' ? $('#ng-format').value : null,
-          p_starts_at: start.toISOString(),
-          p_minutes: parseInt($('#ng-len').value, 10),
+          p_sport: g.sport,
+          p_format: g.format,
+          p_starts_at: new Date(g.day + 'T' + g.time).toISOString(),
+          p_minutes: g.mins,
           p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London',
-          p_location: $('#ng-place').value.trim() || null,
-          p_places: places,
-          p_cost: $('#ng-cost').value.trim() || null,
-          p_weekly: $('#ng-weekly').checked,
+          p_location: g.place || null,
+          p_places: g.places,
+          p_cost: g.cost || null,
+          p_weekly: g.weekly,
         }).then(
           function (id) {
-            toast('Game made. Share the link and people can take a place.');
-            go('#/games/' + id);
+            go('#/games/' + id + '?made=1');
           },
           function (e) {
             setBusy(button, false);
-            err.textContent = friendly(e);
-            err.hidden = false;
+            showErr(friendly(e));
           },
         );
       };
+    }
+
+    // Straight after making a game: share the link (and, once, how to keep HQ
+    // on the home screen like an app).
+    function drawGameMade(g) {
+      var link = SITE + '/g/?c=' + encodeURIComponent(g.code);
+      var when = new Date(g.starts_at).toLocaleString('en-GB', {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: g.timezone || undefined,
+      });
+      var text =
+        g.title +
+        '\n' +
+        when +
+        (g.location ? '\n' + g.location : '') +
+        (g.cost ? '\n' + g.cost : '') +
+        '\n\n' +
+        g.places +
+        ' places, first come first served. Tap to say you’re in:\n' +
+        link;
+      var standalone = window.navigator.standalone || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+      var tipSeen = false;
+      try {
+        tipSeen = !!localStorage.getItem('dayli_hq_a2hs');
+      } catch (e) {
+        tipSeen = true;
+      }
+      var iphone = /iPhone|iPad|iPod/.test(navigator.userAgent);
+      render(
+        '<div class="ng ng-made"><div class="ng-ok">' +
+          TICK.replace('width="16" height="16"', 'width="40" height="40"') +
+          '</div><h1>Game on</h1><p class="muted">' +
+          esc(g.title + ' · ' + when) +
+          (g.location ? '<br>' + esc(g.location) : '') +
+          '</p><div class="ng-lbl" style="text-align:left">Send this to your group</div><div class="ng-link-box"><span>' +
+          esc(link.replace(/^https:\/\//, '')) +
+          '</span><button type="button" id="ng-copy">Copy</button></div>' +
+          '<a class="btn ng-go ng-wa" target="_blank" rel="noopener" href="https://wa.me/?text=' +
+          encodeURIComponent(text) +
+          '">Share on WhatsApp</a><a class="btn ng-go" href="#/games/' +
+          esc(g.id) +
+          '">Open the game</a><p class="muted small">You’re in place 1. People take the rest with the link.</p>' +
+          (!standalone && !tipSeen && iphone
+            ? '<div class="ng-tip" id="ng-tip"><b>Keep HQ on your home screen</b><div>Opens full screen like an app. No download.</div><ol><li>Tap <b>Share</b> in Safari</li><li>Tap <b>Add to Home Screen</b></li><li>Tap <b>Add</b></li></ol><button type="button" class="btn" id="ng-tip-ok">Got it</button></div>'
+            : '') +
+          '</div>',
+      );
+      $('#ng-copy').onclick = function () {
+        (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(
+          function () {
+            toast('Link copied');
+          },
+          function () {
+            window.prompt('Copy this link:', link);
+          },
+        );
+      };
+      if ($('#ng-tip-ok'))
+        $('#ng-tip-ok').onclick = function () {
+          try {
+            localStorage.setItem('dayli_hq_a2hs', '1');
+          } catch (e) {
+            /* private mode */
+          }
+          $('#ng-tip').remove();
+        };
     }
 
     function drawGame(g, mine) {

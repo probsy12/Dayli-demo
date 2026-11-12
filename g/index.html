@@ -143,7 +143,7 @@
     </div>
   </div>
 </main>
-<script src="../config.js?v=84402d6"></script>
+<script src="../config.js?v=6f81630"></script>
 <script>
   (function () {
     var cfg = window.DAYLI_CONFIG || {};
@@ -202,8 +202,9 @@
       game = g;
       var tz = g.timezone || 'Europe/London';
       var a = wall(g.starts_at, tz), b = wall(g.ends_at, tz);
-      var fmt = { '5': '5-a-side', '6': '6-a-side', '7': '7-a-side', '11': '11-a-side' }[g.format] || '';
-      var sport = (g.sport || 'game').charAt(0).toUpperCase() + (g.sport || 'game').slice(1);
+      var fmt = { '5': '5-a-side', '6': '6-a-side', '7': '7-a-side', '8': '8-a-side', '11': '11-a-side', '3x3': '3 v 3', singles: 'Singles', doubles: 'Doubles', beach: 'Beach 2 v 2' }[g.format] || '';
+      var sport = (g.sport || 'game').replace(/_/g, ' ');
+      sport = sport.charAt(0).toUpperCase() + sport.slice(1);
       var kick = [g.team_name, fmt || sport].filter(Boolean).join(' · ');
       $('kicker').textContent = '';
       if (g.badge) {

@@ -4957,3 +4957,459 @@ i.nr {
   align-items: center;
   gap: 10px;
 }
+
+/* --- HQ, phone first ------------------------------------------------------------------- */
+/* Sign in and the code: one column, big. */
+.hq-auth {
+  max-width: 420px;
+  margin: 0 auto;
+  padding: 10px 0 30px;
+  text-align: center;
+}
+.hq-auth h1 {
+  font-size: 30px;
+  line-height: 1.15;
+  margin: 0 0 8px;
+}
+.hq-auth-logo {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font: 700 30px Georgia, 'Times New Roman', serif;
+  margin: 24px 0 22px;
+}
+.hq-auth-logo img {
+  width: 44px;
+  height: 44px;
+}
+.hq-auth-logo span {
+  font: 800 15px -apple-system, Arial, sans-serif;
+  color: var(--accent);
+  letter-spacing: 0.04em;
+}
+.hq-auth form {
+  margin-top: 22px;
+  text-align: left;
+}
+.hq-auth .hq-auth-inp,
+.hq-auth .code-input {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 17px;
+  padding: 15px 16px;
+  border-radius: 14px;
+  margin: 0;
+}
+.hq-auth .code-input {
+  font: 700 30px Georgia, serif;
+  letter-spacing: 0.4em;
+  text-align: center;
+}
+.hq-auth .hq-auth-go,
+.hq-auth button[type='submit'],
+.hq-auth #send {
+  width: 100%;
+  padding: 16px;
+  font-size: 16px;
+  border-radius: 14px;
+  margin: 12px 0 0;
+}
+.hq-auth .card {
+  text-align: left;
+}
+.hq-auth-code {
+  text-align: left;
+}
+
+/* No games yet, New game, Game on. */
+.ng {
+  max-width: 520px;
+  margin: 0 auto;
+}
+.ng-empty,
+.ng-made {
+  text-align: center;
+}
+.ng-empty h1,
+.ng-made h1 {
+  font-size: 28px;
+  margin: 0 0 6px;
+}
+.ng-art {
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: var(--accent-soft);
+  margin: 10px auto 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ng-how {
+  text-align: left;
+  margin: 16px 0 6px;
+}
+.ng-how > div {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 9px 0;
+}
+.ng-how i {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  background: var(--ink);
+  color: var(--bg);
+  font-style: normal;
+  font-weight: 800;
+  font-size: 13px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+}
+.ng-how small {
+  display: block;
+  color: var(--muted);
+}
+.ng-go {
+  display: flex;
+  width: 100%;
+  box-sizing: border-box;
+  justify-content: center;
+  padding: 15px;
+  font-size: 16px;
+  border-radius: 14px;
+  margin: 12px 0 0;
+  text-decoration: none;
+}
+.ng-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+.ng-top b {
+  font-size: 17px;
+}
+.ng-link {
+  color: var(--muted);
+  text-decoration: none;
+  font-weight: 600;
+}
+.ng-lbl {
+  font-size: 14px;
+  font-weight: 800;
+  margin: 18px 0 8px;
+}
+.ng-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.ng-chip {
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 9px 14px;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  margin: 0;
+  cursor: pointer;
+}
+.ng-chip.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+.ng-inp {
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 16px;
+  padding: 13px 14px;
+  border-radius: 14px;
+  margin: 8px 0 0;
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 50px;
+}
+.ng-chips + .ng-chips {
+  margin-top: 8px;
+}
+.ng-switch {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 18px 0 0;
+  font-weight: 700;
+  font-size: 15px;
+  cursor: pointer;
+}
+.ng-switch input {
+  position: absolute;
+  opacity: 0;
+  width: 1px;
+  height: 1px;
+}
+.ng-switch span {
+  width: 46px;
+  height: 28px;
+  border-radius: 14px;
+  background: var(--border);
+  position: relative;
+  flex: none;
+  transition: background 0.15s;
+}
+.ng-switch span:after {
+  content: '';
+  position: absolute;
+  left: 3px;
+  top: 3px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #fff;
+  transition: left 0.15s;
+}
+.ng-switch input:checked + span {
+  background: var(--accent);
+}
+.ng-switch input:checked + span:after {
+  left: 21px;
+}
+.ng-step {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 14px;
+  padding: 8px;
+}
+.ng-step button {
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  border: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-size: 26px;
+  font-weight: 700;
+  margin: 0;
+  cursor: pointer;
+}
+.ng-step div {
+  text-align: center;
+}
+.ng-step b {
+  display: block;
+  font: 700 30px Georgia, serif;
+}
+.ng-step small {
+  color: var(--muted);
+  font-weight: 700;
+}
+.ng-note {
+  margin: 6px 0 0;
+}
+.ng-sum {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 12px 14px;
+  margin-top: 18px;
+}
+.ng-sum .lbl {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+}
+.ng-ok {
+  width: 84px;
+  height: 84px;
+  border-radius: 50%;
+  background: var(--accent);
+  margin: 24px auto 16px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.ng-made .ng-lbl {
+  margin-top: 22px;
+}
+.ng-link-box {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--surface);
+  border: 1.5px dashed var(--border);
+  border-radius: 14px;
+  padding: 10px 12px;
+  font-size: 14px;
+  text-align: left;
+}
+.ng-link-box span {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ng-link-box button {
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font-weight: 800;
+  margin: 0;
+  padding: 4px 6px;
+  cursor: pointer;
+}
+.ng-wa {
+  background: #25d366;
+  border-color: #25d366;
+  color: #fff;
+}
+.ng-tip {
+  text-align: left;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 16px;
+  padding: 16px;
+  margin-top: 20px;
+}
+.ng-tip ol {
+  margin: 8px 0 12px;
+  padding-left: 20px;
+  line-height: 1.7;
+}
+.ng-tip .btn {
+  margin: 0;
+}
+
+/* The bottom bar (phones only). */
+.hq-bottom {
+  display: none;
+}
+@media (max-width: 700px) {
+  html.hq .hq-bottom {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    justify-content: space-around;
+  }
+  html.hq body.auth .hq-bottom,
+  html.hq body.hq-bare .hq-bottom {
+    display: none;
+  }
+  .hq-bottom a,
+  .hq-bottom button {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    color: var(--muted);
+    text-decoration: none;
+    font: inherit;
+    font-size: 11px;
+    font-weight: 700;
+    background: none;
+    border: 0;
+    margin: 0;
+    padding: 4px 0;
+    cursor: pointer;
+  }
+  .hq-bottom svg {
+    width: 24px;
+    height: 24px;
+  }
+  .hq-bottom .on {
+    color: var(--accent);
+  }
+  html.hq main,
+  html.hq #app {
+    padding-bottom: 90px;
+  }
+  html.hq .tabs-nav.hq-empty-tabs {
+    display: none !important;
+  }
+  html.hq .topbar .menu {
+    display: none;
+  }
+  /* The game page: the list first, then the pitch; controls stack. */
+  html.hq .sg-grid > div:last-child {
+    order: 0;
+  }
+  html.hq .sg-set {
+    gap: 10px;
+  }
+  html.hq .sg-set .muted.small.grow {
+    flex-basis: 100%;
+    order: 9;
+  }
+  html.hq .sg-card .muted.small.grow {
+    flex-basis: 100%;
+  }
+  html.hq .th-head {
+    flex-wrap: wrap;
+    gap: 10px;
+  }
+  html.hq .th-head .row {
+    flex-wrap: wrap;
+  }
+  /* Welcome: the three cards as compact rows. */
+  html.hq .hq-choices {
+    grid-template-columns: 1fr !important;
+    gap: 10px;
+  }
+  html.hq .hq-ch ul,
+  html.hq .hq-ch .hq-ex {
+    display: none;
+  }
+  html.hq .hq-ch {
+    display: grid;
+    grid-template-columns: 50px 1fr 30px;
+    align-items: center;
+    text-align: left;
+    padding: 14px;
+    gap: 2px 12px;
+  }
+  html.hq .hq-ch .hq-ic {
+    grid-row: span 2;
+    width: 48px;
+    height: 48px;
+    margin: 0;
+  }
+  html.hq .hq-ch h3 {
+    margin: 0;
+    font-size: 17px;
+    grid-column: 2;
+  }
+  html.hq .hq-ch p {
+    margin: 0;
+    grid-column: 2;
+  }
+  html.hq .hq-ch .hq-tick {
+    position: static;
+    grid-column: 3;
+    grid-row: 1 / span 2;
+  }
+}
+select.ng-inp {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%23847f74' stroke-width='2.5'%3E%3Cpath d='M7 10l5 5 5-5'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 14px center;
+  padding-right: 40px;
+}
