@@ -5583,3 +5583,17 @@ select.ng-inp {
 .ng-switch-row .ng-switch {
   margin: 0;
 }
+
+/* iPhone Safari zooms in on any box with text under 16px, and on a double tap: neither on phones. */
+@media (max-width: 900px) {
+  html.hq input,
+  html.hq select,
+  html.hq textarea {
+    font-size: 16px !important;
+  }
+  html.hq button,
+  html.hq a,
+  html.hq .btn {
+    touch-action: manipulation;
+  }
+}

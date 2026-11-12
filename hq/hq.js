@@ -1754,13 +1754,27 @@
           '</div>'
         );
       }
+      // After a change: fetch the game again without the loading screen or a jump to the top.
+      function refreshGame() {
+        rpc('game_view', { p_game: g.id }).then(
+          function (ng) {
+            if (!ng) return loadGames(g.id);
+            var y = window.scrollY;
+            drawGame(ng, mine);
+            window.scrollTo(0, y);
+          },
+          function () {
+            loadGames(g.id);
+          },
+        );
+      }
       function refund(placeId, name, amount, button) {
         if (!confirm('Give ' + name + ' all ' + sgPounds(amount) + ' back? It reaches their card in 5 to 10 days.')) return;
         if (button) setBusy(button, true);
         invoke('game-pay', { action: 'refund', place_id: placeId }).then(
           function () {
             toast(name + ' refunded');
-            loadGames(g.id);
+            refreshGame();
           },
           function (err) {
             if (button) setBusy(button, false);
@@ -1773,7 +1787,7 @@
         rpc('game_set_price', { p_game: g.id, p_price_pence: pence }).then(
           function () {
             toast(pence ? 'Players can pay by card on the link' : 'Card payments off for this game');
-            loadGames(g.id);
+            refreshGame();
           },
           function (err) {
             setBusy(button, false);
@@ -1783,6 +1797,7 @@
       }
 
       function draw() {
+        var keepY = window.scrollY;
         var bibsList = inn.filter(function (p) {
           return side[p.id] === 'bibs';
         });
@@ -1970,6 +1985,7 @@
             (dirty ? '<b class="ink">Save the teams so everyone sees them in Dayli.</b>' : g.sides_set ? 'Everyone sees these teams in Dayli.' : '') +
             '</p></div></div>',
         );
+        window.scrollTo(0, keepY);
         wire();
       }
 
@@ -1993,17 +2009,33 @@
         dirty = true;
         draw();
       }
-      function savePlaces(p, b, button) {
-        setBusy(button, true);
-        rpc('game_set_places', { p_game: g.id, p_places: p, p_bibs: b }).then(
-          function () {
-            loadGames(g.id);
-          },
-          function (err) {
-            setBusy(button, false);
-            toast(friendly(err));
-          },
-        );
+      // The numbers change at once; it saves once the taps stop.
+      var savedPlaces = places;
+      var savedBibs = bibs;
+      var placesTimer = null;
+      function savePlaces(p, b) {
+        places = p;
+        bibs = b;
+        draw();
+        clearTimeout(placesTimer);
+        placesTimer = setTimeout(function () {
+          var wanted = places;
+          rpc('game_set_places', { p_game: g.id, p_places: places, p_bibs: bibs }).then(
+            function () {
+              var grew = wanted > savedPlaces;
+              savedPlaces = wanted;
+              savedBibs = bibs;
+              // More places lets people in off the waiting list: show who moved up.
+              if (grew && waiting.length && wanted === places) refreshGame();
+            },
+            function (err) {
+              places = savedPlaces;
+              bibs = savedBibs;
+              draw();
+              toast(friendly(err));
+            },
+          );
+        }, 600);
       }
 
       function wire() {
@@ -2045,7 +2077,7 @@
             rpc('game_leave', { p_game: g.id, p_place: p.id }).then(
               function () {
                 toast(p.name + ' is out');
-                loadGames(g.id);
+                refreshGame();
               },
               function (err) {
                 toast(friendly(err));
@@ -2061,7 +2093,7 @@
           rpc('game_add_name', { p_game: g.id, p_name: name }).then(
             function (r) {
               toast(r && r.status === 'waiting' ? name + ' is on the waiting list (the game is full)' : name + ' added');
-              loadGames(g.id);
+              refreshGame();
             },
             function (err) {
               setBusy(button, false);
@@ -2077,14 +2109,14 @@
           b.onclick = function () {
             var p = places + Number(b.dataset.places);
             if (p < 2 || p > 40) return;
-            savePlaces(p, Math.min(bibs, p - 1), b);
+            savePlaces(p, Math.min(bibs, p - 1));
           };
         });
         $$('[data-bibs]').forEach(function (b) {
           b.onclick = function () {
             var nb = bibs + Number(b.dataset.bibs);
             if (nb < 1 || nb > places - 1) return;
-            savePlaces(places, nb, b);
+            savePlaces(places, nb);
           };
         });
         $('#sg-mix').onclick = mix;
@@ -2137,7 +2169,7 @@
           rpc('game_set_sides', { p_game: g.id, p_sides: side }).then(
             function () {
               toast('Teams saved. Everyone sees them in Dayli.');
-              loadGames(g.id);
+              refreshGame();
             },
             function (err) {
               setBusy(button, false);
