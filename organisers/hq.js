@@ -2100,7 +2100,8 @@
     function drawGame(g, mine) {
       if (gameTabFor !== g.id) {
         gameTabFor = g.id;
-        gameTab = 'invites';
+        // A played game opens on the Team sheet, where the score goes.
+        gameTab = g.ends_at && new Date(g.ends_at) < new Date() ? 'teams' : 'invites';
       }
       var players = g.players || [];
       var inn = players.filter(function (p) {
@@ -2148,6 +2149,9 @@
         placed++;
       });
       var dirty = placed > 0;
+      var undoSide = null;
+      var chosen = null; // 'fair' or 'random' once Dayli has chosen
+      var played = g.ends_at && new Date(g.ends_at) < new Date();
 
       function refreshGame() {
         rpc('game_view', { p_game: g.id }).then(
@@ -2329,7 +2333,30 @@
         var nb = inn.filter(function (p) {
           return side[p.id] === 'bibs';
         }).length;
+        var scoreCard = !played
+          ? ''
+          : g.score_bibs != null
+            ? '<div class="gt-score done"><span class="grow">Final score <b>Bibs ' +
+              g.score_bibs +
+              ' – ' +
+              g.score_colours +
+              ' Colours</b></span><button type="button" class="linkish" id="gt-score">Change</button></div>'
+            : inn.length > 1
+              ? '<div class="gt-score"><span class="grow"><b>How did it finish?</b><small>Dayli uses the score to make the next teams fair.</small></span><button type="button" class="btn primary" id="gt-score">Add the score</button></div>'
+              : '';
+        var dayliCard = played
+          ? ''
+          : chosen
+          ? '<div class="gt-chosen"><span class="gt-spark">✦</span><span class="grow">' +
+            (chosen === 'fair' ? 'Fair teams chosen from past results' : 'Teams split at random: save the score after games and Dayli makes them fairer') +
+            '</span><button type="button" class="linkish" id="gt-again">Again</button></div>'
+          : '<div class="gt-dayli"><span class="gt-spark big">✦</span><span class="grow"><b>Let Dayli choose the teams</b><small>Dayli looks at everyone’s past results and splits them into two even sides.</small></span></div>' +
+            '<button type="button" class="btn primary gt-choose" id="gt-choose"' +
+            (inn.length < 2 ? ' disabled' : '') +
+            '>✦ Choose fair teams</button>';
         return (
+          scoreCard +
+          dayliCard +
           '<div class="sg-pitch gt-pitch"><div class="ln box"></div><div class="ln half"></div><div class="ln circle"></div><div class="ln area top"></div><div class="ln area bottom"></div>' +
           '<span class="sg-sl" style="top:10px">BIBS · ' +
           nb +
@@ -2345,11 +2372,13 @@
           '</div><p class="muted small gt-help">' +
           (inn.length ? 'Tap a player to swap sides. ' : 'When people say yes they take a spot here. ') +
           (dirty ? '<b class="ink">Save the teams so everyone sees them.</b>' : g.sides_set ? 'Everyone sees these teams.' : '') +
-          '</p><div class="gt-btns"><button type="button" class="btn" id="gt-mix">Mix them up</button><button type="button" class="btn primary" id="gt-save"' +
+          '</p><div class="gt-btns">' +
+          (undoSide ? '<button type="button" class="btn" id="gt-undo">Undo</button>' : '') +
+          '<button type="button" class="btn primary" id="gt-save"' +
           (dirty ? '' : ' disabled') +
           '>' +
           (g.sides_set ? 'Save the teams' : 'Save and show the teams') +
-          '</button></div>'
+          '</button></div><button type="button" class="gt-mix" id="gt-mix">⇄ Mix them up at random</button>'
         );
       }
       function tabPay() {
@@ -2570,21 +2599,183 @@
             draw();
           };
         });
+        function keepUndo() {
+          undoSide = Object.assign({}, side);
+        }
+        function randomSplit() {
+          var ids = inn
+            .map(function (p) {
+              return p.id;
+            })
+            .sort(function () {
+              return Math.random() - 0.5;
+            });
+          var nb = Math.round((ids.length * bibs) / places);
+          ids.forEach(function (id, i) {
+            side[id] = i < nb ? 'bibs' : 'colours';
+          });
+        }
+        // Two sides whose average ratings are as close as possible: many
+        // shuffled snake drafts, each improved by swapping pairs; then one of
+        // the best at random (so Again gives another fair split).
+        function fairSplit(ratings) {
+          var ids = inn.map(function (p) {
+            return p.id;
+          });
+          var nb = Math.round((ids.length * bibs) / places);
+          var r = function (id) {
+            return Number(ratings[id]) || 1000;
+          };
+          function gap(b, c) {
+            var sb = 0;
+            var sc = 0;
+            b.forEach(function (id) {
+              sb += r(id);
+            });
+            c.forEach(function (id) {
+              sc += r(id);
+            });
+            return Math.abs(sb / Math.max(1, b.length) - sc / Math.max(1, c.length));
+          }
+          var tries = [];
+          for (var t = 0; t < 40; t++) {
+            var order = ids.slice().sort(function (x, y) {
+              return r(y) + Math.random() * 30 - (r(x) + Math.random() * 30);
+            });
+            var b = [];
+            var c = [];
+            order.forEach(function (id, i) {
+              var toB = Math.floor(i / 2) % 2 === 0 ? i % 2 === 0 : i % 2 === 1;
+              if ((toB && b.length < nb) || c.length >= ids.length - nb) b.push(id);
+              else c.push(id);
+            });
+            for (var round = 0, better = true; better && round < 20; round++) {
+              better = false;
+              for (var i = 0; i < b.length; i++) {
+                for (var j = 0; j < c.length; j++) {
+                  var nb2 = b.slice();
+                  var nc2 = c.slice();
+                  nb2[i] = c[j];
+                  nc2[j] = b[i];
+                  if (gap(nb2, nc2) + 0.01 < gap(b, c)) {
+                    b = nb2;
+                    c = nc2;
+                    better = true;
+                  }
+                }
+              }
+            }
+            tries.push({ b: b, c: c, gap: gap(b, c) });
+          }
+          tries.sort(function (x, y) {
+            return x.gap - y.gap;
+          });
+          var good = tries.filter(function (x) {
+            return x.gap <= tries[0].gap + 4;
+          });
+          var pick = good[Math.floor(Math.random() * good.length)];
+          pick.b.forEach(function (id) {
+            side[id] = 'bibs';
+          });
+          pick.c.forEach(function (id) {
+            side[id] = 'colours';
+          });
+        }
+        function choose(button) {
+          if (button) setBusy(button, true, 'Choosing…');
+          rpc('game_ratings', { p_game: g.id }).then(
+            function (res) {
+              keepUndo();
+              if (res && res.scored) {
+                fairSplit(res.ratings || {});
+                chosen = 'fair';
+              } else {
+                randomSplit();
+                chosen = 'random';
+              }
+              dirty = true;
+              draw();
+            },
+            function (err) {
+              if (button) setBusy(button, false);
+              toast(friendly(err));
+            },
+          );
+        }
+        if ($('#gt-choose'))
+          $('#gt-choose').onclick = function () {
+            choose(this);
+          };
+        if ($('#gt-again'))
+          $('#gt-again').onclick = function () {
+            choose(null);
+          };
+        if ($('#gt-undo'))
+          $('#gt-undo').onclick = function () {
+            side = undoSide;
+            undoSide = null;
+            chosen = null;
+            draw();
+          };
         if ($('#gt-mix'))
           $('#gt-mix').onclick = function () {
-            var ids = inn
-              .map(function (p) {
-                return p.id;
-              })
-              .sort(function () {
-                return Math.random() - 0.5;
-              });
-            var nb = Math.round((ids.length * bibs) / places);
-            ids.forEach(function (id, i) {
-              side[id] = i < nb ? 'bibs' : 'colours';
-            });
+            keepUndo();
+            randomSplit();
+            chosen = null;
             dirty = true;
             draw();
+          };
+        if ($('#gt-score'))
+          $('#gt-score').onclick = function () {
+            var sb = g.score_bibs != null ? g.score_bibs : 0;
+            var sc = g.score_colours != null ? g.score_colours : 0;
+            var sh = sgSheet(
+              '<div class="gs-head"><b>How did it finish?</b><button type="button" class="linkish" data-close>Close</button></div>' +
+                '<p class="muted small" style="margin:0 0 8px">Dayli uses the score to make the next teams fair.</p>' +
+                '<div class="gt-sc"><div class="b"><small>BIBS</small><span><button type="button" data-s="b" data-d="-1">−</button><b id="gt-sb">' +
+                sb +
+                '</b><button type="button" data-s="b" data-d="1">+</button></span></div><i>v</i><div class="c"><small>COLOURS</small><span><button type="button" data-s="c" data-d="-1">−</button><b id="gt-sc">' +
+                sc +
+                '</b><button type="button" data-s="c" data-d="1">+</button></span></div></div>' +
+                '<button type="button" class="btn primary gs-wide" id="gt-ssave">Save the score</button>' +
+                (g.score_bibs != null ? '<button type="button" class="btn gs-wide" id="gt-sclear">Remove the score</button>' : ''),
+              'gs-small',
+            );
+            $('[data-close]', sh.el).onclick = sh.close;
+            $$('[data-s]', sh.el).forEach(function (b) {
+              b.onclick = function () {
+                if (b.dataset.s === 'b') sb = Math.max(0, Math.min(99, sb + Number(b.dataset.d)));
+                else sc = Math.max(0, Math.min(99, sc + Number(b.dataset.d)));
+                $('#gt-sb', sh.el).textContent = sb;
+                $('#gt-sc', sh.el).textContent = sc;
+              };
+            });
+            function saveScore(x, y, button) {
+              setBusy(button, true);
+              // The teams on the pitch are the ones the score is for.
+              (g.sides_set && !dirty ? Promise.resolve() : rpc('game_set_sides', { p_game: g.id, p_sides: side }))
+                .then(function () {
+                  return rpc('game_set_score', { p_game: g.id, p_bibs: x, p_colours: y });
+                })
+                .then(
+                function () {
+                  sh.close();
+                  toast(x === null ? 'Score removed' : 'Score saved: Bibs ' + x + ' – ' + y + ' Colours');
+                  refreshGame();
+                },
+                function (err) {
+                  setBusy(button, false);
+                  toast(friendly(err));
+                },
+              );
+            }
+            $('#gt-ssave', sh.el).onclick = function () {
+              saveScore(sb, sc, this);
+            };
+            if ($('#gt-sclear', sh.el))
+              $('#gt-sclear', sh.el).onclick = function () {
+                saveScore(null, null, this);
+              };
           };
         if ($('#gt-save'))
           $('#gt-save').onclick = function () {

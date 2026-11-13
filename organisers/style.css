@@ -6660,3 +6660,163 @@ button.sg-pp {
   text-decoration: none;
   margin-bottom: 2px;
 }
+
+/* Team sheet: let Dayli choose, the score, mix them up. */
+.gt-dayli {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  padding: 12px 14px;
+  max-width: 470px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+.gt-dayli span.grow {
+  display: flex;
+  flex-direction: column;
+}
+.gt-dayli b {
+  font-size: 15px;
+}
+.gt-dayli small {
+  color: var(--muted);
+  font-size: 12.5px;
+  line-height: 1.35;
+}
+.gt-spark {
+  color: var(--accent);
+  font-weight: 800;
+}
+.gt-spark.big {
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  flex: none;
+}
+.btn.gt-choose {
+  display: block;
+  width: 100%;
+  max-width: 470px;
+  margin: 10px auto 12px;
+}
+.gt-chosen {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  border-radius: 12px;
+  padding: 9px 12px;
+  font-size: 13px;
+  font-weight: 700;
+  max-width: 470px;
+  margin: 0 auto 10px;
+  box-sizing: border-box;
+}
+.gt-chosen .linkish,
+.gt-score .linkish {
+  margin: 0;
+  font-weight: 800;
+}
+.gt-mix {
+  display: block;
+  margin: 14px auto 0;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 800;
+  cursor: pointer;
+  padding: 8px 12px;
+}
+.gt-score {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fbf3e2;
+  border: 1px solid #efdcb4;
+  border-radius: 14px;
+  padding: 10px 12px;
+  max-width: 470px;
+  margin: 0 auto 10px;
+  box-sizing: border-box;
+}
+.gt-score.done {
+  background: var(--surface);
+  border-color: var(--border);
+}
+.gt-score span.grow {
+  display: flex;
+  flex-direction: column;
+}
+.gt-score small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.gt-score .btn {
+  margin: 0;
+  white-space: nowrap;
+}
+.gt-sc {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 6px 0 4px;
+}
+.gt-sc > div {
+  flex: 1;
+  text-align: center;
+  border-radius: 16px;
+  padding: 10px 6px;
+}
+.gt-sc .b {
+  background: #fff7d6;
+  border: 2px solid #f5c518;
+}
+.gt-sc .c {
+  background: var(--blue-bg);
+  border: 2px solid var(--blue);
+}
+.gt-sc small {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.5px;
+}
+.gt-sc span {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-top: 4px;
+}
+.gt-sc span b {
+  font: 700 38px/1 Georgia, serif;
+  min-width: 34px;
+}
+.gt-sc button {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  font-size: 20px;
+  font-weight: 700;
+  cursor: pointer;
+  margin: 0;
+  padding: 0;
+  color: var(--ink);
+}
+.gt-sc i {
+  font: 700 18px Georgia, serif;
+  color: var(--muted);
+}
