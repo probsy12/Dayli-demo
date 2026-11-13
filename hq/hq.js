@@ -1221,6 +1221,8 @@
           weekly: false,
           mins: 60,
           cost: '',
+          split: false,
+          pitch: '',
           title: '',
           titleTouched: false,
           cal: cals[0] ? cals[0].id : null,
@@ -1253,6 +1255,28 @@
         : when.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' }) + ' · ' + g.time;
       var minsText = { 60: '1 hour', 90: '1½ hours', 120: '2 hours', 180: '3 hours' }[g.mins] || g.mins + ' minutes';
 
+      // A price each, or the pitch fee shared by everyone playing.
+      function pitchPence() {
+        var v = parseFloat(String(g.pitch || '').replace(/[£,\s]/g, ''));
+        return v >= 1 && v <= 1000 ? Math.round(v * 100) : null;
+      }
+      function sharePence(n) {
+        var p = pitchPence();
+        return p ? Math.ceil(p / Math.max(1, n) / 10) * 10 : null;
+      }
+      function costText() {
+        if (g.split) return pitchPence() ? sgPounds(pitchPence()) + ' pitch, split' : 'Split the pitch fee';
+        return g.cost ? g.cost + ' each' : 'Free, or say later';
+      }
+      function splitNote() {
+        return pitchPence()
+          ? 'If all ' +
+              g.places +
+              ' play, that’s ' +
+              sgPounds(sharePence(g.places)) +
+              ' each. Fewer players, a bigger share: it changes as people say yes.'
+          : 'Type what the pitch costs. Everyone playing pays an equal share, and it goes down as more say yes.';
+      }
       function row(key, label, value, editor) {
         return (
           '<div class="ng-row' +
@@ -1404,10 +1428,21 @@
           row(
             'cost',
             'Cost',
-            g.cost ? g.cost + ' each' : 'Free, or say later',
-            '<input type="text" id="ng-cost" class="ng-inp" maxlength="40" placeholder="£5" value="' +
-              esc(g.cost) +
-              '" /><p class="muted small ng-note">People pay you in cash, or by card once card payments are on.</p>',
+            costText(),
+            '<div class="ng-seg ng-cseg"><button type="button" class="' +
+              (g.split ? '' : 'on') +
+              '" data-cmode="each">Price each</button><button type="button" class="' +
+              (g.split ? 'on' : '') +
+              '" data-cmode="split">Split the pitch</button></div>' +
+              (g.split
+                ? '<label class="ng-money"><span>£</span><input type="text" id="ng-pitch" class="ng-inp" inputmode="decimal" maxlength="7" placeholder="60" value="' +
+                  esc(g.pitch) +
+                  '" /></label><p class="muted small ng-note" id="ng-split-note">' +
+                  esc(splitNote()) +
+                  '</p>'
+                : '<input type="text" id="ng-cost" class="ng-inp" maxlength="40" placeholder="£5" value="' +
+                  esc(g.cost) +
+                  '" /><p class="muted small ng-note">People pay you in cash, or by card once card payments are on.</p>'),
           ) +
           '<label class="ng-row ng-switch-row"><span class="muted">Repeats</span><b>Every week</b><span class="ng-switch"><input type="checkbox" id="ng-weekly"' +
           (g.weekly ? ' checked' : '') +
@@ -1436,6 +1471,8 @@
           g.weekly = !!t.weekly;
           g.mins = t.minutes || 60;
           g.cost = t.cost || '';
+          g.split = !!t.pitch_pence;
+          g.pitch = t.pitch_pence ? String(t.pitch_pence / 100) : '';
           g.title = t.title;
           g.titleTouched = true;
           if (t.calendar_id && cals.some(function (c) { return c.id === t.calendar_id; })) g.cal = t.calendar_id;
@@ -1479,8 +1516,20 @@
       if ($('#ng-cost'))
         $('#ng-cost').oninput = function () {
           g.cost = this.value.trim();
-          setText('cost', g.cost ? g.cost + ' each' : 'Free, or say later');
+          setText('cost', costText());
         };
+      if ($('#ng-pitch'))
+        $('#ng-pitch').oninput = function () {
+          g.pitch = this.value.trim();
+          setText('cost', costText());
+          $('#ng-split-note').textContent = splitNote();
+        };
+      $$('[data-cmode]').forEach(function (b) {
+        b.onclick = function () {
+          g.split = b.dataset.cmode === 'split';
+          redraw('cost');
+        };
+      });
       if ($('#ng-date'))
         $('#ng-date').onchange = function () {
           if (this.value) g.day = this.value;
@@ -1534,7 +1583,9 @@
           ? 'You need a calendar in Dayli first: open the Dayli app once.'
           : isNaN(start.getTime()) || start < new Date()
             ? 'Pick a day and time that’s still to come.'
-            : null;
+            : g.split && !pitchPence()
+              ? 'Type what the pitch costs, like £60 (or choose Price each).'
+              : null;
         if (why) {
           err.textContent = why;
           err.hidden = false;
@@ -1551,9 +1602,17 @@
           p_timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'Europe/London',
           p_location: g.place || null,
           p_places: g.places,
-          p_cost: g.cost || null,
+          p_cost: g.split ? null : g.cost || null,
           p_weekly: g.weekly,
-        }).then(
+        })
+          .then(function (id) {
+            // The pitch fee to split goes on straight after (the game exists by then).
+            if (!g.split) return id;
+            return rpc('game_set_cost', { p_game: id, p_cost: null, p_pitch_pence: pitchPence() }).then(function () {
+              return id;
+            });
+          })
+          .then(
           function (id) {
             go('#/games/' + id + '?made=1');
           },
@@ -1718,7 +1777,8 @@
       });
       var places = g.places;
       var bibs = g.bibs && g.bibs < places ? g.bibs : Math.floor(places / 2);
-      var price = g.price_pence || sgPrice(g.cost);
+      // Each person's price: their share of the pitch when it's split.
+      var price = g.pitch_pence ? g.share_pence : g.price_pence || sgPrice(g.cost);
       var link = SITE + '/g/?c=' + encodeURIComponent(g.code);
       var when = new Date(g.starts_at).toLocaleDateString('en-GB', {
         weekday: 'long',
@@ -1962,7 +2022,11 @@
         var left = g.left_paid || [];
         return (
           '<div class="gi-top"><div class="grow"><b>' +
-          (price ? sgPounds(price * paid.length) + ' of ' + sgPounds(price * inn.length) + ' paid' : paid.length + ' of ' + inn.length + ' paid') +
+          (g.pitch_pence
+            ? sgPounds(price * paid.length) + ' of the ' + sgPounds(g.pitch_pence) + ' pitch paid'
+            : price
+              ? sgPounds(price * paid.length) + ' of ' + sgPounds(price * inn.length) + ' paid'
+              : paid.length + ' of ' + inn.length + ' paid') +
           '</b><div class="gi-bar"><i style="width:' +
           pct +
           '%"></i></div></div></div>' +
@@ -2058,7 +2122,7 @@
             '<h1>' +
             esc(g.title) +
             '</h1><div class="muted gm-meta">' +
-            esc([when, at, g.location, g.cost ? g.cost + ' each' : null].filter(Boolean).join(' · ')) +
+            esc([when, at, g.location, g.cost ? (g.pitch_pence ? g.cost : g.cost + ' each') : null].filter(Boolean).join(' · ')) +
             '</div></div><div class="gm-tools"><a class="gm-tool" href="#/games/new" title="New game" aria-label="New game">+</a><button type="button" class="gm-tool" id="gm-gear" title="Settings" aria-label="Settings"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.8l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.8-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1.1-1.5 1.7 1.7 0 00-1.8.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.8 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1.1 1.7 1.7 0 00-.3-1.8l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.8.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.8-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.8V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg></button></div></div>' +
             '<nav class="gm-tabs">' +
             tabs
@@ -2384,10 +2448,73 @@
             ' v ' +
             (places - bibs) +
             '</span><button type="button" data-bibs="1">+</button></span></div>' +
+            '<div class="gs-cost"><div class="gs-row"><span><b>Cost</b><small id="gs-cnote"></small></span></div>' +
+            '<div class="ng-seg ng-cseg"><button type="button" data-gc="each">Price each</button><button type="button" data-gc="split">Split the pitch</button></div>' +
+            '<div class="gs-cin"><label class="ng-money"><span>£</span><input type="text" id="gs-camt" class="ng-inp" inputmode="decimal" maxlength="7" /></label><button type="button" class="btn" id="gs-csave">Save</button></div></div>' +
             cardBar() +
             '<button type="button" class="btn gs-wide" id="gs-link">Copy the game’s link</button>',
           'gs-tall',
         );
+        // Cost: a price each, or the pitch fee split between everyone playing.
+        var split = !!g.pitch_pence;
+        var amounts = {
+          each: !g.pitch_pence && sgPrice(g.cost) ? String(sgPrice(g.cost) / 100) : '',
+          split: g.pitch_pence ? String(g.pitch_pence / 100) : '',
+        };
+        function costMode() {
+          $$('[data-gc]', s.el).forEach(function (b) {
+            b.classList.toggle('on', (b.dataset.gc === 'split') === split);
+          });
+          $('#gs-camt', s.el).value = amounts[split ? 'split' : 'each'];
+          $('#gs-camt', s.el).placeholder = split ? '60' : '5';
+          costNote();
+        }
+        function costNote() {
+          var v = parseFloat(String($('#gs-camt', s.el).value).replace(/[£,\s]/g, ''));
+          var n = Math.max(1, inn.length);
+          $('#gs-cnote', s.el).textContent = !(v > 0)
+            ? split
+              ? 'What the pitch costs, shared by everyone playing'
+              : 'Leave empty if it’s free'
+            : split
+              ? 'With ' + n + ' playing now, ' + sgPounds(Math.ceil((v * 100) / n / 10) * 10) + ' each. It goes down as more say yes.'
+              : sgPounds(Math.round(v * 100)) + ' each';
+        }
+        $$('[data-gc]', s.el).forEach(function (b) {
+          b.onclick = function () {
+            amounts[split ? 'split' : 'each'] = $('#gs-camt', s.el).value;
+            split = b.dataset.gc === 'split';
+            costMode();
+          };
+        });
+        $('#gs-camt', s.el).oninput = costNote;
+        $('#gs-csave', s.el).onclick = function () {
+          var raw = String($('#gs-camt', s.el).value).replace(/[£,\s]/g, '');
+          var v = raw ? parseFloat(raw) : null;
+          if (v !== null && !(v >= 1 && v <= (split ? 1000 : 100))) {
+            return toast(split ? 'Type a pitch fee between £1 and £1,000' : 'Type a price between £1 and £100');
+          }
+          var pence = v === null ? null : Math.round(v * 100);
+          var button = this;
+          setBusy(button, true);
+          rpc('game_set_cost', {
+            p_game: g.id,
+            p_cost: !split && pence ? sgPounds(pence) : null,
+            p_pitch_pence: split ? pence : null,
+          }).then(
+            function () {
+              s.close();
+              toast(!pence ? 'The game is free' : split ? 'The pitch is split between everyone playing' : 'Cost saved');
+              refreshGame();
+            },
+            function (err) {
+              setBusy(button, false);
+              toast(friendly(err));
+            },
+          );
+        };
+        costMode();
+
         var timer = null;
         function save() {
           $('#gs-n', s.el).textContent = places;
@@ -2491,6 +2618,9 @@
       // Card payments (hidden until team payments are on): set up Stripe, then a price.
       function cardBar() {
         if (!g.payments_on) return '';
+        if (g.pitch_pence) {
+          return '<div class="sg-card"><div class="grow"><b>Card payments</b><div class="muted small">Card payments need a set price each. While the pitch is split, people pay you their share in cash.</div></div></div>';
+        }
         if (!g.card_ready) {
           return (
             '<div class="sg-card"><div class="grow"><b>Take card payments</b><div class="muted small">Players pay on the game’s link or in Dayli with Apple Pay, Google Pay or a card, whenever they like. They cover the card fee; the money goes to your own Stripe account.</div></div>' +

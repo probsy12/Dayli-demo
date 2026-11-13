@@ -6184,3 +6184,41 @@ button.sg-pp {
     font-size: 13px;
   }
 }
+
+/* Cost: a price each, or the pitch split. */
+.ng-cseg {
+  margin: 4px 0 8px;
+}
+.ng-money {
+  position: relative;
+  display: block;
+  flex: 1;
+}
+.ng-money span {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  margin-top: 4px;
+  font-weight: 700;
+  color: var(--muted);
+  pointer-events: none;
+}
+.ng-money .ng-inp {
+  padding-left: 30px;
+}
+.gs-cost .gs-row {
+  border-bottom: 0;
+  padding-bottom: 4px;
+}
+.gs-cin {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--alt);
+}
+.gs-cin .btn {
+  margin: 0;
+  min-height: 50px;
+}
