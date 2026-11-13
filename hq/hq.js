@@ -237,7 +237,9 @@
           link(base + '/squad', 'squad', 'Squad', h === base + '/squad') +
           link(base + '/payments', 'money', 'Payments', h === base + '/payments');
       } else if (c === 'games') {
-        out += link('#/games', 'ball', 'Social games', /^#\/games/.test(h));
+        out +=
+          link('#/games', 'ball', 'Social games', /^#\/games/.test(h) && !/^#\/games\/owed/.test(h)) +
+          link('#/games/owed', 'money', 'Owed to you', /^#\/games\/owed/.test(h));
       } else if (c === 'events') {
         out +=
           link('#/overview', 'home', 'Overview', h === '#/overview') +
@@ -272,7 +274,11 @@
         var team = c && c.indexOf('team:') === 0 ? c.slice(5) : hq.teams[0] && hq.teams[0].calendar_id;
         out += item(team ? '#/teams/' + team : '#/welcome/setup', 'squad', 'Team', c && c.indexOf('team:') === 0);
       }
-      if (runs('games')) out += item('#/games', 'ball', 'Games', c === 'games');
+      if (runs('games')) {
+        var owedOn = /^#\/games\/owed/.test(h);
+        out += item('#/games', 'ball', 'Games', c === 'games' && !owedOn);
+        out += item('#/games/owed', 'money', 'Owed', owedOn);
+      }
       if (runs('events')) out += item('#/overview', 'ticket', 'Events', c === 'events');
       out +=
         '<button type="button" id="hq-more" class="' +
@@ -971,6 +977,7 @@
 
     function screenGames(gameId, query) {
       if (gameId === 'new') return screenNewGame();
+      if (gameId === 'owed') return query && query.p ? screenOwedPerson(query.p) : screenOwed();
       loading();
       if (query && query.made && gameId) {
         return rpc('game_view', { p_game: gameId }).then(
@@ -1701,6 +1708,220 @@
     var gameTab = 'invites';
     var gameTabFor = null;
 
+    // --- Owed to you: who owes what across your games, like a running tab ---
+    function owedDate(iso, long) {
+      return new Date(iso).toLocaleDateString('en-GB', long ? { weekday: 'short', day: 'numeric', month: 'short' } : { day: 'numeric', month: 'short' });
+    }
+    function owedWhatsApp(lines) {
+      window.open('https://wa.me/?text=' + encodeURIComponent(lines), '_blank', 'noopener');
+    }
+    function nudgeOne(r) {
+      return rpc('game_owed_nudge', { p_who: r.who }).then(function (res) {
+        return { r: r, sent: !!(res && res.sent) };
+      });
+    }
+    function screenOwed() {
+      loading();
+      rpc('game_owed').then(
+        function (rows) {
+          rows = rows || [];
+          var total = rows.reduce(function (t, r) {
+            return t + (r.owed_pence || 0);
+          }, 0);
+          render(
+            '<div class="ow"><h1>Owed to you</h1>' +
+              (rows.length
+                ? '<div class="ow-total"><div class="grow"><b>' +
+                  sgPounds(total) +
+                  '</b><span>from ' +
+                  rows.length +
+                  (rows.length === 1 ? ' person' : ' people') +
+                  '</span></div><button type="button" class="btn" id="ow-all">Nudge everyone</button></div>' +
+                  '<div class="ow-list">' +
+                  rows
+                    .map(function (r) {
+                      return (
+                        '<a class="ow-row" href="#/games/owed?p=' +
+                        encodeURIComponent(r.who) +
+                        '">' +
+                        sgAvatar({ id: r.who, name: r.name, avatar_url: r.avatar_url }, 46) +
+                        '<span class="grow"><b>' +
+                        esc(r.name) +
+                        '</b><small>' +
+                        r.games +
+                        (r.games === 1 ? ' game' : ' games') +
+                        ' · since ' +
+                        esc(owedDate(r.since)) +
+                        (r.nudged_at ? ' · reminded ' + esc(sgAgo(r.nudged_at)) : '') +
+                        '</small></span><span class="ow-amt"><small>owes you</small><b>' +
+                        sgPounds(r.owed_pence) +
+                        '</b></span></a>'
+                      );
+                    })
+                    .join('') +
+                  '</div>'
+                : '<div class="ow-none"><b>All settled up</b><p class="muted">Nobody owes you anything. People show here once they’ve played (or the price is locked) and haven’t paid.</p></div>') +
+              '</div>',
+          );
+          if (!$('#ow-all')) return;
+          $('#ow-all').onclick = function () {
+            var button = this;
+            if (!confirm('Remind everyone who owes you? People on Dayli get a notification; for the rest, a WhatsApp message opens.')) return;
+            setBusy(button, true, 'Nudging…');
+            Promise.all(
+              rows.map(function (r) {
+                return nudgeOne(r).catch(function () {
+                  return { r: r, sent: false, skipped: true };
+                });
+              }),
+            ).then(function (res) {
+              setBusy(button, false);
+              var sent = res.filter(function (x) {
+                return x.sent;
+              }).length;
+              var rest = res.filter(function (x) {
+                return !x.sent && !x.skipped && !x.r.user_id;
+              });
+              toast(sent ? 'Reminded ' + sent + ' on Dayli' : 'Nobody new to remind on Dayli (each person once every 12 hours)');
+              if (rest.length) {
+                owedWhatsApp(
+                  'Still to pay for the games: ' +
+                    rest
+                      .map(function (x) {
+                        return sgFirst(x.r.name) + ' ' + sgPounds(x.r.owed_pence);
+                      })
+                      .join(', ') +
+                    '. Thanks!',
+                );
+              }
+              screenOwed();
+            });
+          };
+        },
+        function (err) {
+          render(notice('error', esc(friendly(err))));
+        },
+      );
+    }
+    function screenOwedPerson(who) {
+      loading();
+      rpc('game_owed_person', { p_who: who }).then(
+        function (d) {
+          if (!d) return go('#/games/owed');
+          var games = d.games || [];
+          var owed = games.filter(function (x) {
+            return x.owed;
+          });
+          render(
+            '<div class="ow"><a class="ow-back" href="#/games/owed">‹ Owed to you</a>' +
+              '<div class="ow-head">' +
+              sgAvatar({ id: d.who, name: d.name, avatar_url: d.avatar_url }, 64) +
+              '<div><h1>' +
+              esc(d.name) +
+              '</h1>' +
+              (d.owed_pence
+                ? '<p class="ow-owes">owes you <b>' + sgPounds(d.owed_pence) + '</b></p><p class="muted small">Owed since ' + esc(owedDate(d.since, true)) + (d.nudged_at ? ' · reminded ' + esc(sgAgo(d.nudged_at)) : '') + '</p>'
+                : '<p class="ow-owes settled">All settled up</p>') +
+              '</div></div>' +
+              (d.owed_pence
+                ? '<div class="ow-btns"><button type="button" class="btn primary" id="ow-nudge">' +
+                  (d.user_id ? 'Nudge in Dayli' : 'Remind on WhatsApp') +
+                  '</button><button type="button" class="btn" id="ow-settle">Settle up (paid cash)</button></div>'
+                : '') +
+              '<h2 class="ow-h2">Games</h2><div class="ow-games">' +
+              games
+                .map(function (x) {
+                  var st = x.paid === 'card' ? ['paid', 'Paid by card'] : x.paid ? ['paid', 'Paid cash'] : x.owed ? ['owe', 'Not paid'] : ['soon', 'Not due yet'];
+                  return (
+                    '<div class="ow-game"><a class="grow" href="#/games/' +
+                    esc(x.game_id) +
+                    '"><b>' +
+                    esc(x.title) +
+                    '</b><small>' +
+                    esc(owedDate(x.starts_at, true)) +
+                    '</small></a><span class="ow-gamt">' +
+                    (x.amount ? sgPounds(x.amount) : '') +
+                    '</span><span class="ow-st ' +
+                    st[0] +
+                    '">' +
+                    st[1] +
+                    '</span>' +
+                    (x.owed ? '<button type="button" class="act" data-paid="' + esc(x.place_id) + '">Paid</button>' : '') +
+                    '</div>'
+                  );
+                })
+                .join('') +
+              '</div>' +
+              (owed.length ? '<p class="muted small">Tap Paid when they give you cash for a game. Card payments tick themselves off.</p>' : '') +
+              '</div>',
+          );
+          if ($('#ow-nudge'))
+            $('#ow-nudge').onclick = function () {
+              var button = this;
+              setBusy(button, true);
+              nudgeOne(d).then(
+                function (x) {
+                  setBusy(button, false);
+                  if (x.sent) toast(sgFirst(d.name) + ' has been reminded in Dayli');
+                  else
+                    owedWhatsApp(
+                      'Hi ' +
+                        sgFirst(d.name) +
+                        ', a reminder: ' +
+                        sgPounds(d.owed_pence) +
+                        ' for ' +
+                        owed
+                          .map(function (o) {
+                            return o.title + ' (' + owedDate(o.starts_at) + ')';
+                          })
+                          .join(', ') +
+                        '. Thanks!',
+                    );
+                  screenOwedPerson(who);
+                },
+                function (err) {
+                  setBusy(button, false);
+                  toast(String(err && err.message).indexOf('rate_limited') >= 0 ? 'Already reminded in the last 12 hours.' : friendly(err));
+                },
+              );
+            };
+          if ($('#ow-settle'))
+            $('#ow-settle').onclick = function () {
+              if (!confirm('Mark everything ' + sgFirst(d.name) + ' owes (' + sgPounds(d.owed_pence) + ') as paid in cash?')) return;
+              var button = this;
+              setBusy(button, true);
+              rpc('game_owed_settle', { p_who: who }).then(
+                function () {
+                  toast(sgFirst(d.name) + ' is settled up');
+                  screenOwedPerson(who);
+                },
+                function (err) {
+                  setBusy(button, false);
+                  toast(friendly(err));
+                },
+              );
+            };
+          $$('[data-paid]').forEach(function (b) {
+            b.onclick = function () {
+              setBusy(b, true);
+              rpc('game_mark_paid', { p_place: b.dataset.paid, p_paid: 'cash' }).then(
+                function () {
+                  screenOwedPerson(who);
+                },
+                function (err) {
+                  setBusy(b, false);
+                  toast(friendly(err));
+                },
+              );
+            };
+          });
+        },
+        function (err) {
+          render(notice('error', esc(friendly(err))));
+        },
+      );
+    }
+
     // A sheet from the bottom (a panel on wide screens). Returns close().
     function sgSheet(html, cls) {
       var dim = document.createElement('div');
@@ -2020,7 +2241,21 @@
         });
         var pct = inn.length ? Math.round((paid.length / inn.length) * 100) : 0;
         var left = g.left_paid || [];
+        var lock = !g.pitch_pence
+          ? ''
+          : g.locked_at
+            ? '<div class="gp-lock on"><span class="grow"><b>Price locked at ' +
+              sgPounds(price) +
+              ' each</b><small>' +
+              (g.pay_pence ? 'Players can pay it by card on the link. ' : '') +
+              'What each player owes from now on.</small></span><button type="button" class="btn" id="gp-unlock">Unlock</button></div>'
+            : '<div class="gp-lock"><span class="grow"><b>' +
+              sgPounds(price) +
+              ' each with ' +
+              Math.max(1, inn.length) +
+              ' playing</b><small>It changes as people say yes. It locks by itself after the game, or lock it now.</small></span><button type="button" class="btn primary" id="gp-lock">Lock the price</button></div>';
         return (
+          lock +
           '<div class="gi-top"><div class="grow"><b>' +
           (g.pitch_pence
             ? sgPounds(price * paid.length) + ' of the ' + sgPounds(g.pitch_pence) + ' pitch paid'
@@ -2300,6 +2535,32 @@
             window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
           };
         if ($('#gp-card')) $('#gp-card').onclick = settings;
+        function lockPrice(on, button) {
+          setBusy(button, true);
+          rpc('game_lock_price', { p_game: g.id, p_lock: on }).then(
+            function () {
+              toast(on ? 'Price locked at ' + sgPounds(price) + ' each' : 'Unlocked: the share follows the numbers again');
+              refreshGame();
+            },
+            function (err) {
+              setBusy(button, false);
+              toast(
+                String(err && err.message).indexOf('paid_by_card') >= 0
+                  ? 'Someone has paid by card at this price, so it stays locked.'
+                  : friendly(err),
+              );
+            },
+          );
+        }
+        if ($('#gp-lock'))
+          $('#gp-lock').onclick = function () {
+            if (!confirm('Lock the price at ' + sgPounds(price) + ' each? It won’t change if more people say yes.')) return;
+            lockPrice(true, this);
+          };
+        if ($('#gp-unlock'))
+          $('#gp-unlock').onclick = function () {
+            lockPrice(false, this);
+          };
       }
 
       // --- Add players: your regulars to invite, or a new name straight in ---
@@ -2618,8 +2879,14 @@
       // Card payments (hidden until team payments are on): set up Stripe, then a price.
       function cardBar() {
         if (!g.payments_on) return '';
-        if (g.pitch_pence) {
-          return '<div class="sg-card"><div class="grow"><b>Card payments</b><div class="muted small">Card payments need a set price each. While the pitch is split, people pay you their share in cash.</div></div></div>';
+        if (g.pitch_pence && (g.card_ready || !g.locked_at)) {
+          return (
+            '<div class="sg-card"><div class="grow"><b>Card payments</b><div class="muted small">' +
+            (g.locked_at
+              ? 'Players can pay their ' + sgPounds(g.share_pence) + ' share by card on the link (the card fee is on them).'
+              : 'With the pitch split, cards open once the price is locked (Payments → Lock the price, or after the game).') +
+            '</div></div></div>'
+          );
         }
         if (!g.card_ready) {
           return (

@@ -6222,3 +6222,220 @@ button.sg-pp {
   margin: 0;
   min-height: 50px;
 }
+
+/* --- Owed to you (social games): a running tab per person --------------------------------- */
+.ow {
+  max-width: 720px;
+}
+.ow h1 {
+  margin: 0 0 12px;
+}
+.ow-total {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 12px;
+}
+.ow-total b {
+  display: block;
+  font: 700 28px/1.1 Georgia, serif;
+  color: var(--orange);
+}
+.ow-total span {
+  color: var(--muted);
+  font-size: 14px;
+}
+.ow-total .btn {
+  margin: 0;
+}
+.ow-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.ow-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--alt);
+  color: var(--ink);
+  text-decoration: none;
+}
+.ow-row:last-child {
+  border-bottom: 0;
+}
+.ow-row span.grow {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.ow-row b {
+  font-size: 17px;
+  font-weight: 600;
+}
+.ow-row small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.ow-amt {
+  text-align: right;
+  color: var(--orange);
+  flex: none;
+}
+.ow-amt small {
+  display: block;
+  color: var(--orange);
+  font-size: 12.5px;
+}
+.ow-amt b {
+  font-size: 19px;
+  font-weight: 700;
+}
+.ow-none {
+  text-align: center;
+  padding: 40px 16px;
+}
+.ow-none b {
+  font: 700 22px Georgia, serif;
+}
+.ow-back {
+  display: inline-block;
+  color: var(--accent);
+  font-weight: 700;
+  text-decoration: none;
+  margin-bottom: 12px;
+}
+.ow-head {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.ow-head h1 {
+  margin: 0;
+}
+.ow-owes {
+  margin: 2px 0;
+  color: var(--orange);
+  font-size: 17px;
+}
+.ow-owes b {
+  font-size: 22px;
+}
+.ow-owes.settled {
+  color: var(--accent);
+  font-weight: 700;
+}
+.ow-btns {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 18px;
+}
+.ow-btns .btn {
+  margin: 0;
+  flex: 1;
+}
+.ow-h2 {
+  font-size: 13px;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 0 0 8px;
+}
+.ow-games {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  margin-bottom: 10px;
+}
+.ow-game {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--alt);
+}
+.ow-game:last-child {
+  border-bottom: 0;
+}
+.ow-game a {
+  display: flex;
+  flex-direction: column;
+  color: var(--ink);
+  text-decoration: none;
+  min-width: 0;
+}
+.ow-game small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.ow-gamt {
+  font-weight: 700;
+}
+.ow-st {
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 8px;
+  padding: 4px 8px;
+  white-space: nowrap;
+}
+.ow-st.owe {
+  background: var(--orange-bg);
+  color: var(--orange);
+}
+.ow-st.paid {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.ow-st.soon {
+  background: var(--alt);
+  color: var(--muted);
+}
+.ow-game .act {
+  margin: 0;
+}
+
+/* Split pitch: the price lock on the Payments tab. */
+.gp-lock {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fbf3e2;
+  border: 1px solid #efdcb4;
+  border-radius: 14px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.gp-lock.on {
+  background: var(--accent-soft);
+  border-color: var(--border);
+}
+.gp-lock span.grow {
+  display: flex;
+  flex-direction: column;
+}
+.gp-lock small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.gp-lock .btn {
+  margin: 0;
+  white-space: nowrap;
+}
+@media (max-width: 700px) {
+  .ow-row {
+    padding: 11px 12px;
+    gap: 12px;
+  }
+  .ow-game {
+    flex-wrap: wrap;
+  }
+}
