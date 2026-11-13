@@ -6439,3 +6439,224 @@ button.sg-pp {
     flex-wrap: wrap;
   }
 }
+
+/* --- HQ Games list: coming up, then past games ------------------------------------------- */
+.gl {
+  max-width: 760px;
+}
+.gl-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.gl-head h1 {
+  margin: 0;
+}
+.gl-head .btn {
+  margin: 0;
+}
+.gl-k {
+  font-size: 11.5px;
+  font-weight: 800;
+  letter-spacing: 0.6px;
+  color: var(--muted);
+  margin: 18px 0 8px;
+}
+.gl-card {
+  position: relative;
+  display: flex;
+  gap: 12px;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 18px;
+  padding: 12px;
+  margin-bottom: 10px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.gl-card.next {
+  border: 2px solid var(--accent);
+}
+.gl-card span.grow {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.gl-date {
+  width: 54px;
+  flex: none;
+  align-self: flex-start;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  color: var(--accent);
+  text-align: center;
+  padding: 6px 0;
+}
+.gl-date small {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 800;
+  letter-spacing: 0.4px;
+}
+.gl-date b {
+  display: block;
+  font: 700 22px/1.1 Georgia, serif;
+  color: var(--ink);
+}
+.gl-date i {
+  display: block;
+  font-style: normal;
+  font-size: 10.5px;
+  font-weight: 700;
+}
+.gl-t {
+  font-size: 16px;
+  font-weight: 800;
+  padding-right: 64px;
+}
+.gl-s {
+  font-size: 12.5px;
+  color: var(--muted);
+}
+.gl-bar {
+  display: block;
+  height: 6px;
+  border-radius: 3px;
+  background: var(--border);
+  margin: 8px 0 6px;
+  overflow: hidden;
+}
+.gl-bar i {
+  display: block;
+  height: 6px;
+  background: var(--accent);
+}
+.gl-chips {
+  display: flex;
+  gap: 5px;
+  flex-wrap: wrap;
+}
+.gl-chips span {
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 7px;
+  padding: 3px 7px;
+  background: var(--alt);
+  color: #5d584f;
+}
+.gl-chips .g {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.gl-chips .o {
+  background: var(--orange-bg);
+  color: var(--orange);
+}
+.gl-chips .y {
+  background: #f3e9d2;
+  color: #8a6116;
+}
+.gl-tag {
+  position: absolute;
+  right: 12px;
+  top: 12px;
+  font-size: 10px;
+  font-weight: 800;
+  border-radius: 7px;
+  padding: 3px 7px;
+  background: var(--accent);
+  color: #fff;
+}
+.gl-ar {
+  color: #c9c4b8;
+  font-size: 20px;
+  align-self: center;
+}
+.gl-past {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.gl-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--alt);
+  color: var(--ink);
+  text-decoration: none;
+}
+.gl-row:last-child {
+  border-bottom: 0;
+}
+.gl-row span.grow {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.gl-row b {
+  font-size: 14.5px;
+}
+.gl-row small {
+  font-size: 12px;
+  color: var(--muted);
+}
+.gl-dd {
+  width: 40px;
+  flex: none;
+  text-align: center;
+  line-height: 1.05;
+}
+.gl-dd small {
+  font-size: 10px !important;
+  font-weight: 800;
+}
+.gl-dd b {
+  display: block;
+  font: 700 17px Georgia, serif;
+}
+.gl-owed,
+.gl-paid {
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 7px;
+  padding: 3px 7px;
+  white-space: nowrap;
+}
+.gl-owed {
+  color: var(--orange);
+  background: var(--orange-bg);
+}
+.gl-paid {
+  color: var(--accent);
+  background: var(--accent-soft);
+}
+.gl-more {
+  display: block;
+  width: 100%;
+  border: 0;
+  background: none;
+  color: var(--accent);
+  font: inherit;
+  font-weight: 800;
+  padding: 14px;
+  cursor: pointer;
+  margin: 0;
+}
+.gl-none {
+  background: var(--surface);
+  border: 1.5px dashed var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  color: var(--muted);
+}
+.gm-back {
+  display: inline-block;
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--accent);
+  text-decoration: none;
+  margin-bottom: 2px;
+}

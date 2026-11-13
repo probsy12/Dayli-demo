@@ -1011,16 +1011,8 @@
       });
     }
 
-    function loadGames(gameId) {
-      loading();
-      rpc('my_games').then(
-        function (rows) {
-          var mine = (rows || []).filter(function (g) {
-            return g.is_organiser;
-          });
-          var id = gameId || (mine[0] && mine[0].id);
-          if (!id) {
-            render(
+    function gamesEmpty() {
+      render(
               '<div class="ng ng-empty"><div class="ng-art"><svg width="72" height="72" viewBox="0 0 24 24" fill="none" stroke="#3a61c9" stroke-width="1.6"><circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10z"/></svg></div>' +
                 '<h1>Your first game</h1><p class="muted">Make it in a minute, share the link, and people take a place.</p><div class="ng-how">' +
                 [
@@ -1034,8 +1026,136 @@
                   .join('') +
                 '</div><a class="btn primary ng-go" href="#/games/new">+ Start a game</a></div>',
             );
-            return;
+    }
+
+    // Games: everything coming up (soonest first, the next one outlined), then
+    // past games (newest first, 20 at a time). Tap one to open it.
+    function screenGamesList() {
+      loading();
+      Promise.all([rpc('game_list', { p_past: false }), rpc('game_list', { p_past: true })]).then(
+        function (res) {
+          var coming = res[0] || [];
+          var past = res[1] || [];
+          if (!coming.length && !past.length) return gamesEmpty();
+          var today = ymdLocal(new Date());
+          function dayParts(x) {
+            var d = new Date(x.starts_at);
+            var o = { timeZone: x.timezone || undefined };
+            return {
+              wd: d.toLocaleDateString('en-GB', Object.assign({ weekday: 'short' }, o)).toUpperCase(),
+              n: d.toLocaleDateString('en-GB', Object.assign({ day: 'numeric' }, o)),
+              m: d.toLocaleDateString('en-GB', Object.assign({ month: 'short' }, o)).toUpperCase(),
+              t: d.toLocaleTimeString('en-GB', Object.assign({ hour: '2-digit', minute: '2-digit' }, o)),
+              ymd: ymdLocal(d),
+            };
           }
+          function card(x, i) {
+            var d = dayParts(x);
+            var full = x.playing >= x.places;
+            var pct = Math.min(100, Math.round((x.playing / Math.max(1, x.places)) * 100));
+            var chips = ['<span class="g">' + x.playing + ' of ' + x.places + ' playing</span>'];
+            if (full) chips.push('<span class="g">Full</span>');
+            if (x.waiting) chips.push('<span>' + x.waiting + ' waiting</span>');
+            if (x.no_reply) chips.push('<span class="y">' + x.no_reply + ' no reply</span>');
+            if (x.price_each && x.unpaid) chips.push('<span class="o">' + sgPounds(x.price_each * x.unpaid) + ' to collect</span>');
+            if (x.pitch_pence && !x.locked) chips.push('<span>' + sgPounds(x.pitch_pence) + ' pitch, split</span>');
+            var tag = d.ymd === today ? 'TODAY' : '';
+            return (
+              '<a class="gl-card' +
+              (i === 0 ? ' next' : '') +
+              '" href="#/games/' +
+              esc(x.id) +
+              '">' +
+              (tag ? '<span class="gl-tag">' + tag + '</span>' : '') +
+              '<span class="gl-date"><small>' +
+              esc(d.wd) +
+              '</small><b>' +
+              esc(d.n) +
+              '</b><i>' +
+              esc(d.m) +
+              '</i></span><span class="grow"><b class="gl-t">' +
+              esc(x.title) +
+              '</b><small class="gl-s">' +
+              esc([d.t, x.location, x.weekly ? 'weekly' : null].filter(Boolean).join(' · ')) +
+              '</small><span class="gl-bar"><i style="width:' +
+              pct +
+              '%"></i></span><span class="gl-chips">' +
+              chips.join('') +
+              '</span></span><span class="gl-ar">›</span></a>'
+            );
+          }
+          function row(x) {
+            var d = dayParts(x);
+            var owed = x.price_each && x.unpaid ? x.price_each * x.unpaid : 0;
+            return (
+              '<a class="gl-row" href="#/games/' +
+              esc(x.id) +
+              '"><span class="gl-dd"><small>' +
+              esc(d.wd) +
+              '</small><b>' +
+              esc(d.n) +
+              '</b></span><span class="grow"><b>' +
+              esc(x.title) +
+              '</b><small>' +
+              esc(d.m.charAt(0) + d.m.slice(1).toLowerCase()) +
+              ' · ' +
+              x.playing +
+              ' played' +
+              (x.price_each ? ' · ' + sgPounds(x.price_each) + ' each' : x.cost ? '' : ' · free') +
+              '</small></span>' +
+              (owed ? '<span class="gl-owed">' + sgPounds(owed) + ' owed</span>' : x.price_each ? '<span class="gl-paid">All paid</span>' : '') +
+              '<span class="gl-ar">›</span></a>'
+            );
+          }
+          render(
+            '<div class="gl"><div class="gl-head"><h1>Games</h1><a class="btn primary" href="#/games/new">+ New game</a></div>' +
+              '<div class="gl-k">COMING UP</div>' +
+              (coming.length
+                ? coming.map(card).join('')
+                : '<div class="gl-none">Nothing coming up. <a href="#/games/new">Start a game</a></div>') +
+              (past.length
+                ? '<div class="gl-k">PAST GAMES</div><div class="gl-past" id="gl-past">' +
+                  past.map(row).join('') +
+                  '</div>' +
+                  (past.length >= 20 ? '<button type="button" class="gl-more" id="gl-more">Show older games</button>' : '')
+                : '') +
+              '</div>',
+          );
+          var last = past.length ? past[past.length - 1].starts_at : null;
+          if ($('#gl-more'))
+            $('#gl-more').onclick = function () {
+              var button = this;
+              setBusy(button, true, 'Loading…');
+              rpc('game_list', { p_past: true, p_before: last }).then(
+                function (more) {
+                  more = more || [];
+                  $('#gl-past').insertAdjacentHTML('beforeend', more.map(row).join(''));
+                  if (more.length) last = more[more.length - 1].starts_at;
+                  if (more.length < 20) button.remove();
+                  else setBusy(button, false);
+                },
+                function (err) {
+                  setBusy(button, false);
+                  toast(friendly(err));
+                },
+              );
+            };
+        },
+        function (err) {
+          render(notice('error', esc(friendly(err))));
+        },
+      );
+    }
+
+    function loadGames(gameId) {
+      loading();
+      rpc('my_games').then(
+        function (rows) {
+          var mine = (rows || []).filter(function (g) {
+            return g.is_organiser;
+          });
+          var id = gameId;
+          if (!id) return screenGamesList();
           rpc('game_view', { p_game: id }).then(
             function (g) {
               if (!g || !g.is_organiser) {
@@ -2317,9 +2437,6 @@
       }
 
       function draw() {
-        var others = mine.filter(function (x) {
-          return x.id !== g.id;
-        });
         var tabs = [
           ['invites', 'Invites', ICON.squad],
           ['teams', 'Team sheet', ICON.ball],
@@ -2328,32 +2445,7 @@
         render(
           '<div class="gm">' +
             '<div class="gm-head"><div class="grow">' +
-            (others.length
-              ? '<label class="gm-pick"><select id="gm-pick" aria-label="Game">' +
-                mine
-                  .map(function (x) {
-                    return (
-                      '<option value="' +
-                      esc(x.id) +
-                      '"' +
-                      (x.id === g.id ? ' selected' : '') +
-                      '>' +
-                      esc(
-                        new Date(x.starts_at).toLocaleDateString('en-GB', {
-                          weekday: 'short',
-                          day: 'numeric',
-                          month: 'short',
-                          timeZone: x.timezone || undefined,
-                        }),
-                      ) +
-                      ' · ' +
-                      esc(x.title) +
-                      '</option>'
-                    );
-                  })
-                  .join('') +
-                '</select></label>'
-              : '') +
+            '<a class="gm-back" href="#/games">‹ Games</a>' +
             '<h1>' +
             esc(g.title) +
             '</h1><div class="muted gm-meta">' +
@@ -2441,10 +2533,6 @@
         });
         $('#gm-share').onclick = share;
         $('#gm-gear').onclick = settings;
-        if ($('#gm-pick'))
-          $('#gm-pick').onchange = function () {
-            go('#/games/' + this.value);
-          };
         $$('[data-who]').forEach(function (b) {
           b.onclick = function () {
             var p = find(b.dataset.who);
