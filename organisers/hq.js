@@ -288,9 +288,8 @@
           item(base + '/payments', 'money', 'Payments', h === base + '/payments');
       } else if (c === 'games') {
         out +=
-          item('#/games', 'ball', 'Games', /^#\/games/.test(h) && !/^#\/games\/(owed|new)/.test(h)) +
-          item('#/games/owed', 'money', 'Owed', /^#\/games\/owed/.test(h)) +
-          item('#/games/new', 'plus', 'New game', h === '#/games/new', 'hq-plus');
+          item('#/games', 'ball', 'Games', /^#\/games/.test(h) && !/^#\/games\/owed/.test(h)) +
+          item('#/games/owed', 'money', 'Owed', /^#\/games\/owed/.test(h));
       } else if (c === 'events') {
         out +=
           item('#/overview', 'home', 'Overview', h === '#/overview') +

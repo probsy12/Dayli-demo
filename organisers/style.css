@@ -7118,16 +7118,4 @@ button.sg-pp {
     text-overflow: ellipsis;
     white-space: nowrap;
   }
-  html.hq .hq-bottom a.hq-plus svg {
-    width: 44px;
-    height: 44px;
-    padding: 10px;
-    border-radius: 14px;
-    background: var(--accent);
-    color: #fff;
-    margin-top: -6px;
-  }
-  html.hq .hq-bottom a.hq-plus span {
-    display: none;
-  }
 }
