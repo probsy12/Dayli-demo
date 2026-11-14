@@ -95,13 +95,20 @@
 
     <!-- Not in yet: a name and I'm in. -->
     <div id="join" class="hidden">
-      <label for="name">Your name</label>
+      <label for="name" id="nameLbl">Your name</label>
       <input id="name" autocomplete="name" maxlength="40" placeholder="Chris Taylor" />
       <button class="btn primary" id="in">I'm in</button>
       <button class="btn outline" id="out">Can't make it</button>
       <p class="fine hidden" id="saidNo"></p>
       <p class="err hidden" id="joinErr"></p>
       <p class="fine">Or <a id="getLink" href="#get">get Dayli</a> and take your place in the app.</p>
+    </div>
+
+    <!-- Dayli HQ: a place takes a Dayli account (email, password, a code once). -->
+    <div id="signup" class="hidden">
+      <button class="btn primary" id="signupIn">I'm in</button>
+      <button class="btn outline" id="signupOut">Can't make it</button>
+      <p class="fine">You'll make a free Dayli account with your email and a password, or sign in if you have one. It keeps your place yours, and you'll see the game here any time.</p>
     </div>
 
     <div id="closed" class="card hidden"><p class="line" id="closedText" style="text-align:center"></p></div>
@@ -145,13 +152,16 @@
     </div>
   </div>
 </main>
-<script src="../config.js?v=9afca5b"></script>
+<script src="../config.js?v=178196a"></script>
 <script>
   (function () {
     var cfg = window.DAYLI_CONFIG || {};
     // Opened from Dayli HQ (daylihq.co.uk): your name is all it takes, and the
     // app is offered as an extra, not pushed.
     var HQ = /(^|\.)daylihq\.co\.uk$/.test(location.hostname);
+    // Signed in to Dayli HQ on this site: places are taken with the account.
+    var acct = null; // { sb, token, name }
+    var gameId = null;
     if (HQ) {
       var gl = document.getElementById('getLink');
       if (gl && gl.parentNode) gl.parentNode.style.display = 'none';
@@ -183,7 +193,7 @@
     function rpc(name, body) {
       return fetch(cfg.supabaseUrl + '/rest/v1/rpc/' + name, {
         method: 'POST',
-        headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+        headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + (acct ? acct.token : cfg.supabaseAnonKey), 'Content-Type': 'application/json' },
         body: JSON.stringify(body)
       }).then(function (r) {
         return r.text().then(function (text) {
@@ -316,12 +326,34 @@
       if (!game.upcoming) { $('closedText').textContent = 'This game has been played.'; show('closed', true); show('join', false); return; }
       if (!game.open) { $('closedText').textContent = 'Places are for the squad for now. Get Dayli to join the squad.'; show('closed', true); show('join', false); return; }
       show('closed', false); show('join', true);
+      applyMode();
+    }
+    // On HQ: signed in, your name comes from your account; not signed in (and
+    // no place from before), the buttons go via making an account.
+    function applyMode() {
+      var signup = HQ && !acct && !saved();
+      var named = !HQ || (!acct && !signup);
+      $('nameLbl').style.display = named ? '' : 'none';
+      $('name').style.display = named ? '' : 'none';
+      $('in').style.display = signup ? 'none' : '';
+      $('out').style.display = signup ? 'none' : '';
+      show('signup', signup);
     }
 
     function refresh() {
       return rpc('game_public', { p_code: code }).then(function (g) {
         if (!g) { show('loading', false); show('bad', true); return; }
         render(g);
+        if (acct) {
+          return rpc('game_mine', { p_code: code }).then(function (me) {
+            gameId = me && me.game_id;
+            if (me) me.name = me.name || acct.name;
+            if (me && me.status === 'no') showSaidNo(me);
+            else if (me && (me.status === 'in' || me.status === 'waiting')) showMine(me);
+            else showJoin();
+            return me;
+          });
+        }
         var t = saved();
         if (!t) { showJoin(); return; }
         return rpc('game_guest_status', { p_code: code, p_token: t }).then(function (me) {
@@ -335,7 +367,34 @@
     if (!code) { show('loading', false); show('bad', true); return; }
     $('openApp').href = 'dayli://g/' + code;
 
+    function friendlyErr(e) {
+      var m = String(e.code || e.message || '');
+      return m.indexOf('not_open') >= 0 ? 'Places aren’t open on the link right now.'
+        : m.indexOf('rate_limited') >= 0 ? 'Lots of people at once. Try again in a few minutes.'
+        : m.indexOf('game_over') >= 0 ? 'This game has been played.'
+        : 'That didn’t work. Check your signal and try again.';
+    }
+    function joinAccount() {
+      show('joinErr', false);
+      $('in').disabled = true;
+      return rpc('game_join', { p_game: gameId, p_code: code }).then(refresh).catch(function (e) {
+        $('joinErr').textContent = friendlyErr(e);
+        show('joinErr', true);
+      }).then(function () { $('in').disabled = false; });
+    }
+    function declineAccount() {
+      show('joinErr', false);
+      $('out').disabled = true;
+      return rpc('game_decline_code', { p_code: code }).then(refresh).catch(function (e) {
+        $('joinErr').textContent = friendlyErr(e);
+        show('joinErr', true);
+      }).then(function () { $('out').disabled = false; });
+    }
+    $('signupIn').addEventListener('click', function () { location.href = '/app/#/game/' + code + '?want=in'; });
+    $('signupOut').addEventListener('click', function () { location.href = '/app/#/game/' + code + '?want=no'; });
+
     $('in').addEventListener('click', function () {
+      if (acct) { joinAccount(); return; }
       var name = $('name').value.trim();
       show('joinErr', false);
       if (name.length < 2) { $('joinErr').textContent = 'Type your name so the others know who you are.'; show('joinErr', true); return; }
@@ -354,6 +413,7 @@
     });
 
     $('out').addEventListener('click', function () {
+      if (acct) { declineAccount(); return; }
       var name = $('name').value.trim();
       show('joinErr', false);
       if (name.length < 2) { $('joinErr').textContent = 'Type your name so ' + (game.organiser || 'the organiser') + ' knows who can’t make it.'; show('joinErr', true); return; }
@@ -373,13 +433,13 @@
 
     $('payBtn').addEventListener('click', function () {
       var t = saved();
-      if (!t) return;
+      if (!t && !acct) return;
       show('payErr', false);
       $('payBtn').disabled = true;
       fetch(cfg.supabaseUrl + '/functions/v1/game-pay', {
         method: 'POST',
-        headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'pay', code: code, token: t, back: HQ ? 'hq' : undefined })
+        headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + (acct ? acct.token : cfg.supabaseAnonKey), 'Content-Type': 'application/json' },
+        body: JSON.stringify(acct ? { action: 'pay', game_id: gameId, back: 'hq' } : { action: 'pay', code: code, token: t, back: HQ ? 'hq' : undefined })
       }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d || {} }; }); }).then(function (res) {
         if (res.ok && res.d.url) { location.href = res.d.url; return; }
         var m = res.d.error || '';
@@ -403,7 +463,7 @@
         ? 'Give up your place? You paid by card: ask ' + (game.organiser || 'the organiser') + ' if you want it back, they can refund you from Dayli.'
         : 'Give up your place? The first on the waiting list gets it.')) return;
       var t = saved();
-      rpc('game_leave_guest', { p_code: code, p_token: t }).then(function () {
+      (acct ? rpc('game_leave', { p_game: gameId }) : rpc('game_leave_guest', { p_code: code, p_token: t })).then(function () {
         return refresh();
       }).catch(function () { alert('That didn’t work. Try again.'); });
     });
@@ -418,7 +478,51 @@
       setTimeout(function () { refresh().then(settle); }, 1500);
     }
 
-    refresh().then(settle).catch(function () {
+    // Dayli HQ's sign-in (same site): HQ's own copy of supabase-js reads it.
+    function account() {
+      if (!HQ) return Promise.resolve();
+      return new Promise(function (resolve) {
+        var s = document.createElement('script');
+        s.src = '/app/vendor/supabase.js';
+        s.onload = function () {
+          try {
+            var sb = window.supabase.createClient(cfg.supabaseUrl, cfg.supabaseAnonKey);
+            sb.auth.getSession().then(function (r) {
+              var session = r && r.data && r.data.session;
+              if (!session) return resolve();
+              acct = { sb: sb, token: session.access_token, name: '' };
+              sb.from('profiles').select('display_name').eq('id', session.user.id).maybeSingle().then(function (p) {
+                acct.name = (p && p.data && p.data.display_name) || '';
+                resolve();
+              }, function () { resolve(); });
+            }, function () { resolve(); });
+          } catch (e) { resolve(); }
+        };
+        s.onerror = function () { resolve(); };
+        document.head.appendChild(s);
+      });
+    }
+    // Back from making an account: do what they tapped (I'm in / Can't make it).
+    function wanted(me) {
+      var want = params.get('want');
+      if (!acct || !want) return;
+      try { history.replaceState(null, '', location.pathname + '?c=' + code); } catch (e) {}
+      var has = me && (me.status === 'in' || me.status === 'waiting');
+      if (want === 'in' && !has) return joinAccount();
+      if (want === 'no' && !(me && me.status === 'no')) return declineAccount();
+    }
+
+    // On HQ the app is an extra; signed in, the place is on the account.
+    function hqWords() {
+      if (!HQ) return;
+      $('getTitle').textContent = 'Want reminders? Get the Dayli app (optional)';
+      var appFine = document.querySelector('#get .fine');
+      if (appFine) appFine.textContent = 'Sign in to the app with the same email and your games and teams are there.';
+      var leaveFine = document.querySelector('#leaveBox .fine');
+      if (leaveFine && acct) leaveFine.textContent = 'Your place is on your Dayli account: come back to this link any time.';
+    }
+
+    account().then(function () { hqWords(); }).then(refresh).then(wanted).then(settle).catch(function () {
       show('loading', false);
       $('bad').querySelector('p').textContent = 'Couldn’t load the game. Check your signal and refresh.';
       show('bad', true);

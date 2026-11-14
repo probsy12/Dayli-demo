@@ -466,6 +466,7 @@
       }
       if (parts[0] === 'verify' && state.pendingEmail) return screenVerify();
       if (HQ && parts[0] === 'join') return hq.screenJoinOut(parts[1] || '');
+      if (HQ && parts[0] === 'game') return hq.screenGameOut(parts[1] || '', query.want);
       return screenSignIn('signin');
     }
     if (state.organiser === undefined) {
@@ -491,7 +492,7 @@
           render(notice('error', esc(friendly(err))), true);
         });
       }
-      var free = ['welcome', 'verify', 'profile', 'reset', 'admin', 'join', 'play'];
+      var free = ['welcome', 'verify', 'profile', 'reset', 'admin', 'join', 'play', 'game'];
       if (!hq.onboarded() && free.indexOf(parts[0]) < 0) return go(hq.homeHash()); // players: their teams
       if (parts[0] === 'welcome') {
         setShell(true, 'welcome');
@@ -502,6 +503,10 @@
       if (parts[0] === 'settings') {
         setShell(true, 'settings');
         return hq.screenSettings();
+      }
+      if (parts[0] === 'game' && parts[1]) {
+        setShell(true, 'game');
+        return hq.screenGame(parts[1], query.want);
       }
       if (parts[0] === 'join') {
         setShell(true, 'join');

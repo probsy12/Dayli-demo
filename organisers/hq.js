@@ -8,6 +8,7 @@
  *   #/join/<code>        a player joins a team from its link (account, name,
  *                        "which one is you?") and gets their team page
  *   #/play               the teams you play for
+ *   #/game/<code>        from a game's page: an account, then back to take a place
  *   #/calendar           everything you run, by month
  *   #/settings           what you run, account
  *   #/home               the first thing you run
@@ -179,6 +180,10 @@
     }
     function homeHash() {
       var joining = pendingJoin();
+      if (joining && joining.indexOf('g:') === 0) {
+        var bits = joining.split(':');
+        return '#/game/' + bits[1] + '?want=' + (bits[2] || 'in');
+      }
       if (joining) return '#/join/' + joining;
       if (!hq || !hq.onboarded) return hq && hq.playing.length ? '#/play' : '#/welcome';
       return contextHome(context());
@@ -1735,6 +1740,115 @@
       );
       document.body.classList.add('hq-bare');
       wireTop();
+    }
+
+    // #/game/<code>?want=in|no: from a social game's page (daylihq.co.uk/g/),
+    // a Dayli account first (email, password, a code once), then your name if
+    // it's new, then back to the game page, which takes the place.
+    function gameBack(code, want) {
+      location.href = '/g/?c=' + encodeURIComponent(code) + (want ? '&want=' + encodeURIComponent(want) : '');
+    }
+    function screenGameOut(raw, want) {
+      var code = cleanCode(raw);
+      if (!code) return go('#/sign-in');
+      want = want === 'no' ? 'no' : 'in';
+      pendingJoin('g:' + code + ':' + want);
+      render(
+        bareTop(false) +
+          '<div class="hq-wrap hq-join"><h1 class="hq-h1" id="hj-title">' +
+          (want === 'no' ? 'Tell them you can’t make it' : 'Take your place') +
+          '</h1><p class="hq-lead" id="hj-sub">Checking the game…</p>' +
+          '<form id="hj-form" class="hq-join-form" novalidate><label for="hj-email">Your email</label><input type="email" id="hj-email" autocomplete="email" placeholder="you@example.com" />' +
+          '<label for="hj-pw">Choose a password</label><input type="password" id="hj-pw" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" />' +
+          '<div class="notice error" id="hj-err" hidden></div><button class="btn primary hq-big" type="submit">Create account</button></form>' +
+          '<p class="muted small hq-join-note">We email you a 6-digit code once, to check it’s you. Your free Dayli account works for every game and team on Dayli HQ, and in the Dayli app if you ever want it.</p>' +
+          '<p class="small">Already on Dayli? <a href="#/sign-in">Sign in</a> and you’ll go straight back to the game.</p></div>',
+        true,
+      );
+      document.body.classList.add('hq-bare');
+      rpc('game_public', { p_code: code }).then(
+        function (g) {
+          if (!$('#hj-sub')) return;
+          if (!g) {
+            pendingJoin(null);
+            $('#hj-title').textContent = 'This link has expired';
+            $('#hj-sub').textContent = 'Ask the organiser to send the game’s link again.';
+            $('#hj-form').hidden = true;
+            return;
+          }
+          var when = new Date(g.starts_at).toLocaleString('en-GB', {
+            weekday: 'short',
+            day: 'numeric',
+            month: 'short',
+            hour: '2-digit',
+            minute: '2-digit',
+            timeZone: g.timezone || undefined,
+          });
+          $('#hj-title').textContent = (want === 'no' ? 'Can’t make ' : 'Join ') + g.title;
+          $('#hj-sub').textContent =
+            when + (g.location ? ' · ' + g.location : '') + ' · ' + g.taken + ' of ' + g.places + ' places taken';
+        },
+        function () {
+          if ($('#hj-sub')) $('#hj-sub').textContent = 'Make your free Dayli account to carry on.';
+        },
+      );
+      $('#hj-form').onsubmit = function (e) {
+        e.preventDefault();
+        var err = $('#hj-err');
+        err.hidden = true;
+        var address = $('#hj-email').value.trim();
+        var pw = $('#hj-pw').value;
+        var why = !/^\S+@\S+\.\S+$/.test(address)
+          ? 'Enter your email address.'
+          : pw.length < 8
+            ? 'Choose a password of at least 8 characters.'
+            : null;
+        if (why) {
+          err.textContent = why;
+          err.hidden = false;
+          return;
+        }
+        ctx.passwordAuth('create', address, pw, $('#hj-form button[type=submit]'), err);
+      };
+    }
+    function screenGame(raw, want) {
+      var code = cleanCode(raw);
+      if (!code) return go(homeHash());
+      want = want === 'no' ? 'no' : 'in';
+      loading();
+      loadName().then(function (name) {
+        if (name) {
+          pendingJoin(null);
+          return gameBack(code, want);
+        }
+        pendingJoin('g:' + code + ':' + want);
+        render(
+          bareTop(true) +
+            '<div class="hq-wrap hq-join"><h1 class="hq-h1">One more thing</h1><p class="hq-lead">What’s your name? The organiser and the other players see it.</p>' +
+            '<form id="hj-form" class="hq-join-form" novalidate><label for="hj-name">Your name</label><input type="text" id="hj-name" maxlength="60" autocomplete="name" placeholder="e.g. Sam Taylor" />' +
+            '<button class="btn primary hq-big" type="submit">Back to the game</button></form></div>',
+        );
+        document.body.classList.add('hq-bare');
+        wireTop();
+        $('#hj-name').focus();
+        $('#hj-form').onsubmit = function (e) {
+          e.preventDefault();
+          var value = $('#hj-name').value.trim();
+          if (!value) return toast('Add your name');
+          var button = $('#hj-form button[type=submit]');
+          setBusy(button, true);
+          saveName(value).then(
+            function () {
+              pendingJoin(null);
+              gameBack(code, want);
+            },
+            function (err) {
+              setBusy(button, false);
+              toast(friendly(err));
+            },
+          );
+        };
+      });
     }
 
     // #/play: the teams you play for, each with your own page.
@@ -4510,6 +4624,8 @@
       screenJoin: screenJoin,
       screenJoinOut: screenJoinOut,
       screenPlay: screenPlay,
+      screenGame: screenGame,
+      screenGameOut: screenGameOut,
       screenCalendar: screenCalendar,
       screenPeople: screenPeople,
       screenSettings: screenSettings,
