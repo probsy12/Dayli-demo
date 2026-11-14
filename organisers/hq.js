@@ -8,8 +8,11 @@
  *   #/join/<code>        a player joins a team from its link (account, name,
  *                        "which one is you?") and gets their team page
  *   #/play               the teams you play for
- *   #/game/<code>        from a game's page: an account, then back to take a place
+ *   #/game/<code>        from a game's link, signed out: sign in first (then your name)
+ *   #/pg/<code>          a game for a player: Game, Team sheet, Pay, Chat
+ *   #/me                 a player's account
  *   #/calendar           everything you run, by month
+ *   #/payments           card payments: one Stripe set-up for games, teams, tickets
  *   #/settings           what you run, account
  *   #/home               the first thing you run
  *   #/games[/<id>]       social games: add players, Bibs v Colours, who's paid
@@ -106,6 +109,9 @@
         rpc('my_teams').catch(function () {
           return [];
         }),
+        rpc('team_payments_on').catch(function () {
+          return false;
+        }),
       ]).then(function (r) {
         var p = r[0] || { runs: [], onboarded: false, has: {} };
         hq = {
@@ -115,6 +121,7 @@
           teams: (r[1] || []).filter(function (t) {
             return t.my_role === 'manager' && !t.sample;
           }),
+          paymentsOn: r[2] === true,
           // Teams they play for (someone else manages): their team pages.
           playing: (r[1] || []).filter(function (t) {
             return t.my_role !== 'manager' && !t.sample;
@@ -180,10 +187,7 @@
     }
     function homeHash() {
       var joining = pendingJoin();
-      if (joining && joining.indexOf('g:') === 0) {
-        var bits = joining.split(':');
-        return '#/game/' + bits[1] + '?want=' + (bits[2] || 'in');
-      }
+      if (joining && joining.indexOf('g:') === 0) return '#/pg/' + joining.split(':')[1];
       if (joining) return '#/join/' + joining;
       if (!hq || !hq.onboarded) return hq && hq.playing.length ? '#/play' : '#/welcome';
       return contextHome(context());
@@ -278,6 +282,7 @@
       out +=
         '<div class="hq-navgap"></div>' +
         link('#/calendar', 'calendar', 'Calendar', h === '#/calendar') +
+        (hq.paymentsOn ? link('#/payments', 'money', 'Card payments', h === '#/payments') : '') +
         link('#/settings', 'gear', 'Settings', h === '#/settings');
       if (state.admin) out += link('#/admin', 'shield', 'Admin', /^#\/admin/.test(h));
       return out;
@@ -310,6 +315,7 @@
       out +=
         '<div class="hq-navgap"></div>' +
         link('#/calendar', 'calendar', 'Calendar', h === '#/calendar') +
+        (hq.paymentsOn ? link('#/payments', 'money', 'Card payments', h === '#/payments') : '') +
         link('#/settings', 'gear', 'Settings', h === '#/settings');
       if (state.admin) out += link('#/admin', 'shield', 'Admin', /^#\/admin/.test(h));
       return out;
@@ -351,7 +357,7 @@
           item('#/payouts', 'ticket', 'Tickets', /^#\/(payouts|tickets|checkin)/.test(h)) +
           item('#/analytics', 'chart', 'Analytics', /^#\/analytics/.test(h));
       }
-      out += item('#/more', 'more', 'More', /^#\/(more|settings|admin|calendar)/.test(h));
+      out += item('#/more', 'more', 'More', /^#\/(more|settings|admin|calendar|payments)/.test(h));
       return out;
     }
     function switcherItems(c) {
@@ -581,6 +587,7 @@
           '</small></span></div>' +
           '<div class="hq-mo-list hq-mo-cal">' +
           row('#/calendar', 'calendar', 'Calendar', 'Everything you run, by date') +
+          (hq.paymentsOn ? row('#/payments', 'money', 'Card payments', 'Set up Stripe once, for everything') : '') +
           (c && c.indexOf('team:') === 0
             ? row('#/teams/' + c.slice(5) + '/stats', 'chart', 'Stats', 'Appearances, goals and more')
             : '') +
@@ -1745,9 +1752,6 @@
     // #/game/<code>?want=in|no: from a social game's page (daylihq.co.uk/g/),
     // a Dayli account first (email, password, a code once), then your name if
     // it's new, then back to the game page, which takes the place.
-    function gameBack(code, want) {
-      location.href = '/g/?c=' + encodeURIComponent(code) + (want ? '&want=' + encodeURIComponent(want) : '');
-    }
     function screenGameOut(raw, want) {
       var code = cleanCode(raw);
       if (!code) return go('#/sign-in');
@@ -1755,9 +1759,8 @@
       pendingJoin('g:' + code + ':' + want);
       render(
         bareTop(false) +
-          '<div class="hq-wrap hq-join"><h1 class="hq-h1" id="hj-title">' +
-          (want === 'no' ? 'Tell them you can’t make it' : 'Take your place') +
-          '</h1><p class="hq-lead" id="hj-sub">Checking the game…</p>' +
+          '<div class="hq-wrap hq-join"><div class="card pl-card pl-gamecard"><div class="kicker small muted" id="hj-kick">A GAME ON DAYLI</div><h1 class="hq-h1" id="hj-title">Take your place</h1><p class="muted" id="hj-sub">Checking the game…</p></div>' +
+          '<h2 class="hq-h2 pl-signh">Sign in to take your place</h2>' +
           '<form id="hj-form" class="hq-join-form" novalidate><label for="hj-email">Your email</label><input type="email" id="hj-email" autocomplete="email" placeholder="you@example.com" />' +
           '<label for="hj-pw">Choose a password</label><input type="password" id="hj-pw" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" />' +
           '<div class="notice error" id="hj-err" hidden></div><button class="btn primary hq-big" type="submit">Create account</button></form>' +
@@ -1784,7 +1787,8 @@
             minute: '2-digit',
             timeZone: g.timezone || undefined,
           });
-          $('#hj-title').textContent = (want === 'no' ? 'Can’t make ' : 'Join ') + g.title;
+          $('#hj-title').textContent = g.title;
+          if (g.organiser) $('#hj-kick').textContent = (g.organiser + '’s game').toUpperCase();
           $('#hj-sub').textContent =
             when + (g.location ? ' · ' + g.location : '') + ' · ' + g.taken + ' of ' + g.places + ' places taken';
         },
@@ -1819,7 +1823,7 @@
       loadName().then(function (name) {
         if (name) {
           pendingJoin(null);
-          return gameBack(code, want);
+          return go('#/pg/' + code);
         }
         pendingJoin('g:' + code + ':' + want);
         render(
@@ -1840,7 +1844,7 @@
           saveName(value).then(
             function () {
               pendingJoin(null);
-              gameBack(code, want);
+              go('#/pg/' + code);
             },
             function (err) {
               setBusy(button, false);
@@ -1851,53 +1855,6 @@
       });
     }
 
-    // #/play: the teams you play for, each with your own page.
-    function screenPlay() {
-      loading();
-      load(true).then(function () {
-        var list = hq.playing;
-        Promise.all(
-          list.map(function (t) {
-            return rpc('team_join_info', { p_calendar: t.calendar_id }).catch(function () {
-              return null;
-            });
-          }),
-        ).then(function (infos) {
-          var bare = !hq.onboarded;
-          var rows = list
-            .map(function (t, i) {
-              var info = infos[i];
-              return (
-                '<div class="hq-tm">' +
-                crest(t.name, t.color, 44) +
-                '<div class="grow"><b>' +
-                esc(t.name) +
-                '</b><div class="muted small">' +
-                esc(sportName(t.sport)) +
-                ' · ' +
-                t.players +
-                ' in the squad</div></div>' +
-                (info && info.token ? '<a class="btn primary" href="' + playerPage(info.token) + '">Open</a>' : '') +
-                '</div>'
-              );
-            })
-            .join('');
-          render(
-            (bare ? bareTop(true) + '<div class="hq-wrap hq-left">' : '<div>') +
-              '<h1 class="hq-h1 hq-l">Your teams</h1><p class="hq-lead2">Say if you can play, pay what you owe and see the team when it’s picked.</p>' +
-              (rows
-                ? '<div class="hq-found">' + rows + '</div>'
-                : notice('info', 'You’re not in a team yet. Ask your manager for the team’s link.')) +
-              (bare ? '<p class="small" style="margin-top:22px"><a href="#/welcome">Run a team, games or events yourself? Set up HQ</a></p>' : '') +
-              '</div>',
-          );
-          if (bare) {
-            document.body.classList.add('hq-bare');
-            wireTop();
-          }
-        });
-      });
-    }
 
     // --- calendar: everything you run, by month ------------------------------------------
     // #/calendar?m=2026-11&d=2026-11-15. Games, team fixtures and training, and
@@ -2154,6 +2111,688 @@
             { once: true },
           );
         };
+    }
+
+    // --- players: a game (#/pg/<code>), their home (#/play), You (#/me) ---------------
+    // Someone with a Dayli account who plays (rather than runs): a game's details
+    // with their place, the team sheet, paying and the chat; their games, team
+    // fixtures and teams in one list. Bare pages with their own bottom bar for
+    // people who don't run anything; inside the usual HQ menus for those who do.
+
+    function pounds(p) {
+      var v = (p || 0) / 100;
+      return '£' + (v % 1 ? v.toFixed(2) : v.toFixed(0));
+    }
+    function playerShell(html, tab) {
+      var bare = !hq || !hq.onboarded;
+      if (!bare) return render('<div class="pl">' + html + '</div>');
+      var item = function (href, key, label, icon) {
+        return (
+          '<a href="' +
+          href +
+          '" class="' +
+          (tab === key ? 'on' : '') +
+          '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          ICON[icon] +
+          '</svg><span>' +
+          label +
+          '</span></a>'
+        );
+      };
+      render(
+        bareTop(true) +
+          '<div class="pl pl-bare">' +
+          html +
+          '</div><nav class="pl-bar">' +
+          item('#/play', 'home', 'Home', 'home') +
+          item('#/play?f=games', 'games', 'Games', 'ball') +
+          item('#/play?f=teams', 'teams', 'Teams', 'squad') +
+          item('#/me', 'me', 'You', 'person') +
+          '</nav>',
+      );
+      document.body.classList.add('hq-bare');
+      wireTop();
+    }
+    function dateBlock(iso, tz) {
+      var d = new Date(iso);
+      var opt = tz ? { timeZone: tz } : {};
+      return (
+        '<div class="pl-when"><small>' +
+        d.toLocaleDateString('en-GB', Object.assign({ weekday: 'short' }, opt)) +
+        '</small><b>' +
+        d.toLocaleDateString('en-GB', Object.assign({ day: 'numeric' }, opt)) +
+        '</b></div>'
+      );
+    }
+    function timeOf(iso, tz) {
+      return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', timeZone: tz || undefined });
+    }
+    function dayOf(iso, tz) {
+      return new Date(iso).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', timeZone: tz || undefined });
+    }
+
+    // The game chat (players and the organiser), also on the organiser's game page.
+    var chatTimer = null;
+    function stopChat() {
+      if (chatTimer) clearInterval(chatTimer);
+      chatTimer = null;
+    }
+    function chatBox(code, holder) {
+      stopChat();
+      var hash = location.hash;
+      var last = '';
+      holder.innerHTML =
+        '<div class="pl-chat"><div class="pl-msgs" id="pl-msgs"><p class="muted small">Loading the chat…</p></div>' +
+        '<form class="pl-send" id="pl-send"><input type="text" id="pl-text" maxlength="1000" placeholder="Message the group" autocomplete="off" /><button class="btn primary" type="submit">Send</button></form></div>';
+      function draw(list) {
+        var box = $('#pl-msgs');
+        if (!box) return stopChat();
+        var key = JSON.stringify(list.map(function (m) { return m.id; }));
+        if (key === last) return;
+        last = key;
+        box.innerHTML = list.length
+          ? list
+              .map(function (m) {
+                return (
+                  '<div class="pl-msg' +
+                  (m.me ? ' me' : '') +
+                  '">' +
+                  (m.me ? '' : '<b>' + esc(m.name || 'Player') + (m.organiser ? ' · organiser' : '') + '</b>') +
+                  '<span>' +
+                  esc(m.body) +
+                  '</span><small>' +
+                  esc(timeOf(m.created_at)) +
+                  '</small></div>'
+                );
+              })
+              .join('')
+          : '<p class="muted small">No messages yet. Say hello, or ask who’s bringing the bibs.</p>';
+        box.scrollTop = box.scrollHeight;
+      }
+      function pull() {
+        if (location.hash !== hash) return stopChat();
+        return rpc('game_chat', { p_code: code }).then(
+          function (list) {
+            draw(list || []);
+          },
+          function (err) {
+            var box = $('#pl-msgs');
+            if (box) box.innerHTML = '<p class="muted small">' + esc(friendly(err)) + '</p>';
+            stopChat();
+          },
+        );
+      }
+      pull();
+      chatTimer = setInterval(pull, 8000);
+      $('#pl-send').onsubmit = function (e) {
+        e.preventDefault();
+        var input = $('#pl-text');
+        var text = input.value.trim();
+        if (!text) return;
+        input.value = '';
+        rpc('game_chat_send', { p_code: code, p_body: text }).then(pull, function (err) {
+          input.value = text;
+          toast(friendly(err));
+        });
+      };
+    }
+
+    function screenPlayerGame(raw, query) {
+      var code = cleanCode(raw);
+      if (!code) return go(homeHash());
+      stopChat();
+      loading();
+      Promise.all([load(), loadName(), rpc('game_player', { p_code: code })]).then(
+        function (r) {
+          if (!r[1]) return go('#/game/' + code); // a name first
+          var g = r[2];
+          if (!g) {
+            return playerShell(
+              '<h1 class="pl-h1">This link doesn’t work</h1><p class="muted">Ask the organiser to send the game’s link again.</p>',
+              'games',
+            );
+          }
+          if (query && query.paid && g.mine && !g.mine.paid && !query.tries) {
+            toast('Payment received. Just checking with the bank…');
+          }
+          drawPlayerGame(g, (query && query.t) || 'game', query || {});
+        },
+        function (err) {
+          render(notice('error', esc(friendly(err))));
+        },
+      );
+    }
+    function drawPlayerGame(g, tab, query) {
+      var me = g.mine || null;
+      var tz = g.timezone;
+      var inn = g.players.filter(function (p) {
+        return p.status === 'in';
+      });
+      var waiting = g.players.filter(function (p) {
+        return p.status === 'waiting';
+      });
+      var owes = me && me.status === 'in' && g.price_pence && !me.paid;
+      var base = '#/pg/' + g.code;
+      var tabs = [
+        ['game', 'Game', ICON.ball],
+        ['sheet', 'Team sheet', ICON.squad],
+        ['pay', 'Pay', ICON.money],
+        ['chat', 'Chat', '<path d="M4 5h16v11H8l-4 4z"/>'],
+      ];
+      var head =
+        '<a class="pl-back" href="#/play">‹ Your games</a><h1 class="pl-h1">' +
+        esc(g.title) +
+        '</h1><p class="muted small pl-meta">' +
+        esc(dayOf(g.starts_at, tz) + ' · ' + timeOf(g.starts_at, tz)) +
+        (g.location
+          ? ' · ' +
+            esc(g.location) +
+            ' · <a target="_blank" rel="noopener" href="https://www.google.com/maps/search/?api=1&query=' +
+            encodeURIComponent(g.location) +
+            '">Directions</a>'
+          : '') +
+        '</p>' +
+        '<nav class="gm-tabs pl-tabs">' +
+        tabs
+          .map(function (t) {
+            return (
+              '<a class="' +
+              (tab === t[0] ? 'on' : '') +
+              '" href="' +
+              base +
+              '?t=' +
+              t[0] +
+              '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+              t[2] +
+              '</svg><span>' +
+              t[1] +
+              '</span></a>'
+            );
+          })
+          .join('') +
+        '</nav>';
+      var body = '';
+      if (tab === 'game') {
+        var pill = !me
+          ? '<span class="pl-pill">Not in yet</span>'
+          : me.status === 'in'
+            ? '<span class="pl-pill ok">✓ You’re in · place ' + me.position + ' of ' + g.places + '</span>'
+            : me.status === 'waiting'
+              ? '<span class="pl-pill warn">' + ordinalWord(me.position) + ' on the waiting list</span>'
+              : me.status === 'invited'
+                ? '<span class="pl-pill warn">You’re invited</span>'
+                : '<span class="pl-pill">You can’t make it</span>';
+        var on = me && (me.status === 'in' || me.status === 'waiting') ? 'in' : me && me.status === 'no' ? 'no' : '';
+        body +=
+          '<div class="card pl-card"><div class="pl-pills">' +
+          pill +
+          (owes ? '<a class="pl-pill warn" href="' + base + '?t=pay">' + pounds(g.pay_pence) + ' to pay</a>' : '') +
+          (me && me.paid ? '<span class="pl-pill ok">Paid</span>' : '') +
+          '</div>' +
+          (g.upcoming
+            ? '<div class="pl-seg"><button type="button" id="pl-in" class="' +
+              (on === 'in' ? 'on' : '') +
+              '">' +
+              (g.taken >= g.places && on !== 'in' ? 'Join the waiting list' : 'I’m in') +
+              '</button><button type="button" id="pl-no" class="' +
+              (on === 'no' ? 'on' : '') +
+              '">Can’t make it</button></div><p class="muted small">' +
+              (on === 'in'
+                ? 'Can’t make it any more? Tap it and your place goes to the first on the waiting list.'
+                : g.organiser + ' sees your answer straight away.') +
+              '</p>'
+            : '<p class="muted small">This game has been played.</p>') +
+          '</div>' +
+          '<div class="card pl-card"><div class="pl-row"><b>' +
+          inn.length +
+          ' of ' +
+          g.places +
+          ' playing</b><span class="muted small">' +
+          Math.max(0, g.places - inn.length) +
+          ' left · ' +
+          waiting.length +
+          ' waiting</span></div><div class="pl-bar-fill"><b style="width:' +
+          Math.min(100, Math.round((inn.length / Math.max(1, g.places)) * 100)) +
+          '%"></b></div><div class="pl-avs">' +
+          inn
+            .map(function (p) {
+              return '<div class="pl-av' + (p.me ? ' me' : '') + '">' + sgAvatar({ id: p.name, name: p.name }, 38) + '<span>' + esc(p.me ? 'You' : p.name) + '</span></div>';
+            })
+            .join('') +
+          Array.apply(null, Array(Math.max(0, g.places - inn.length)))
+            .map(function () {
+              return '<div class="pl-av"><i class="pl-free">?</i><span>Free</span></div>';
+            })
+            .join('') +
+          '</div>' +
+          (waiting.length
+            ? '<p class="muted small">Waiting: ' +
+              waiting
+                .map(function (p) {
+                  return esc(p.me ? 'You' : p.name);
+                })
+                .join(', ') +
+              '</p>'
+            : '') +
+          '</div>' +
+          (g.notes
+            ? '<div class="card pl-card"><b>From ' + esc(g.organiser) + '</b><p class="muted" style="margin:4px 0 0;white-space:pre-wrap">' + esc(g.notes) + '</p></div>'
+            : '');
+      } else if (tab === 'sheet') {
+        if (!g.sides_set) {
+          body += notice('info', 'The teams aren’t picked yet. ' + esc(g.organiser) + ' picks Bibs v Colours nearer the time, and they show here.');
+        } else {
+          var bibs = inn.filter(function (p) {
+            return p.side === 'bibs';
+          });
+          var cols = inn.filter(function (p) {
+            return p.side === 'colours';
+          });
+          var half = function (list, top) {
+            return sgHalf(list.length, top)
+              .map(function (s, i) {
+                var p = list[i];
+                return (
+                  '<div class="sg-pp pl-pp' +
+                  (top ? ' b' : '') +
+                  (p.me ? ' me' : '') +
+                  '" style="left:' +
+                  s.x.toFixed(1) +
+                  '%;top:' +
+                  s.y.toFixed(1) +
+                  '%">' +
+                  sgAvatar({ id: p.name, name: p.name }, 38) +
+                  '<b>' +
+                  esc(p.me ? 'You' : p.name) +
+                  '</b></div>'
+                );
+              })
+              .join('');
+          };
+          var mine = me && me.side;
+          body +=
+            '<div class="card pl-card">' +
+            sgCourt(g.sport) +
+            '<span class="sg-sl" style="top:10px">BIBS · ' +
+            bibs.length +
+            '</span><span class="sg-sl" style="bottom:10px">COLOURS · ' +
+            cols.length +
+            '</span>' +
+            half(bibs, true) +
+            half(cols, false) +
+            '</div></div>' +
+            (mine
+              ? '<div class="card pl-card"><b>You’re in ' +
+                (mine === 'bibs' ? 'Bibs' : 'Colours') +
+                '</b><p class="muted small" style="margin:4px 0 0">' +
+                (mine === 'bibs' ? 'Bring a light top; bibs go over it.' : 'Bring a dark top.') +
+                '</p></div>'
+              : '');
+        }
+      } else if (tab === 'pay') {
+        if (!g.price_pence) {
+          body += notice('info', 'There’s nothing to pay for this game through Dayli.' + (g.cost ? ' ' + esc(g.organiser) + ' says: ' + esc(g.cost) + '.' : ''));
+        } else if (!me || me.status !== 'in') {
+          body += notice('info', 'Take a place first, then you can pay here.');
+        } else if (me.paid) {
+          body += '<div class="card pl-card pl-paybox"><span class="pl-pill ok">✓ ' + (me.paid === 'card' ? 'Paid by card' : 'Paid in cash') + '</span><p class="muted">Thanks, you’re all square for this game.</p></div>';
+        } else {
+          var fee = (g.pay_pence || 0) - (g.price_pence || 0);
+          body +=
+            '<div class="card pl-card pl-paybox"><div class="muted small">Your place</div><div class="pl-big">' +
+            pounds(g.card ? g.pay_pence : g.price_pence) +
+            '</div>' +
+            (g.card
+              ? '<div class="muted small">' +
+                pounds(g.price_pence) +
+                ' to ' +
+                esc(g.organiser) +
+                (fee > 0 ? ' + ' + (fee < 100 ? fee + 'p' : pounds(fee)) + ' card fee' : '') +
+                '</div><button class="btn primary hq-big" id="pl-pay">Pay ' +
+                pounds(g.pay_pence) +
+                '</button><p class="muted small">Card, Apple Pay or Google Pay on Stripe’s secure page. Or pay ' +
+                esc(g.organiser) +
+                ' in cash and they’ll mark it.</p>'
+              : '<p class="muted small">Pay ' + esc(g.organiser) + ' in cash or by bank transfer; they’ll mark it here.</p>') +
+            '</div>';
+        }
+        if ((g.history || []).length) {
+          body +=
+            '<div class="pl-sec">With ' +
+            esc(g.organiser) +
+            '</div><div class="card pl-card pl-list">' +
+            g.history
+              .map(function (h) {
+                return (
+                  '<div class="pl-line"><span class="grow"><b>' +
+                  esc(dayOf(h.starts_at)) +
+                  '</b> <span class="muted small">' +
+                  esc(h.code === g.code ? 'this game' : h.title) +
+                  '</span></span>' +
+                  (h.paid
+                    ? '<span class="pl-tag ok">' + (h.paid === 'card' ? 'Paid by card' : 'Cash') + '</span>'
+                    : '<span class="pl-tag warn">' + pounds(h.amount) + '</span>') +
+                  '</div>'
+                );
+              })
+              .join('') +
+            '</div>';
+        }
+      } else if (tab === 'chat') {
+        body += '<div class="card pl-card" id="pl-chat-holder"></div>';
+      }
+      playerShell(head + body, 'games');
+      if (tab === 'chat') {
+        if (!me && !g.is_organiser) {
+          $('#pl-chat-holder').innerHTML = '<p class="muted">Take a place (or say you can’t make it) to join the chat.</p>';
+        } else chatBox(g.code, $('#pl-chat-holder'));
+      }
+      function act(p) {
+        return p.then(
+          function () {
+            screenPlayerGame(g.code, { t: 'game' });
+          },
+          function (err) {
+            toast(friendly(err));
+          },
+        );
+      }
+      if ($('#pl-in'))
+        $('#pl-in').onclick = function () {
+          if (me && (me.status === 'in' || me.status === 'waiting')) return;
+          act(rpc('game_join', { p_game: g.id, p_code: g.code }));
+        };
+      if ($('#pl-no'))
+        $('#pl-no').onclick = function () {
+          if (me && me.status === 'no') return;
+          if (me && me.status === 'in' && me.paid === 'card' && !confirm('Give up your place? You paid by card: ask ' + g.organiser + ' about a refund.')) return;
+          act(me && (me.status === 'in' || me.status === 'waiting') ? rpc('game_leave', { p_game: g.id }) : rpc('game_decline_code', { p_code: g.code }));
+        };
+      if ($('#pl-pay'))
+        $('#pl-pay').onclick = function () {
+          var button = this;
+          setBusy(button, true, 'Opening…');
+          invoke('game-pay', { action: 'pay', game_id: g.id, back: 'hq' }).then(
+            function (d) {
+              if (d && d.url) location.href = d.url;
+              else {
+                setBusy(button, false);
+                toast('That didn’t work. Try again in a moment.');
+              }
+            },
+            function (err) {
+              setBusy(button, false);
+              toast(friendly(err));
+            },
+          );
+        };
+      // Back from paying: Stripe tells Dayli a moment later.
+      if (query.paid && me && me.status === 'in' && !me.paid) {
+        var tries = Number(query.tries || 0);
+        if (tries < 5)
+          setTimeout(function () {
+            if (location.hash.indexOf('#/pg/' + g.code) !== 0) return;
+            screenPlayerGame(g.code, { t: tab, paid: 1, tries: tries + 1 });
+          }, 1500);
+      }
+    }
+    function ordinalWord(n) {
+      var s = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ['th', 'st', 'nd', 'rd'][n % 10] || 'th';
+      return n + s;
+    }
+
+    // #/play: a player's home. What they owe, what's coming up (games and team
+    // fixtures), their teams.
+    function screenPlay(query) {
+      stopChat();
+      loading();
+      Promise.all([load(true), rpc('player_home')]).then(
+        function (r) {
+          var h = r[1] || { games: [], fixtures: [], teams: [], owed: [] };
+          var f = (query && query.f) || '';
+          var first = String(h.name || '').trim().split(/\s+/)[0];
+          var items = [];
+          if (f !== 'teams') {
+            (h.games || []).forEach(function (x) {
+              items.push({ at: x.starts_at, html: gameRow(x) });
+            });
+          }
+          if (f !== 'games') {
+            (h.fixtures || []).forEach(function (x) {
+              items.push({ at: x.starts_at, html: fixtureRow(x) });
+            });
+          }
+          items.sort(function (a, b) {
+            return a.at < b.at ? -1 : 1;
+          });
+          var owed = h.owed || [];
+          var owedTotal = owed.reduce(function (s, x) {
+            return s + (x.amount || 0);
+          }, 0);
+          var html =
+            (f
+              ? '<h1 class="pl-h1">' + (f === 'games' ? 'Your games' : 'Your teams') + '</h1>'
+              : '<h1 class="pl-h1">' + (first ? 'Hi ' + esc(first) : 'Hi') + '</h1><p class="muted">Your games and teams, in one place.</p>') +
+            (!f && owed.length
+              ? '<div class="card pl-card pl-owe"><span class="grow"><b>' +
+                pounds(owedTotal) +
+                ' to pay</b><small>' +
+                esc(owed[0].title + ' · ' + owed[0].organiser) +
+                (owed.length > 1 ? ' and ' + (owed.length - 1) + ' more' : '') +
+                '</small></span><a class="btn primary" href="#/pg/' +
+                esc(owed[0].code) +
+                '?t=pay">Pay</a></div>'
+              : '') +
+            (f !== 'teams'
+              ? '<div class="pl-sec">Coming up</div>' +
+                (items.length
+                  ? items
+                      .map(function (x) {
+                        return x.html;
+                      })
+                      .join('')
+                  : '<div class="card pl-card"><p class="muted" style="margin:0">Nothing coming up. When someone sends you a game or team link, it shows here.</p></div>')
+              : '') +
+            (f !== 'games'
+              ? '<div class="pl-sec">Your teams</div>' +
+                ((h.teams || []).length
+                  ? h.teams
+                      .map(function (t) {
+                        return (
+                          '<a class="card pl-card pl-item" href="' +
+                          (t.manager ? '#/teams/' + esc(t.calendar_id) : playerPage(t.token)) +
+                          '">' +
+                          crest(t.name, t.color, 44) +
+                          '<span class="grow"><b>' +
+                          esc(t.name) +
+                          '</b><small>' +
+                          esc(sportName(t.sport) + ' · ' + t.players + ' in the squad') +
+                          '</small></span><i>›</i></a>'
+                        );
+                      })
+                      .join('')
+                  : '<div class="card pl-card"><p class="muted" style="margin:0">No teams yet. Your manager’s team link puts you in the squad.</p></div>')
+              : '') +
+            (hq.onboarded ? '' : '<p class="small pl-setup"><a href="#/welcome">Run a team, games or events yourself? Set up HQ</a></p>');
+          playerShell(html, f || 'home');
+        },
+        function (err) {
+          render(notice('error', esc(friendly(err))));
+        },
+      );
+    }
+    function gameRow(x) {
+      var status =
+        x.status === 'in'
+          ? 'You’re in' + (x.side ? ' · ' + (x.side === 'bibs' ? 'Bibs' : 'Colours') : '')
+          : x.status === 'waiting'
+            ? 'Waiting list'
+            : 'Invited';
+      return (
+        '<a class="card pl-card pl-item" href="#/pg/' +
+        esc(x.code) +
+        '">' +
+        dateBlock(x.starts_at, x.timezone) +
+        '<span class="grow"><b>' +
+        esc(x.title) +
+        '</b><small>' +
+        esc(timeOf(x.starts_at, x.timezone) + (x.location ? ' · ' + x.location : '') + ' · ' + status) +
+        '</small></span>' +
+        (x.status === 'invited' ? '<span class="pl-tag warn">Reply</span>' : x.owe ? '<span class="pl-tag warn">' + pounds(x.owe) + '</span>' : '') +
+        '</a>'
+      );
+    }
+    function fixtureRow(x) {
+      var title =
+        x.kind === 'match' && x.opponent ? x.team + (x.home ? ' v ' : ' @ ') + x.opponent : x.title || (x.kind === 'training' ? 'Training' : x.team);
+      var said = { available: 'You said yes', maybe: 'You said maybe', cant: 'You can’t make it' }[x.status] || '';
+      var slot = x.slot === 'start' ? 'Starting' : x.slot === 'sub' ? 'Sub' : '';
+      return (
+        '<a class="card pl-card pl-item" href="' +
+        (x.token ? playerPage(x.token) : '#/play') +
+        '">' +
+        dateBlock(x.starts_at, x.timezone) +
+        '<span class="grow"><b>' +
+        esc(title) +
+        '</b><small>' +
+        esc([timeOf(x.starts_at, x.timezone), x.location, slot || said].filter(Boolean).join(' · ')) +
+        '</small></span>' +
+        (x.ask && !x.status ? '<span class="pl-tag warn">Reply</span>' : '') +
+        '</a>'
+      );
+    }
+
+    // #/me: their account, for people who only play.
+    function screenMe() {
+      stopChat();
+      loading();
+      Promise.all([load(), loadName()]).then(function () {
+        var mail = ctx.email ? ctx.email() : '';
+        playerShell(
+          '<h1 class="pl-h1">You</h1><div class="card pl-card"><label class="field"><span>Your name</span><input type="text" id="me-name" maxlength="60" value="' +
+            esc(myName || '') +
+            '" /></label><p class="muted small">' +
+            esc(mail) +
+            '</p><button class="btn" id="me-out">Sign out</button></div>' +
+            '<div class="card pl-card"><b>Run something yourself?</b><p class="muted small">A team, social games or events: set up Dayli HQ with the same account.</p><a class="btn" href="#/welcome">Set up HQ</a></div>' +
+            '<div class="card pl-card"><b>The Dayli app</b><p class="muted small">Optional: your games and teams in a calendar, with reminders. Sign in with the same email.</p><a class="btn" target="_blank" rel="noopener" href="' +
+            SITE +
+            '/download/">Get the app</a></div>',
+          'me',
+        );
+        $('#me-out').onclick = ctx.signOut;
+        $('#me-name').onchange = function () {
+          var v = this.value.trim();
+          if (!v) return toast('Add your name');
+          saveName(v).then(
+            function () {
+              toast('Name saved');
+            },
+            function (err) {
+              toast(friendly(err));
+            },
+          );
+        };
+      });
+    }
+
+    // #/payments: card payments in one place. One Stripe account covers social
+    // games, team subs and tickets; this shows where you are (not started,
+    // details still needed, ready) and the one button for the next step.
+    function screenPayments(query) {
+      stopChat();
+      loading();
+      invoke('payout-setup', { action: 'status' }).then(
+        function (st) {
+          drawPayments(st || {}, query || {});
+        },
+        function (err) {
+          var m = String((err && err.message) || '');
+          render(
+            '<div class="page-head"><div><h1>Card payments</h1></div></div>' +
+              notice('info', /not_on/.test(m) ? 'Card payments aren’t switched on for HQ yet.' : esc(friendly(err))),
+          );
+        },
+      );
+    }
+    function drawPayments(st, query) {
+      var step = !st.connected ? 0 : !st.ready ? 1 : 2;
+      var steps = [
+        ['Tell Stripe who you are', 'Your name, date of birth and address. Stripe may ask for photo ID.'],
+        ['Add your bank account', 'Where your money goes. Payouts arrive a few days after each payment.'],
+        ['Take card payments', 'Players pay by card, Apple Pay or Google Pay for games, subs and tickets.'],
+      ];
+      var status =
+        step === 0
+          ? '<div class="pay-state"><span class="pl-pill">Not set up</span><h2>Set up card payments</h2><p class="muted">One Stripe account for all your games, team subs and tickets. It takes about 5 minutes.</p><button class="btn primary hq-big" id="pay-go">Set up card payments</button></div>'
+          : step === 1
+            ? '<div class="pay-state"><span class="pl-pill warn">Almost there</span><h2>Stripe needs a few more details</h2><p class="muted">' +
+              (st.due ? st.due + ' thing' + (st.due === 1 ? '' : 's') + ' left to fill in.' : 'Stripe is checking what you sent; this usually takes a few minutes.') +
+              '</p><button class="btn primary hq-big" id="pay-go">Continue with Stripe</button><button class="linkish" id="pay-check">Check again</button></div>'
+            : '<div class="pay-state"><span class="pl-pill ok">✓ Card payments are on</span><h2>You’re ready</h2><p class="muted">' +
+              (st.payouts
+                ? 'Payouts to your bank' + (st.bank && st.bank.last4 ? ' ending ' + esc(st.bank.last4) : '') + ' are on.'
+                : 'Stripe is still checking your bank details; payments work in the meantime.') +
+              '</p><button class="btn" id="pay-dash">Open your Stripe dashboard</button></div>';
+      render(
+        '<div class="page-head"><div><h1>Card payments</h1><p class="muted">Money goes straight to your bank through Stripe. Dayli never holds it.</p></div></div>' +
+          '<div class="pay-grid"><div class="card">' +
+          status +
+          '</div><div class="card pay-steps">' +
+          steps
+            .map(function (s, i) {
+              var cls = i < step || step === 2 ? 'done' : i === step ? 'on' : '';
+              return (
+                '<div class="pay-step ' +
+                cls +
+                '"><b>' +
+                (cls === 'done' ? '✓' : i + 1) +
+                '</b><span><strong>' +
+                esc(s[0]) +
+                '</strong><small>' +
+                esc(s[1]) +
+                '</small></span></div>'
+              );
+            })
+            .join('') +
+          '</div></div>' +
+          '<div class="card"><h3>What it costs</h3><div class="pay-fees">' +
+          '<div><b>Social games and tickets</b><span class="muted small">Players pay a booking fee on top: 3.5% + 10p. A £5 game is £5.34 for them; you get £5.</span></div>' +
+          '<div><b>Team subs and match fees</b><span class="muted small">A 1% Dayli fee, which you can pass on to players.</span></div>' +
+          '<div><b>Stripe’s card fee</b><span class="muted small">About 1.5% + 20p per payment, taken by Stripe from what you receive.</span></div>' +
+          '</div></div>' +
+          '<div class="card"><h3>Where you use it</h3><p class="muted small" style="margin:0">Once you’re set up, turn on card payments for a game (its Payments tab), for team subs and match fees (the team’s Payments page), or for event tickets. The same account is used for all of them.</p></div>',
+      );
+      function start(button) {
+        setBusy(button, true, 'Opening Stripe…');
+        invoke('payout-setup', { action: 'start' }).then(
+          function (d) {
+            if (d && d.url) location.href = d.url;
+            else {
+              setBusy(button, false);
+              toast('That didn’t work. Try again in a moment.');
+            }
+          },
+          function (err) {
+            setBusy(button, false);
+            toast(friendly(err));
+          },
+        );
+      }
+      if ($('#pay-go'))
+        $('#pay-go').onclick = function () {
+          start(this);
+        };
+      if ($('#pay-check'))
+        $('#pay-check').onclick = function () {
+          screenPayments({});
+        };
+      if ($('#pay-dash'))
+        $('#pay-dash').onclick = function () {
+          window.open('https://dashboard.stripe.com/', '_blank', 'noopener');
+        };
+      if (query.back && step === 2) toast('Card payments are on');
+      if (query.retry) toast('That link ran out. Press the button to carry on.');
     }
 
     // --- settings ----------------------------------------------------------------------
@@ -3879,6 +4518,7 @@
           ['invites', 'Invites', ICON.squad],
           ['teams', 'Team sheet', ICON.ball],
           ['pay', 'Payments', '<rect x="3" y="6" width="18" height="12" rx="2"/><path d="M3 10h18M7 15h3"/>'],
+          ['chat', 'Chat', '<path d="M4 5h16v11H8l-4 4z"/>'],
         ];
         render(
           '<div class="gm">' +
@@ -3907,10 +4547,12 @@
               .join('') +
             '<button type="button" class="share" id="gm-share"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2a10 10 0 00-8.6 15.1L2 22l5-1.3A10 10 0 1012 2zm5.3 14.2c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.3-.7-2.8-1.1-4.5-4-4.7-4.2-.1-.2-1.1-1.5-1.1-2.8s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.8 2c.1.2.1.3 0 .5l-.4.5-.3.4c-.1.1-.2.3-.1.5.5.8 1 1.4 1.7 2 .8.7 1.5.9 1.7 1 .2.1.4.1.5-.1l.8-.9c.2-.2.3-.2.5-.1l1.9.9c.3.1.4.2.5.3 0 .2 0 .7-.2 1.3z"/></svg><span>Share</span></button></nav>' +
             '<div class="gm-body">' +
-            (gameTab === 'teams' ? tabTeams() : gameTab === 'pay' ? tabPay() : tabInvites()) +
+            (gameTab === 'teams' ? tabTeams() : gameTab === 'pay' ? tabPay() : gameTab === 'chat' ? '<div class="card pl-card" id="gm-chat"></div>' : tabInvites()) +
             '</div></div>',
         );
         wire();
+        if (gameTab === 'chat') chatBox(g.code, $('#gm-chat'));
+        else stopChat();
       }
 
       function find(id) {
@@ -4621,10 +5263,13 @@
       screenWelcome: screenWelcome,
       screenNewTeam: screenNewTeam,
       screenStats: screenStats,
+      screenPayments: screenPayments,
       screenJoin: screenJoin,
       screenJoinOut: screenJoinOut,
       screenPlay: screenPlay,
       screenGame: screenGame,
+      screenPlayerGame: screenPlayerGame,
+      screenMe: screenMe,
       screenGameOut: screenGameOut,
       screenCalendar: screenCalendar,
       screenPeople: screenPeople,

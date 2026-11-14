@@ -152,7 +152,7 @@
     </div>
   </div>
 </main>
-<script src="../config.js?v=178196a"></script>
+<script src="../config.js?v=ca3f9d5"></script>
 <script>
   (function () {
     var cfg = window.DAYLI_CONFIG || {};
@@ -176,6 +176,13 @@
     var storeKey = 'dayli.game.' + code;
     var game = null;
     var mineNow = null;
+    // Dayli HQ: the game lives in HQ for players (sign in first, then your
+    // place, the team sheet, paying and the chat). Someone who joined here by
+    // name before keeps this page.
+    if (HQ && code && !saved()) {
+      location.replace('/app/#/pg/' + code + (params.get('paid') ? '?paid=1' : ''));
+      return;
+    }
 
     function token() {
       var t = null;

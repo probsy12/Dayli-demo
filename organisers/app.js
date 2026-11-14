@@ -466,7 +466,7 @@
       }
       if (parts[0] === 'verify' && state.pendingEmail) return screenVerify();
       if (HQ && parts[0] === 'join') return hq.screenJoinOut(parts[1] || '');
-      if (HQ && parts[0] === 'game') return hq.screenGameOut(parts[1] || '', query.want);
+      if (HQ && (parts[0] === 'game' || parts[0] === 'pg')) return hq.screenGameOut(parts[1] || '', query.want);
       return screenSignIn('signin');
     }
     if (state.organiser === undefined) {
@@ -492,7 +492,7 @@
           render(notice('error', esc(friendly(err))), true);
         });
       }
-      var free = ['welcome', 'verify', 'profile', 'reset', 'admin', 'join', 'play', 'game'];
+      var free = ['welcome', 'verify', 'profile', 'reset', 'admin', 'join', 'play', 'game', 'pg', 'me'];
       if (!hq.onboarded() && free.indexOf(parts[0]) < 0) return go(hq.homeHash()); // players: their teams
       if (parts[0] === 'welcome') {
         setShell(true, 'welcome');
@@ -516,13 +516,25 @@
         setShell(true, 'teams');
         return hq.screenStats(parts[1], query);
       }
+      if (parts[0] === 'payments') {
+        setShell(true, 'payments');
+        return hq.screenPayments(query);
+      }
       if (parts[0] === 'calendar') {
         setShell(true, 'calendar');
         return hq.screenCalendar(query);
       }
       if (parts[0] === 'play') {
         setShell(true, 'play');
-        return hq.screenPlay();
+        return hq.screenPlay(query);
+      }
+      if (parts[0] === 'pg' && parts[1]) {
+        setShell(true, 'play');
+        return hq.screenPlayerGame(parts[1], query);
+      }
+      if (parts[0] === 'me') {
+        setShell(true, 'play');
+        return hq.screenMe();
       }
       if (parts[0] === 'new-team') {
         setShell(true, 'teams');

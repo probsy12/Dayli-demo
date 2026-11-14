@@ -7785,3 +7785,446 @@ button.sg-pp {
 .st-grid .st-in {
   min-width: 56px;
 }
+
+/* HQ for players (hq.js screenPlayerGame / screenPlay / screenMe). */
+.pl {
+  max-width: 640px;
+  margin: 0 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.pl-bare {
+  padding: 0 16px 96px;
+}
+.pl-h1 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 28px;
+  line-height: 1.15;
+  margin: 2px 0 2px;
+}
+.pl-back {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  text-decoration: none;
+}
+.pl-meta {
+  margin: 0;
+}
+.pl-tabs {
+  margin: 4px 0 0;
+  max-width: none;
+}
+.pl-tabs a {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  border-radius: 13px;
+  color: var(--bg);
+  font-size: 11.5px;
+  font-weight: 800;
+  padding: 7px 4px;
+  text-decoration: none;
+}
+.pl-tabs a svg {
+  width: 19px;
+  height: 19px;
+}
+.pl-tabs a.on {
+  background: var(--bg);
+  color: var(--ink);
+}
+.pl-card {
+  margin: 0;
+}
+.pl-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.pl-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--alt);
+  color: var(--ink);
+  font-weight: 800;
+  font-size: 13px;
+  padding: 6px 11px;
+  border-radius: 999px;
+  text-decoration: none;
+}
+.pl-pill.ok {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.pl-pill.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.pl-seg {
+  display: flex;
+  gap: 8px;
+}
+.pl-seg button {
+  flex: 1;
+  font: inherit;
+  font-weight: 800;
+  font-size: 15px;
+  padding: 13px 8px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  cursor: pointer;
+}
+.pl-seg button.on {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.pl-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+}
+.pl-bar-fill {
+  height: 8px;
+  border-radius: 4px;
+  background: var(--alt);
+  overflow: hidden;
+  margin: 8px 0 12px;
+}
+.pl-bar-fill b {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+}
+.pl-avs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(58px, 1fr));
+  gap: 10px 6px;
+}
+.pl-av {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  font-size: 11.5px;
+  text-align: center;
+  min-width: 0;
+}
+.pl-av span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.pl-av.me .th-av,
+.pl-pp.me .th-av {
+  box-shadow:
+    0 0 0 3px var(--surface),
+    0 0 0 5px var(--accent);
+}
+.pl-free {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  border: 2px dashed var(--border);
+  color: var(--muted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-style: normal;
+  font-weight: 800;
+}
+.pl-pp {
+  cursor: default;
+}
+.pl-paybox {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.pl-big {
+  font: 700 38px Georgia, 'Times New Roman', serif;
+}
+.pl-sec {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin: 8px 2px -2px;
+}
+.pl-list {
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.pl-line {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+.pl-line:last-child {
+  border-bottom: 0;
+}
+.pl-line .grow,
+.pl-item .grow {
+  flex: 1;
+  min-width: 0;
+}
+.pl-tag {
+  font-size: 12px;
+  font-weight: 800;
+  padding: 3px 8px;
+  border-radius: 6px;
+  white-space: nowrap;
+}
+.pl-tag.ok {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.pl-tag.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.pl-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: var(--ink);
+  text-decoration: none;
+  padding: 12px 14px;
+}
+.pl-item b {
+  display: block;
+  font-size: 15px;
+}
+.pl-item small {
+  display: block;
+  color: var(--muted);
+  font-size: 13px;
+}
+.pl-item i {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 20px;
+}
+.pl-when {
+  width: 52px;
+  flex: none;
+  text-align: center;
+  border-radius: 12px;
+  background: var(--alt);
+  padding: 6px 0;
+}
+.pl-when small {
+  display: block;
+  font-size: 11px;
+  font-weight: 800;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+.pl-when b {
+  font: 700 21px Georgia, 'Times New Roman', serif;
+}
+.pl-owe {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--warn-bg);
+  border-color: transparent;
+}
+.pl-owe small {
+  display: block;
+  color: var(--warn);
+}
+.pl-setup {
+  text-align: center;
+  margin-top: 10px;
+}
+.pl-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 30;
+  display: flex;
+  justify-content: space-around;
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  padding: 8px 8px calc(8px + env(safe-area-inset-bottom));
+}
+.pl-bar a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  text-decoration: none;
+  min-width: 64px;
+}
+.pl-bar a svg {
+  width: 22px;
+  height: 22px;
+}
+.pl-bar a.on {
+  color: var(--accent);
+}
+.pl-chat {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.pl-msgs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 52vh;
+  overflow-y: auto;
+  padding: 2px;
+}
+.pl-msg {
+  align-self: flex-start;
+  max-width: 82%;
+  background: var(--alt);
+  border-radius: 14px 14px 14px 4px;
+  padding: 8px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.pl-msg.me {
+  align-self: flex-end;
+  background: var(--accent);
+  color: var(--accent-ink);
+  border-radius: 14px 14px 4px 14px;
+}
+.pl-msg b {
+  font-size: 12px;
+}
+.pl-msg span {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.pl-msg small {
+  font-size: 11px;
+  opacity: 0.7;
+  align-self: flex-end;
+}
+.pl-send {
+  display: flex;
+  gap: 8px;
+}
+.pl-send input {
+  flex: 1;
+  min-width: 0;
+}
+.pl-gamecard {
+  text-align: left;
+  margin-bottom: 18px;
+}
+.pl-gamecard .hq-h1 {
+  font-size: 28px;
+  margin: 4px 0;
+}
+.pl-signh {
+  text-align: left;
+  font-size: 22px;
+}
+
+/* HQ Card payments (hq.js screenPayments). */
+.pay-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr);
+  gap: 16px;
+}
+.pay-grid .card {
+  margin: 0;
+}
+.pay-state {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.pay-state h2 {
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 24px;
+  margin: 4px 0 0;
+}
+.pay-state p {
+  margin: 0 0 6px;
+}
+.pay-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.pay-step {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+}
+.pay-step b {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  flex: none;
+}
+.pay-step.on b {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.pay-step.done b {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft);
+  color: var(--accent);
+}
+.pay-step strong {
+  display: block;
+}
+.pay-step small {
+  color: var(--muted);
+}
+.pay-fees {
+  display: grid;
+  gap: 12px;
+}
+.pay-fees div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+@media (max-width: 800px) {
+  .pay-grid {
+    grid-template-columns: 1fr;
+  }
+}
+html.hq .pl .pl-tabs {
+  position: static;
+  margin: 4px 0 0;
+  left: auto;
+  right: auto;
+  bottom: auto;
+}
