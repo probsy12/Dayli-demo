@@ -2924,6 +2924,13 @@
       var m = /(\d+(?:\.\d{1,2})?)/.exec(String(cost || ''));
       return m ? Math.round(parseFloat(m[1]) * 100) : null;
     }
+    // What a cost takes by card, read as the server does: "£5", "£4.50 each", "150p"; £1 to £100.
+    function cardPence(cost) {
+      var m = /(\d{1,5}(?:\.\d{1,2})?)\s*(p)?(?![a-z])/.exec(String(cost || '').toLowerCase());
+      if (!m) return null;
+      var x = Math.round(m[2] ? Number(m[1]) : Number(m[1]) * 100);
+      return x >= 100 && x <= 10000 ? x : null;
+    }
     function sgPounds(p) {
       var v = p / 100;
       return '£' + (v % 1 ? v.toFixed(2) : v.toFixed(0));
@@ -3435,6 +3442,12 @@
         var p = pitchPence();
         return p ? Math.ceil(p / Math.max(1, n) / 10) * 10 : null;
       }
+      // Card payments: whether the cost they type will take cards straight away.
+      function cardNote() {
+        if (!hq.paymentsOn) return 'People pay you in cash, or by bank transfer.';
+        if (hq.cardReady) return 'Players can pay this by card in Dayli, straight to your bank.';
+        return 'Want players to pay by card in Dayli? You’ll set up Stripe once, right after making the game.';
+      }
       function costText() {
         if (g.split) return pitchPence() ? sgPounds(pitchPence()) + ' pitch, split' : 'Split the pitch fee';
         return g.cost ? g.cost + ' each' : 'Free, or say later';
@@ -3613,7 +3626,9 @@
                   '</p>'
                 : '<input type="text" id="ng-cost" class="ng-inp" maxlength="40" placeholder="£5" value="' +
                   esc(g.cost) +
-                  '" /><p class="muted small ng-note">People pay you in cash, or by card once card payments are on.</p>'),
+                  '" /><p class="muted small ng-note" id="ng-card-note">' +
+                  esc(cardNote()) +
+                  '</p>'),
           ) +
           '<label class="ng-row ng-switch-row"><span class="muted">Repeats</span><b>Every week</b><span class="ng-switch"><input type="checkbox" id="ng-weekly"' +
           (g.weekly ? ' checked' : '') +
@@ -3742,6 +3757,18 @@
           setText('places', n + ' · ' + sidesLabel(g.sport, n));
         };
       });
+      if (hq.paymentsOn && hq.cardReady === undefined) {
+        hq.cardReady = false;
+        invoke('payout-setup', { action: 'status' }).then(
+          function (st) {
+            hq.cardReady = !!(st && st.ready);
+            if ($('#ng-card-note')) $('#ng-card-note').textContent = cardNote();
+          },
+          function () {
+            /* leave the note as it is */
+          },
+        );
+      }
       $('#ng-weekly').onchange = function () {
         g.weekly = this.checked;
       };
@@ -3804,6 +3831,9 @@
     // on the home screen like an app).
     function drawGameMade(g) {
       var link = 'https://daylihq.co.uk/g/?c=' + encodeURIComponent(g.code);
+      // A cost, card payments on for them, Stripe not ready: offer it now.
+      var price = g.pitch_pence ? null : cardPence(g.cost);
+      var stripe = g.payments_on && !g.card_ready && (price || g.pitch_pence);
       var when = new Date(g.starts_at).toLocaleString('en-GB', {
         weekday: 'long',
         day: 'numeric',
@@ -3836,7 +3866,18 @@
           '</div><h1>Game on</h1><p class="muted">' +
           esc(g.title + ' · ' + when) +
           (g.location ? '<br>' + esc(g.location) : '') +
-          '</p><div class="ng-lbl" style="text-align:left">Send this to your group</div><div class="ng-link-box"><span>' +
+          '</p>' +
+          (stripe
+            ? '<div class="ng-stripe"><b>Let players pay you in Dayli</b><span class="muted small">' +
+              (price ? 'They pay ' + sgPounds(price) + ' by card, Apple Pay or Google Pay from the link. ' : 'They pay by card, Apple Pay or Google Pay from the link. ') +
+              (g.stripe_connected
+                ? 'Stripe needs a few more details first.'
+                : 'Set up Stripe once (about 5 minutes) and it’s on for every game you run. The money goes straight to your bank.') +
+              '</span><button type="button" class="btn primary" id="ng-stripe">' +
+              (g.stripe_connected ? 'Carry on with Stripe' : 'Set up card payments') +
+              '</button></div>'
+            : '') +
+          '<div class="ng-lbl" style="text-align:left">Send this to your group</div><div class="ng-link-box"><span>' +
           esc(link.replace(/^https:\/\//, '')) +
           '</span><button type="button" id="ng-copy">Copy</button></div>' +
           '<a class="btn ng-go ng-wa" target="_blank" rel="noopener" href="https://wa.me/?text=' +
@@ -3849,6 +3890,21 @@
             : '') +
           '</div>',
       );
+      if ($('#ng-stripe'))
+        $('#ng-stripe').onclick = function () {
+          var button = this;
+          setBusy(button, true, 'Opening Stripe…');
+          invoke('game-pay', { action: 'connect', game_id: g.id, back: 'hq' }).then(
+            function (r) {
+              if (r && r.url) location.href = r.url;
+              else setBusy(button, false);
+            },
+            function (err) {
+              setBusy(button, false);
+              toast(friendly(err));
+            },
+          );
+        };
       $('#ng-copy').onclick = function () {
         (navigator.clipboard ? navigator.clipboard.writeText(link) : Promise.reject()).then(
           function () {

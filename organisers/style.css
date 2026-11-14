@@ -5422,6 +5422,20 @@ i.nr {
 .ng-made .ng-lbl {
   margin-top: 22px;
 }
+.ng-stripe {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+  border: 1.5px solid var(--accent);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin: 4px 0 16px;
+}
+.ng-stripe .btn {
+  margin-top: 6px;
+  align-self: flex-start;
+}
 .ng-link-box {
   display: flex;
   align-items: center;
