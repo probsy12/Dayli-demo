@@ -14,8 +14,9 @@
   var topbar = document.getElementById('topbar');
   var tabsNav = document.getElementById('tabs-nav');
   var SITE = 'https://daylicalendar.co.uk';
-  // Dayli HQ: the same site served at /hq/ (daylihq.co.uk later), with Teams.
-  var HQ = /^\/hq(\/|$)/.test(location.pathname);
+  // Dayli HQ: the same site with Teams, at daylihq.co.uk/app/ (and the old
+  // daylicalendar.co.uk/hq/).
+  var HQ = /^\/hq(\/|$)/.test(location.pathname) || /(^|\.)daylihq\.co\.uk$/.test(location.hostname);
   if (HQ) document.documentElement.classList.add('hq');
   var APP_NOTE_KEY = 'dayli_organisers_app_note_seen';
 
@@ -493,13 +494,17 @@
       if (!hq.onboarded() && free.indexOf(parts[0]) < 0) return go('#/welcome');
       if (parts[0] === 'welcome') {
         setShell(true, 'welcome');
-        if (parts[1] === 'setup') return hq.screenSetup();
+        if (parts[1] === 'setup') return go('#/new-team'); // old link
         if (parts[1] === 'people') return hq.screenPeople();
         return hq.screenWelcome();
       }
       if (parts[0] === 'settings') {
         setShell(true, 'settings');
         return hq.screenSettings();
+      }
+      if (parts[0] === 'new-team') {
+        setShell(true, 'teams');
+        return hq.screenNewTeam();
       }
       if (parts[0] === 'more') {
         setShell(true, 'more');
@@ -816,7 +821,7 @@
           return showError(err, 'Enter your email address first.');
         setBusy(forgot, true, 'Sending…');
         sb.auth
-          .resetPasswordForEmail(address, { redirectTo: location.origin + '/organisers/?reset=1' })
+          .resetPasswordForEmail(address, { redirectTo: location.origin + location.pathname + '?reset=1' })
           .then(function (res) {
             setBusy(forgot, false);
             if (res.error) return showError(err, friendly(res.error));
@@ -834,7 +839,7 @@
   function screenSignInHQ() {
     render(
       '<div class="hq-auth"><div class="hq-auth-logo"><img src="../img/icon.svg" alt="" />Dayli <span>HQ</span></div>' +
-        '<h1>Run your team, games and events</h1><p class="muted">Same account as the Dayli app. New? It makes one for you.</p>' +
+        '<h1>Run your team, games and events</h1><p class="muted">New here? We make your account, no app needed. Already use the Dayli app? Same email.</p>' +
         '<form id="hq-auth" novalidate><input type="email" name="email" class="hq-auth-inp" autocomplete="email" placeholder="you@example.com" />' +
         '<div class="notice error" id="err" hidden></div><button class="btn primary hq-auth-go" type="submit">Send me a code</button></form>' +
         '<p class="muted small">No password: we email you a 6-digit code.</p><button type="button" class="linkish small" id="hq-pw">Use a password instead</button></div>',

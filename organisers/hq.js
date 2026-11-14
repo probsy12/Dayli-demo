@@ -1,10 +1,9 @@
 /* Dayli HQ: the shell around teams, games and events. Asks what someone runs
  * (hq_prefs, supabase/migrations/20261111000400_hq_prefs.sql) and builds the
  * menus, the switcher and the home page from that; Settings changes it.
- *   #/welcome            1. what you run
- *   #/welcome/setup      2. set it up (teams found in the app, a new team,
- *                           games, the organiser profile)
- *   #/welcome/people     3. bring people in (invite links)
+ *   #/welcome            1. your name (a new account) and what you run
+ *   #/welcome/people     2. bring people in (invite links; a new team)
+ *   #/new-team           add a team
  *   #/settings           what you run, account
  *   #/home               the first thing you run
  *   #/games[/<id>]       social games: add players, Bibs v Colours, who's paid
@@ -164,7 +163,7 @@
       }
     }
     function contextHome(c) {
-      if (!c) return runs('teams') ? '#/welcome/setup' : '#/settings';
+      if (!c) return runs('teams') ? '#/new-team' : '#/settings';
       if (c === 'games') return '#/games';
       if (c === 'events') return state.organiser ? '#/overview' : '#/profile';
       return '#/teams/' + c.slice(5);
@@ -340,7 +339,7 @@
           '<span>' +
           esc(state.organiser ? state.organiser.name : 'Your events') +
           '<small>Events and tickets</small></span></a>';
-      if (runs('teams')) out += '<a class="hq-dd-add" href="#/welcome/setup">+ Add a team</a>';
+      if (runs('teams')) out += '<a class="hq-dd-add" href="#/new-team">+ Add a team</a>';
       if (runs('games')) out += '<a class="hq-dd-add" href="#/games/new">+ New social game</a>';
       if (runs('events')) out += '<a class="hq-dd-add" href="#/events/new">+ New event</a>';
       if (
@@ -491,7 +490,7 @@
           sub: 'Events and tickets',
         });
       var adds = [];
-      if (runs('teams')) adds.push(['#/welcome/setup', '+ Add a team']);
+      if (runs('teams')) adds.push(['#/new-team', '+ Add a team']);
       if (runs('games')) adds.push(['#/games/new', '+ New social game']);
       if (runs('events')) adds.push(['#/events/new', '+ New event']);
       if (
@@ -576,11 +575,12 @@
     // --- welcome ---------------------------------------------------------------------
 
     var chosen = null; // the choice while going through the welcome steps
+    var myName = null; // the account's name ('' until they give one)
     var TICK =
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
 
     function steps(n) {
-      var names = ['What you run', 'Set it up', 'Bring people in'];
+      var names = ['What you run', 'Bring people in'];
       return (
         '<div class="hq-steps">' +
         names
@@ -613,17 +613,41 @@
       if (b) b.onclick = ctx.signOut;
     }
 
+    // The account's name. An account made here starts without one; players and
+    // guests see it on games, teams and events.
+    function uid() {
+      return state.session && state.session.user ? state.session.user.id : null;
+    }
+    function loadName() {
+      if (myName !== null) return Promise.resolve(myName);
+      return ctx.sb
+        .from('profiles')
+        .select('display_name')
+        .eq('id', uid())
+        .maybeSingle()
+        .then(function (r) {
+          myName = (r.data && r.data.display_name) || '';
+          return myName;
+        });
+    }
+    function saveName(name) {
+      var patch = { display_name: name };
+      return ctx.sb
+        .from('profiles')
+        .update(patch)
+        .eq('id', uid())
+        .then(function (r) {
+          if (r.error) throw r.error;
+          myName = name;
+        });
+    }
+
     function screenWelcome() {
       loading();
-      load(true).then(
+      Promise.all([load(true), loadName()]).then(
         function () {
-          if (!chosen) {
-            chosen = hq.runs.length
-              ? hq.runs.slice()
-              : ['teams', 'games', 'events'].filter(function (k) {
-                  return hq.has[k];
-                });
-          }
+          // Nothing ticked for someone new: they say what they run.
+          if (!chosen) chosen = hq.runs.slice();
           drawWelcome();
         },
         function (err) {
@@ -634,7 +658,11 @@
     function drawWelcome() {
       render(
         topBar(1) +
-          '<div class="hq-wrap"><h1 class="hq-h1">What are you running?</h1><p class="hq-lead">Pick all that apply. HQ shows only what you need.</p><div class="hq-choices">' +
+          '<div class="hq-wrap"><h1 class="hq-h1">What are you running?</h1><p class="hq-lead">Pick all that apply. HQ shows only what you need.</p>' +
+          (myName
+            ? ''
+            : '<div class="hq-name"><label for="hq-name">Your name</label><input type="text" id="hq-name" maxlength="60" autocomplete="name" placeholder="e.g. Sam Taylor" /><p class="muted small">Players and guests see this on your teams, games and events.</p></div>') +
+          '<div class="hq-choices">' +
           RUNS.map(function (r) {
             var on = chosen.indexOf(r.key) >= 0;
             return (
@@ -678,9 +706,7 @@
         }).map(function (r) {
           return r.title.replace('A team or club', 'Team or club');
         });
-        $('#hq-picked').innerHTML = names.length
-          ? '<b class="ink">' + esc(names.join(' + ')) + '</b> picked · same login as the Dayli app'
-          : 'Pick at least one';
+        $('#hq-picked').innerHTML = names.length ? '<b class="ink">' + esc(names.join(' + ')) + '</b> picked' : 'Pick at least one';
         $('#hq-next').disabled = !names.length;
       }
       $$('[data-run]').forEach(function (b) {
@@ -698,138 +724,49 @@
       });
       picked();
       $('#hq-next').onclick = function () {
+        var input = $('#hq-name');
+        var name = input ? input.value.trim() : myName;
+        if (!name) {
+          input.focus();
+          return toast('Add your name');
+        }
         var button = this;
         setBusy(button, true);
-        rpc('hq_prefs_set', { p_runs: chosen, p_done: false }).then(
-          function () {
-            go('#/welcome/setup');
-          },
-          function (err) {
-            setBusy(button, false);
-            toast(friendly(err));
-          },
-        );
+        (input ? saveName(name) : Promise.resolve())
+          .then(function () {
+            return rpc('hq_prefs_set', { p_runs: chosen, p_done: false });
+          })
+          .then(
+            function () {
+              go('#/welcome/people');
+            },
+            function (err) {
+              setBusy(button, false);
+              toast(friendly(err));
+            },
+          );
       };
     }
 
-    function screenSetup() {
-      loading();
-      Promise.all([
-        load(true),
-        rpc('my_games').catch(function () {
-          return [];
-        }),
-      ]).then(
-        function (r) {
-          if (!hq.runs.length) return go('#/welcome');
-          drawSetup(
-            (r[1] || []).filter(function (g) {
-              return g.is_organiser;
-            }),
+    // A new team: name, sport, colour. On Bring people in (no team yet) and on
+    // its own page from "+ Add a team".
+    function teamForm() {
+      return (
+        '<div class="hq-new"><label>Team name<input type="text" id="t-name" maxlength="60" placeholder="e.g. Clapton Juniors U12" /></label>' +
+        '<div class="field-label">Sport</div><div class="hq-chips" id="t-sport">' +
+        SPORTS.map(function (s, i) {
+          return '<button type="button" data-v="' + s[0] + '" class="' + (i === 0 ? 'on' : '') + '">' + esc(s[1]) + '</button>';
+        }).join('') +
+        '</div><div class="field-label">Team colour</div><div class="hq-sws" id="t-colour">' +
+        COLOURS.map(function (c, i) {
+          return (
+            '<button type="button" aria-label="Colour ' + c + '" data-v="' + c + '" class="' + (i === 0 ? 'on' : '') + '" style="background:' + c + '"></button>'
           );
-        },
-        function (err) {
-          render(notice('error', esc(friendly(err))));
-        },
+        }).join('') +
+        '</div><button class="btn primary" id="t-make">Create the team</button></div>'
       );
     }
-    function drawSetup(games) {
-      var sections = '';
-      if (runs('teams')) {
-        sections +=
-          '<section class="hq-sec"><h2 class="hq-h2">Your team</h2><p class="hq-lead2">Teams you already run in the Dayli app are ready here. Or start a new one.</p>' +
-          (hq.teams.length
-            ? '<div class="hq-found"><div class="hq-found-h">ALREADY IN YOUR DAYLI APP</div>' +
-              hq.teams
-                .map(function (t) {
-                  return (
-                    '<div class="hq-tm">' +
-                    crest(t.name, t.color, 44) +
-                    '<div><b>' +
-                    esc(t.name) +
-                    '</b><div class="muted small">' +
-                    esc(sportName(t.sport)) +
-                    ' · ' +
-                    t.players +
-                    ' in the squad · you’re the manager</div></div><span class="hq-ok">Ready</span></div>'
-                  );
-                })
-                .join('') +
-              '</div><div class="hq-or">OR START A NEW TEAM</div>'
-            : '') +
-          '<div class="hq-new"><label>Team name<input type="text" id="t-name" maxlength="60" placeholder="e.g. Clapton Juniors U12" /></label>' +
-          '<div class="field-label">Sport</div><div class="hq-chips" id="t-sport">' +
-          SPORTS.map(function (s, i) {
-            return '<button type="button" data-v="' + s[0] + '" class="' + (i === 0 ? 'on' : '') + '">' + esc(s[1]) + '</button>';
-          }).join('') +
-          '</div><div class="field-label">Team colour</div><div class="hq-sws" id="t-colour">' +
-          COLOURS.map(function (c, i) {
-            return (
-              '<button type="button" aria-label="Colour ' +
-              c +
-              '" data-v="' +
-              c +
-              '" class="' +
-              (i === 0 ? 'on' : '') +
-              '" style="background:' +
-              c +
-              '"></button>'
-            );
-          }).join('') +
-          '</div><button class="btn' +
-          (hq.teams.length ? '' : ' primary') +
-          '" id="t-make">Create the team</button></div></section>';
-      }
-      if (runs('games')) {
-        sections +=
-          '<section class="hq-sec"><h2 class="hq-h2">Your social games</h2><p class="hq-lead2">Pick-up games: one link in the group chat and the spaces fill up, first come first served.</p>' +
-          (games.length
-            ? '<div class="hq-found">' +
-              games
-                .slice(0, 4)
-                .map(function (g) {
-                  return (
-                    '<div class="hq-tm">' +
-                    crest('G', '#3a61c9', 40) +
-                    '<div><b>' +
-                    esc(g.title) +
-                    '</b><div class="muted small">' +
-                    esc(new Date(g.starts_at).toLocaleString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })) +
-                    ' · ' +
-                    g.taken +
-                    ' of ' +
-                    g.places +
-                    ' spaces</div></div><span class="hq-ok">Ready</span></div>'
-                  );
-                })
-                .join('') +
-              '</div>'
-            : notice(
-                'info',
-                'Start a game in the Dayli app (Events → Hosting → New game). It shows here straight away: add players, pick Bibs v Colours and tick who’s paid in Social games.',
-              )) +
-          '</section>';
-      }
-      if (runs('events')) {
-        sections +=
-          '<section class="hq-sec"><h2 class="hq-h2">Your events</h2><p class="hq-lead2">Events need an organiser profile: the name people see, and a way to check your email.</p>' +
-          (state.organiser
-            ? '<div class="hq-found"><div class="hq-tm">' +
-              crest(state.organiser.name, '#1c1a17', 40) +
-              '<div><b>' +
-              esc(state.organiser.name) +
-              '</b><div class="muted small">Your organiser profile</div></div><span class="hq-ok">Ready</span></div></div>'
-            : '<a class="btn" href="#/profile">Set up the organiser profile</a> <span class="muted small">You can do this after the welcome too.</span>') +
-          '</section>';
-      }
-      render(
-        topBar(2) +
-          '<div class="hq-wrap hq-left">' +
-          sections +
-          '<div class="hq-foot"><a class="btn" href="#/welcome">Back</a><button class="btn primary hq-big" id="hq-next">Continue</button></div></div>',
-      );
-      document.body.classList.add('hq-bare');
-      wireTop();
+    function wireTeamForm(done) {
       function pick(id) {
         $$('#' + id + ' button').forEach(function (b) {
           b.onclick = function () {
@@ -839,41 +776,54 @@
           };
         });
       }
-      if ($('#t-make')) {
-        pick('t-sport');
-        pick('t-colour');
-        $('#t-make').onclick = function () {
-          var name = $('#t-name').value.trim();
-          if (!name) return toast('Give the team a name');
-          var button = this;
-          setBusy(button, true);
-          rpc('team_create', {
-            p_name: name,
-            p_sport: $('#t-sport button.on').dataset.v,
-            p_league: null,
-            p_color: $('#t-colour button.on').dataset.v,
-            p_sample: false,
-          }).then(
-            function () {
-              toast(name + ' is set up');
-              screenSetup();
-            },
-            function (err) {
-              setBusy(button, false);
-              toast(friendly(err));
-            },
-          );
-        };
-      }
-      $('#hq-next').onclick = function () {
-        if (runs('teams') && !hq.teams.length) return toast('Create your team first, or untick Team in step 1');
-        go('#/welcome/people');
+      pick('t-sport');
+      pick('t-colour');
+      $('#t-make').onclick = function () {
+        var name = $('#t-name').value.trim();
+        if (!name) return toast('Give the team a name');
+        var button = this;
+        setBusy(button, true);
+        rpc('team_create', {
+          p_name: name,
+          p_sport: $('#t-sport button.on').dataset.v,
+          p_league: null,
+          p_color: $('#t-colour button.on').dataset.v,
+          p_sample: false,
+        }).then(
+          function (id) {
+            toast(name + ' is set up');
+            done(id);
+          },
+          function (err) {
+            setBusy(button, false);
+            toast(friendly(err));
+          },
+        );
       };
+    }
+
+    // #/new-team: "+ Add a team", and where HQ opens when you run a team but
+    // haven't made one yet.
+    function screenNewTeam() {
+      render(
+        '<div class="page-head"><div><h1>Add a team</h1><p class="muted">You’re the manager. Then send the squad its join link.</p></div></div>' +
+          '<div class="card">' +
+          teamForm() +
+          '</div>',
+      );
+      wireTeamForm(function () {
+        load(true).then(function () {
+          drawMenus();
+          var t = hq.teams[hq.teams.length - 1];
+          go(t ? '#/teams/' + t.calendar_id + '/squad' : homeHash());
+        });
+      });
     }
 
     function screenPeople() {
       loading();
       load(true).then(function () {
+        if (!hq.runs.length) return go('#/welcome');
         var codes = {};
         var ids = hq.teams.map(function (t) {
           return t.calendar_id;
@@ -896,6 +846,7 @@
     }
     function drawPeople(codes) {
       var rows = '';
+      var newTeam = runs('teams') && !hq.teams.length;
       if (runs('teams')) {
         rows += hq.teams
           .map(function (t) {
@@ -907,7 +858,7 @@
               esc(t.name) +
               '</b><div class="muted small">' +
               t.players +
-              ' in the squad so far. Players tap the link and join in the Dayli app.</div></div>' +
+              ' in the squad so far. Players tap the link to join.</div></div>' +
               (url
                 ? '<button class="btn" data-copy="' +
                   esc(url) +
@@ -919,6 +870,11 @@
             );
           })
           .join('');
+        if (newTeam)
+          rows +=
+            '<div class="hq-tm hq-tm-new"><div class="grow"><b>Your team</b><div class="muted small">Make your team and its join link appears here. Or skip this and add it later.</div>' +
+            teamForm() +
+            '</div></div>';
       }
       if (runs('games'))
         rows +=
@@ -931,13 +887,14 @@
           crest(state.organiser ? state.organiser.name : 'E', '#1c1a17', 44) +
           '<div class="grow"><b>Events</b><div class="muted small">Every event gets a page to share. People nearby find published events in the Dayli app.</div></div></div>';
       render(
-        topBar(3) +
-          '<div class="hq-wrap hq-left"><h1 class="hq-h1 hq-l">Bring people in</h1><p class="hq-lead2">Send the link to your group chat. Anyone who joins sees fixtures and games in their own calendar.</p><div class="hq-found">' +
+        topBar(2) +
+          '<div class="hq-wrap hq-left"><h1 class="hq-h1 hq-l">Bring people in</h1><p class="hq-lead2">Send the link to your group chat. Anyone who joins sees fixtures and games straight away.</p><div class="hq-found">' +
           rows +
-          '</div><div class="hq-foot"><a class="btn" href="#/welcome/setup">Back</a><button class="btn primary hq-big" id="hq-done">Go to HQ</button></div></div>',
+          '</div><div class="hq-foot"><a class="btn" href="#/welcome">Back</a><button class="btn primary hq-big" id="hq-done">Go to HQ</button></div></div>',
       );
       document.body.classList.add('hq-bare');
       wireTop();
+      if (newTeam) wireTeamForm(screenPeople);
       $$('[data-copy]').forEach(function (b) {
         b.onclick = function () {
           var url = b.dataset.copy;
@@ -974,7 +931,7 @@
 
     function screenSettings() {
       loading();
-      load(true).then(function () {
+      Promise.all([load(true), loadName()]).then(function () {
         var sel = hq.runs.slice();
         function draw() {
           render(
@@ -1001,7 +958,10 @@
                 );
               }).join('') +
               '</div><div class="row" style="margin-top:12px"><button class="btn primary" id="hq-save">Save</button><span class="muted small" id="hq-saved"></span></div></div>' +
-              '<div class="card"><h3>Account</h3><p class="sub">Same account as the Dayli app.</p><p>' +
+              '<div class="card"><h3>Account</h3><p class="sub">Your Dayli account. If you ever want the Dayli calendar app, sign in there with the same email.</p>' +
+              '<label class="field"><span>Your name</span><input type="text" id="hq-myname" maxlength="60" autocomplete="name" value="' +
+              esc(myName || '') +
+              '" /></label><p class="muted small">' +
               esc((state.session && state.session.user && state.session.user.email) || '') +
               '</p>' +
               (runs('events') ? '<a class="btn" href="#/profile">Organiser profile</a> ' : '') +
@@ -1017,6 +977,18 @@
             };
           });
           $('#hq-signout').onclick = ctx.signOut;
+          $('#hq-myname').onchange = function () {
+            var name = this.value.trim();
+            if (!name) return toast('Add your name');
+            saveName(name).then(
+              function () {
+                toast('Name saved');
+              },
+              function (err) {
+                toast(friendly(err));
+              },
+            );
+          };
           $('#hq-save').onclick = function () {
             if (!sel.length) return toast('Keep at least one turned on');
             var button = this;
@@ -1909,9 +1881,8 @@
         var err = $('#ng-err');
         err.hidden = true;
         var start = new Date(g.day + 'T' + g.time);
-        var why = !g.cal
-          ? 'You need a calendar in Dayli first: open the Dayli app once.'
-          : isNaN(start.getTime()) || start < new Date()
+        var why =
+          isNaN(start.getTime()) || start < new Date()
             ? 'Pick a day and time that’s still to come.'
             : g.split && !pitchPence()
               ? 'Type what the pitch costs, like £60 (or choose Price each).'
@@ -1922,7 +1893,11 @@
           return;
         }
         setBusy(button, true);
-        rpc('game_create', {
+        // No calendar yet (an account made in HQ): games get one of their own.
+        (g.cal ? Promise.resolve(g.cal) : rpc('create_calendar', { p_name: 'Games' }))
+          .then(function (cal) {
+            g.cal = cal;
+            return rpc('game_create', {
           p_calendar: g.cal,
           p_title: (g.title || '').trim() || 'Game',
           p_sport: g.sport,
@@ -1934,7 +1909,8 @@
           p_places: g.places,
           p_cost: g.split ? null : g.cost || null,
           p_weekly: g.weekly,
-        })
+            });
+          })
           .then(function (id) {
             // The pitch fee to split goes on straight after (the game exists by then).
             if (!g.split) return id;
@@ -3413,7 +3389,7 @@
       drawMenus: drawMenus,
       menuSheet: menuSheet,
       screenWelcome: screenWelcome,
-      screenSetup: screenSetup,
+      screenNewTeam: screenNewTeam,
       screenPeople: screenPeople,
       screenSettings: screenSettings,
       screenGames: screenGames,

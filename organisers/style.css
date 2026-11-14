@@ -3005,6 +3005,27 @@ body.hq-bare #app {
   height: 1px;
   background: var(--border);
 }
+.hq-name {
+  max-width: 420px;
+  margin: 0 auto 26px;
+  text-align: left;
+}
+.hq-name label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+.hq-name input {
+  width: 100%;
+  font-size: 17px;
+}
+.hq-name p {
+  margin: 6px 0 0;
+}
+.hq-tm-new .hq-new {
+  margin-top: 14px;
+}
 .hq-new label {
   display: flex;
   flex-direction: column;
