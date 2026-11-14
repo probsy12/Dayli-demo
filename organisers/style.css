@@ -5160,6 +5160,43 @@ i.nr {
 .hq-auth .card {
   text-align: left;
 }
+.hq-auth-tabs {
+  display: flex;
+  gap: 4px;
+  background: var(--alt);
+  border-radius: 14px;
+  padding: 4px;
+  margin-top: 22px;
+}
+.hq-auth-tabs button {
+  flex: 1;
+  font: inherit;
+  font-weight: 700;
+  font-size: 15px;
+  border: 0;
+  border-radius: 11px;
+  padding: 10px;
+  background: transparent;
+  color: var(--muted);
+  cursor: pointer;
+}
+.hq-auth-tabs button.on {
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.08);
+}
+.hq-auth .hq-auth-tabs + form {
+  margin-top: 16px;
+}
+.hq-auth-lbl {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  margin: 12px 0 6px;
+}
+.hq-auth-alt {
+  margin-top: 14px;
+}
 .hq-auth-code {
   text-align: left;
 }
@@ -7454,4 +7491,297 @@ button.sg-pp {
     text-align: center;
     padding: 8px 0;
   }
+}
+
+/* HQ side menu in sections (hq.js allSections): a heading for each thing you
+   run, its pages under it. */
+#hq-switch.hq-sw-phone {
+  display: none;
+}
+.hq-sec-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 16px 0 4px;
+  padding: 0 10px;
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+.hq-sec-h:first-child {
+  margin-top: 4px;
+}
+.hq-sec-h span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.hq-sec-h.on {
+  color: var(--ink);
+}
+.hq-sec-add {
+  display: block;
+  padding: 6px 10px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent);
+  text-decoration: none;
+}
+.side:has(.hq-nav-secs) {
+  overflow-y: auto;
+}
+.hq-nav-secs a {
+  padding-top: 7px !important;
+  padding-bottom: 7px !important;
+  font-size: 14px;
+}
+
+/* HQ team set-up (hq.js screenNewTeam): three steps. */
+.ts {
+  max-width: 640px;
+  margin: 0 auto;
+}
+.ts h1 {
+  margin: 14px 0 4px;
+}
+.ts-steps {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  flex-wrap: wrap;
+}
+.ts-steps i {
+  width: 26px;
+  height: 2px;
+  background: var(--border);
+}
+.ts-st {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ts-st b {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+}
+.ts-st.on {
+  color: var(--ink);
+}
+.ts-st.on b {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-ink);
+}
+.ts-st.done b {
+  background: var(--accent-soft);
+  border-color: var(--accent-soft);
+  color: var(--accent);
+}
+.ts-card {
+  margin-top: 16px;
+}
+.ts-logo {
+  margin-bottom: 16px;
+}
+.ts-logo-pick {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  cursor: pointer;
+  font-weight: 700;
+  color: var(--accent);
+}
+.ts-logo-photo {
+  width: 72px;
+  height: 72px;
+  border-radius: 18px;
+  object-fit: cover;
+  display: block;
+}
+.ts-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 6px 0 14px;
+}
+.ts-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: var(--alt);
+  font-size: 14px;
+  font-weight: 600;
+}
+.ts-chip.own {
+  background: var(--accent-soft);
+  color: var(--ink);
+}
+.ts-chip button {
+  border: 0;
+  background: none;
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 0 0 0 2px;
+}
+.ts-add,
+.ts-link,
+.tq-newpos {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.tq-newpos {
+  margin-top: 8px;
+}
+.ts-add input,
+.tq-newpos input {
+  flex: 1;
+  min-width: 180px;
+}
+.ts-link code {
+  flex: 1 1 100%;
+  font-size: 13px;
+  padding: 10px 12px;
+  background: var(--alt);
+  border-radius: 10px;
+  overflow-wrap: anywhere;
+}
+.ts textarea {
+  width: 100%;
+  box-sizing: border-box;
+  margin-bottom: 8px;
+}
+.ts-foot {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 18px 0 30px;
+}
+
+/* HQ Stats (hq.js screenStats): leaderboard and a match's numbers. */
+.st-tabs {
+  margin-bottom: 14px;
+}
+.st-tabs a {
+  font-size: 13px;
+  font-weight: 700;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 7px 14px;
+  text-decoration: none;
+}
+.st-tabs a.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+.st-tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: 12px;
+  margin-bottom: 14px;
+}
+.st-tile {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+}
+.st-tile .label {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.st-tile b {
+  font: 700 30px Georgia, 'Times New Roman', serif;
+}
+.st-tile small {
+  color: var(--muted);
+}
+.st-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.st-table th,
+.st-table td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: center;
+  white-space: nowrap;
+}
+.st-table th:first-child,
+.st-table td:first-child {
+  text-align: left;
+  position: sticky;
+  left: 0;
+  background: var(--surface);
+}
+.st-table th {
+  font-size: 12px;
+  color: var(--muted);
+}
+.st-table th a {
+  color: inherit;
+  text-decoration: none;
+}
+.st-table th.on a {
+  color: var(--ink);
+  text-decoration: underline;
+}
+.st-table td small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.st-table td.zero {
+  color: var(--muted);
+}
+.st-enter-top {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  margin-bottom: 12px;
+}
+.st-enter-top .field {
+  flex: 1 1 260px;
+  margin: 0;
+}
+.st-newstat {
+  display: flex;
+  gap: 8px;
+}
+.st-in {
+  width: 64px;
+  text-align: center;
+  padding: 7px 4px;
+}
+.st-grid {
+  width: max-content;
+  min-width: 100%;
+}
+.st-grid .st-in {
+  min-width: 56px;
 }

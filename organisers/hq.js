@@ -3,7 +3,8 @@
  * menus, the switcher and the home page from that; Settings changes it.
  *   #/welcome            1. your name (a new account) and what you run
  *   #/welcome/people     2. bring people in (invite links; a new team)
- *   #/new-team           add a team
+ *   #/new-team[/<cal>/positions|players]   set up a team in three steps
+ *   #/teams/<cal>/stats  player statistics (leaderboard, add a match's numbers)
  *   #/join/<code>        a player joins a team from its link (account, name,
  *                        "which one is you?") and gets their team page
  *   #/play               the teams you play for
@@ -242,6 +243,40 @@
         '</a>'
       );
     }
+    // Wide screens: a section for each thing you run (Social games, each team,
+    // Events), each with its own pages; then Calendar and Settings.
+    function sectionHead(name, colour, on) {
+      return (
+        '<div class="hq-sec-h' +
+        (on ? ' on' : '') +
+        '">' +
+        crest(name, colour, 22) +
+        '<span>' +
+        esc(name) +
+        '</span></div>'
+      );
+    }
+    function allSections() {
+      var h = location.hash.split('?')[0];
+      var c = context();
+      var out = '';
+      if (runs('games')) out += sectionHead('Social games', '#3a61c9', c === 'games') + menuLinks('games', true);
+      if (runs('teams')) {
+        hq.teams.forEach(function (t) {
+          var key = 'team:' + t.calendar_id;
+          out += sectionHead(t.name, t.color, c === key) + menuLinks(key, true);
+        });
+        out += '<a class="hq-sec-add" href="#/new-team">+ Add a team</a>';
+      }
+      if (runs('events'))
+        out += sectionHead(state.organiser ? state.organiser.name : 'Events', '#1c1a17', c === 'events') + menuLinks('events', true);
+      out +=
+        '<div class="hq-navgap"></div>' +
+        link('#/calendar', 'calendar', 'Calendar', h === '#/calendar') +
+        link('#/settings', 'gear', 'Settings', h === '#/settings');
+      if (state.admin) out += link('#/admin', 'shield', 'Admin', /^#\/admin/.test(h));
+      return out;
+    }
     function menuLinks(c, bare) {
       var h = location.hash.split('?')[0];
       var out = '';
@@ -252,7 +287,8 @@
           link(base, 'home', 'Home', h === base) +
           link(base + '/fixtures', 'fixtures', 'Fixtures & results', h === base + '/fixtures' || h.indexOf(base + '/fixture/') === 0 || h === base + '/new') +
           link(base + '/squad', 'squad', 'Squad', h === base + '/squad') +
-          link(base + '/payments', 'money', 'Payments', h === base + '/payments');
+          link(base + '/payments', 'money', 'Payments', h === base + '/payments') +
+          link(base + '/stats', 'chart', 'Stats', h === base + '/stats');
       } else if (c === 'games') {
         out +=
           link('#/games', 'ball', 'Social games', /^#\/games/.test(h) && !/^#\/games\/owed/.test(h)) +
@@ -430,8 +466,9 @@
         '</small></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 10l5 5 5-5"/></svg></button><div class="hq-dd" id="hq-dd" hidden>' +
         switcherItems(c) +
         '</div>';
-      nav.innerHTML = menuLinks(c);
-      nav.classList.add('hq-nav');
+      nav.innerHTML = allSections();
+      nav.classList.add('hq-nav', 'hq-nav-secs');
+      sw.classList.add('hq-sw-phone');
       // Phones: the bottom bar carries the pages, so no tabs along the top.
       tabs.innerHTML = '';
       tabs.classList.add('hq-empty-tabs');
@@ -539,6 +576,9 @@
           '</small></span></div>' +
           '<div class="hq-mo-list hq-mo-cal">' +
           row('#/calendar', 'calendar', 'Calendar', 'Everything you run, by date') +
+          (c && c.indexOf('team:') === 0
+            ? row('#/teams/' + c.slice(5) + '/stats', 'chart', 'Stats', 'Appearances, goals and more')
+            : '') +
           '</div>' +
           '<div class="hq-mo-lb">SWITCH TO</div><div class="hq-mo-tiles">' +
           tiles
@@ -819,22 +859,547 @@
       };
     }
 
-    // #/new-team: "+ Add a team", and where HQ opens when you run a team but
-    // haven't made one yet.
-    function screenNewTeam() {
-      render(
-        '<div class="page-head"><div><h1>Add a team</h1><p class="muted">You’re the manager. Then send the squad its join link.</p></div></div>' +
-          '<div class="card">' +
-          teamForm() +
-          '</div>',
+    // #/new-team: setting up a team, three steps. 1 the team (name, sport,
+    // colour, logo); 2 positions (the sport's usual ones, plus your own);
+    // 3 players (the join link, and names to add now).
+    function setupSteps(n) {
+      return (
+        '<div class="ts-steps">' +
+        ['The team', 'Positions', 'Players']
+          .map(function (name, i) {
+            var cls = i + 1 < n ? 'done' : i + 1 === n ? 'on' : '';
+            return '<span class="ts-st ' + cls + '"><b>' + (i + 1 < n ? '✓' : i + 1) + '</b>' + name + '</span>';
+          })
+          .join('<i></i>') +
+        '</div>'
       );
-      wireTeamForm(function () {
-        load(true).then(function () {
-          drawMenus();
-          var t = hq.teams[hq.teams.length - 1];
-          go(t ? '#/teams/' + t.calendar_id + '/squad' : homeHash());
+    }
+    function screenNewTeam(cal, step) {
+      if (cal && step === 'positions') return setupPositions(cal);
+      if (cal && step === 'players') return setupPlayers(cal);
+      var logo = null; // the chosen picture, shrunk
+      render(
+        '<div class="ts">' +
+          setupSteps(1) +
+          '<h1>Set up your team</h1><p class="muted">You’re the manager. You can change all of this later.</p>' +
+          '<div class="card ts-card">' +
+          '<div class="ts-logo"><label class="ts-logo-pick" for="ts-logo-file"><span id="ts-logo-img">' +
+          crest('?', COLOURS[0], 72) +
+          '</span><small>Add a logo</small></label><input type="file" id="ts-logo-file" accept="image/*" hidden /></div>' +
+          teamForm() +
+          '</div></div>',
+      );
+      var nameInput = $('#t-name');
+      function preview() {
+        if (logo) return;
+        var colour = ($('#t-colour button.on') || {}).dataset ? $('#t-colour button.on').dataset.v : COLOURS[0];
+        $('#ts-logo-img').innerHTML = crest(nameInput.value.trim() || '?', colour, 72);
+      }
+      nameInput.oninput = preview;
+      $$('#t-colour button').forEach(function (b) {
+        b.addEventListener('click', function () {
+          setTimeout(preview, 0);
         });
       });
+      $('#ts-logo-file').onchange = function () {
+        var file = this.files && this.files[0];
+        if (!file) return;
+        ctx.shrinkPicture(file, { edge: 512 }, 0.85).then(function (blob) {
+          if (!blob) return toast('That picture didn’t work. Try another.');
+          logo = blob;
+          $('#ts-logo-img').innerHTML = '<img class="ts-logo-photo" alt="" src="' + URL.createObjectURL(blob) + '" />';
+        });
+      };
+      $('#t-make').textContent = 'Next: positions';
+      wireTeamForm(function (newCal) {
+        var after = logo
+          ? ctx.sb.storage
+              .from('team-badges')
+              .upload(newCal + '/' + Date.now() + '.jpg', logo, { contentType: 'image/jpeg', cacheControl: '31536000' })
+              .then(function (r) {
+                if (r.error) throw r.error;
+                return rpc('team_set_badge', { p_calendar: newCal, p_path: r.data.path });
+              })
+              .catch(function () {
+                toast('The team is set up, but the logo didn’t upload. Add it again from the team page.');
+              })
+          : Promise.resolve();
+        after.then(function () {
+          return load(true);
+        }).then(function () {
+          drawMenus();
+          go('#/new-team/' + newCal + '/positions');
+        });
+      });
+    }
+    function teamById(cal) {
+      return (
+        (hq &&
+          hq.teams.filter(function (t) {
+            return t.calendar_id === cal;
+          })[0]) ||
+        null
+      );
+    }
+    function setupPositions(cal) {
+      loading();
+      Promise.all([load(), rpc('team_lists', { p_calendar: cal })]).then(
+        function (r) {
+          var t = teamById(cal) || { name: 'Your team', sport: 'football' };
+          var own = (r[1] && r[1].positions) || [];
+          draw();
+          function draw() {
+            var usual = window.DayliSportLists.positions[t.sport] || [];
+            render(
+              '<div class="ts">' +
+                setupSteps(2) +
+                '<h1>Positions</h1><p class="muted">The positions ' +
+                esc(t.name) +
+                ' uses. Pick one for each player on the Squad page.</p>' +
+                '<div class="card ts-card">' +
+                (usual.length
+                  ? '<div class="field-label">Usual for ' +
+                    esc(sportName(t.sport).toLowerCase()) +
+                    '</div><div class="ts-chips">' +
+                    usual
+                      .map(function (x) {
+                        return '<span class="ts-chip">' + esc(x) + '</span>';
+                      })
+                      .join('') +
+                    '</div>'
+                  : '') +
+                '<div class="field-label">Your own</div><div class="ts-chips" id="ts-own">' +
+                (own.length
+                  ? own
+                      .map(function (x) {
+                        return (
+                          '<span class="ts-chip own">' +
+                          esc(x) +
+                          '<button type="button" aria-label="Remove ' +
+                          esc(x) +
+                          '" data-rm="' +
+                          esc(x) +
+                          '">×</button></span>'
+                        );
+                      })
+                      .join('')
+                  : '<span class="muted small">None yet. Add any position the list doesn’t have.</span>') +
+                '</div>' +
+                '<div class="ts-add"><input type="text" id="ts-pos" maxlength="30" placeholder="Like Sweeper keeper" /><button class="btn" id="ts-pos-add">Add</button></div>' +
+                '</div><div class="ts-foot"><a class="btn" href="#/teams/' +
+                esc(cal) +
+                '">Skip</a><a class="btn primary" href="#/new-team/' +
+                esc(cal) +
+                '/players">Next: players</a></div></div>',
+            );
+            function add() {
+              var name = $('#ts-pos').value.trim();
+              if (!name) return toast('Type a position');
+              rpc('team_add_position', { p_calendar: cal, p_name: name }).then(
+                function (list) {
+                  own = list || own;
+                  draw();
+                  $('#ts-pos').focus();
+                },
+                function (err) {
+                  toast(friendly(err));
+                },
+              );
+            }
+            $('#ts-pos-add').onclick = add;
+            $('#ts-pos').onkeydown = function (e) {
+              if (e.key === 'Enter') add();
+            };
+            $$('[data-rm]').forEach(function (b) {
+              b.onclick = function () {
+                rpc('team_remove_position', { p_calendar: cal, p_name: b.dataset.rm }).then(
+                  function (list) {
+                    own = list || [];
+                    draw();
+                  },
+                  function (err) {
+                    toast(friendly(err));
+                  },
+                );
+              };
+            });
+          }
+        },
+        function (err) {
+          render(notice('error', esc(friendly(err))));
+        },
+      );
+    }
+    function setupPlayers(cal) {
+      loading();
+      Promise.all([
+        load(),
+        ctx.sb
+          .from('calendars')
+          .select('id, join_code')
+          .eq('id', cal)
+          .maybeSingle(),
+      ]).then(function (r) {
+        var t = teamById(cal) || { name: 'Your team' };
+        var code = r[1] && r[1].data && r[1].data.join_code;
+        var url = code ? 'https://daylihq.co.uk/join/?code=' + code : null;
+        var added = [];
+        draw();
+        function draw() {
+          render(
+            '<div class="ts">' +
+              setupSteps(3) +
+              '<h1>Bring your players in</h1><p class="muted">Send the link to the team’s group chat. Each player makes a Dayli account and joins; no app needed.</p>' +
+              '<div class="card ts-card">' +
+              (url
+                ? '<div class="ts-link"><code>' +
+                  esc(url) +
+                  '</code><button class="btn" id="ts-copy">Copy link</button><a class="btn hq-wa" target="_blank" rel="noopener" href="https://wa.me/?text=' +
+                  encodeURIComponent('Join ' + t.name + ' on Dayli for fixtures, who’s playing and subs: ' + url) +
+                  '">WhatsApp</a></div>'
+                : '') +
+              '<div class="field-label" style="margin-top:18px">Or add names now</div><p class="muted small" style="margin:0 0 8px">One per line. When they join with the link they tap their name, so nobody’s listed twice.</p>' +
+              '<textarea id="ts-names" rows="4" placeholder="Jordan Mensah&#10;Liam Price"></textarea><button class="btn" id="ts-names-add">Add to the squad</button>' +
+              (added.length
+                ? '<div class="ts-chips" style="margin-top:12px">' +
+                  added
+                    .map(function (n) {
+                      return '<span class="ts-chip">' + esc(n) + '</span>';
+                    })
+                    .join('') +
+                  '</div>'
+                : '') +
+              '</div><div class="ts-foot"><a class="btn" href="#/new-team/' +
+              esc(cal) +
+              '/positions">Back</a><a class="btn primary" href="#/teams/' +
+              esc(cal) +
+              '">Go to ' +
+              esc(t.name) +
+              '</a></div></div>',
+          );
+          if ($('#ts-copy'))
+            $('#ts-copy').onclick = function () {
+              (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(
+                function () {
+                  toast('Link copied');
+                },
+                function () {
+                  window.prompt('Copy this link:', url);
+                },
+              );
+            };
+          $('#ts-names-add').onclick = function () {
+            var names = $('#ts-names')
+              .value.split(/\n+/)
+              .map(function (x) {
+                return x.trim();
+              })
+              .filter(Boolean)
+              .slice(0, 40);
+            if (!names.length) return toast('Type a name on each line');
+            var button = this;
+            setBusy(button, true);
+            names
+              .reduce(function (p, n) {
+                return p.then(function () {
+                  return rpc('team_add_player', { p_calendar: cal, p_name: n }).then(function () {
+                    added.push(n);
+                  });
+                });
+              }, Promise.resolve())
+              .then(
+                function () {
+                  toast(names.length === 1 ? '1 player added' : names.length + ' players added');
+                  draw();
+                },
+                function (err) {
+                  setBusy(button, false);
+                  toast(friendly(err));
+                  draw();
+                },
+              );
+          };
+        }
+      });
+    }
+
+    // #/teams/<cal>/stats: player statistics. The leaderboard (matches played,
+    // starts, and each stat's total) and, for managers, a match's numbers to
+    // fill in.
+    var STATS_MATCH = null;
+    function screenStats(cal, query) {
+      loading();
+      Promise.all([
+        load(),
+        rpc('team_stats_summary', { p_calendar: cal }),
+        rpc('team_lists', { p_calendar: cal }).catch(function () {
+          return null;
+        }),
+        rpc('team_results', { p_calendar: cal, p_limit: 50 }).catch(function () {
+          return [];
+        }),
+      ]).then(
+        function (r) {
+          var t = teamById(cal) || { name: 'Team', sport: 'football', calendar_id: cal };
+          var summary = r[1] || { matches: 0, players: [] };
+          var lists = r[2] || { positions: [], stat_names: [] };
+          var matches = (r[3] || []).filter(function (f) {
+            return (f.kind || 'match') === 'match';
+          });
+          var found = [];
+          summary.players.forEach(function (p) {
+            Object.keys(p.stats || {}).forEach(function (k) {
+              found.push(k);
+            });
+          });
+          var statNames = window.DayliSportLists.merge(
+            window.DayliSportLists.merge(window.DayliSportLists.stats[t.sport] || [], lists.stat_names || []),
+            found,
+          );
+          var view = query && query.view === 'enter' ? 'enter' : 'board';
+          if (view === 'enter') return drawEnter(t, summary, statNames, matches, query);
+          drawBoard(t, summary, statNames, query);
+        },
+        function (err) {
+          render(notice('error', esc(friendly(err))));
+        },
+      );
+    }
+    function statsHead(t, view) {
+      var base = '#/teams/' + t.calendar_id + '/stats';
+      return (
+        '<div class="page-head"><div><h1>Stats</h1><p class="muted">' +
+        esc(t.name) +
+        ': who’s played and what they’ve done.</p></div></div>' +
+        '<div class="hc-filters st-tabs"><a class="' +
+        (view === 'board' ? 'on' : '') +
+        '" href="' +
+        base +
+        '">Leaderboard</a><a class="' +
+        (view === 'enter' ? 'on' : '') +
+        '" href="' +
+        base +
+        '?view=enter">Add match stats</a></div>'
+      );
+    }
+    function drawBoard(t, summary, statNames, query) {
+      var sortBy = (query && query.sort) || 'apps';
+      var players = summary.players.slice().sort(function (a, b) {
+        var va = sortBy === 'apps' ? a.apps : sortBy === 'starts' ? a.starts : (a.stats || {})[sortBy] || 0;
+        var vb = sortBy === 'apps' ? b.apps : sortBy === 'starts' ? b.starts : (b.stats || {})[sortBy] || 0;
+        return vb - va || String(a.name).localeCompare(b.name);
+      });
+      var used = statNames.filter(function (s) {
+        return summary.players.some(function (p) {
+          return (p.stats || {})[s];
+        });
+      });
+      var cols = statNames;
+      var leaders = used.slice(0, 3).map(function (s) {
+        var best = summary.players.slice().sort(function (a, b) {
+          return ((b.stats || {})[s] || 0) - ((a.stats || {})[s] || 0);
+        })[0];
+        return { stat: s, p: best, n: (best.stats || {})[s] || 0 };
+      });
+      var mostApps = summary.players.slice().sort(function (a, b) {
+        return b.apps - a.apps;
+      })[0];
+      var base = '#/teams/' + t.calendar_id + '/stats?sort=';
+      var th = function (key, label) {
+        return '<th class="' + (sortBy === key ? 'on' : '') + '"><a href="' + base + encodeURIComponent(key) + '">' + esc(label) + '</a></th>';
+      };
+      render(
+        statsHead(t, 'board') +
+          '<div class="st-tiles">' +
+          '<div class="card st-tile"><span class="label">Matches played</span><b>' +
+          summary.matches +
+          '</b></div>' +
+          (mostApps && mostApps.apps
+            ? '<div class="card st-tile"><span class="label">Most appearances</span><b>' +
+              mostApps.apps +
+              '</b><small>' +
+              esc(mostApps.name) +
+              '</small></div>'
+            : '') +
+          leaders
+            .map(function (l) {
+              return '<div class="card st-tile"><span class="label">Most ' + esc(l.stat.toLowerCase()) + '</span><b>' + l.n + '</b><small>' + esc(l.p.name) + '</small></div>';
+            })
+            .join('') +
+          '</div>' +
+          (summary.players.length
+            ? '<div class="card st-table-card"><div class="scroll-x"><table class="st-table"><tr><th>Player</th>' +
+              th('apps', 'Played') +
+              th('starts', 'Started') +
+              cols
+                .map(function (s) {
+                  return th(s, s);
+                })
+                .join('') +
+              '</tr>' +
+              players
+                .map(function (p) {
+                  return (
+                    '<tr><td><b>' +
+                    esc(p.name) +
+                    '</b>' +
+                    (p.position ? '<small>' + esc(p.position) + '</small>' : '') +
+                    '</td><td>' +
+                    p.apps +
+                    '</td><td>' +
+                    p.starts +
+                    '</td>' +
+                    cols
+                      .map(function (s) {
+                        var v = (p.stats || {})[s];
+                        return '<td' + (v ? '' : ' class="zero"') + '>' + (v || '–') + '</td>';
+                      })
+                      .join('') +
+                    '</tr>'
+                  );
+                })
+                .join('') +
+              '</table></div><p class="muted small">Played and Started count matches you picked the team for. Tap a heading to sort.</p></div>'
+            : notice('info', 'No players yet. Add them on the Squad page or send the join link.')),
+      );
+    }
+    function drawEnter(t, summary, statNames, matches, query) {
+      var cal = t.calendar_id;
+      if (!matches.length) {
+        render(statsHead(t, 'enter') + notice('info', 'Once a match has been played, its stats go here.'));
+        return;
+      }
+      var ev =
+        (query && query.m) ||
+        (STATS_MATCH &&
+          matches.some(function (m) {
+            return m.event_id === STATS_MATCH;
+          }) &&
+          STATS_MATCH) ||
+        matches[0].event_id;
+      STATS_MATCH = ev;
+      var match = matches.filter(function (m) {
+        return m.event_id === ev;
+      })[0] || matches[0];
+      loading();
+      rpc('team_stats_event', { p_event: match.event_id }).then(
+        function (rows) {
+          var have = {};
+          (rows || []).forEach(function (x) {
+            have[x.player_id + '|' + x.stat] = x.value;
+          });
+          var label = function (m) {
+            return (
+              new Date(m.starts_at).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) +
+              ' · ' +
+              (m.opponent ? (m.home ? 'v ' : '@ ') + m.opponent : m.title || 'Match') +
+              (m.score_us != null && m.score_them != null ? ' · ' + m.score_us + '–' + m.score_them : '')
+            );
+          };
+          render(
+            statsHead(t, 'enter') +
+              '<div class="card st-enter"><div class="st-enter-top"><label class="field"><span>Match</span><select id="st-match">' +
+              matches
+                .map(function (m) {
+                  return '<option value="' + esc(m.event_id) + '"' + (m.event_id === match.event_id ? ' selected' : '') + '>' + esc(label(m)) + '</option>';
+                })
+                .join('') +
+              '</select></label><div class="st-newstat"><input type="text" id="st-new" maxlength="30" placeholder="Add a stat, like Tackles" /><button class="btn" id="st-new-add">Add stat</button></div></div>' +
+              '<div class="scroll-x"><table class="st-table st-grid"><tr><th>Player</th>' +
+              statNames
+                .map(function (s) {
+                  return '<th>' + esc(s) + '</th>';
+                })
+                .join('') +
+              '</tr>' +
+              summary.players
+                .map(function (p) {
+                  return (
+                    '<tr><td><b>' +
+                    esc(p.name) +
+                    '</b></td>' +
+                    statNames
+                      .map(function (s) {
+                        var v = have[p.player_id + '|' + s] || '';
+                        return (
+                          '<td><input type="number" min="0" max="999" inputmode="numeric" class="st-in" data-p="' +
+                          esc(p.player_id) +
+                          '" data-s="' +
+                          esc(s) +
+                          '" data-was="' +
+                          v +
+                          '" value="' +
+                          v +
+                          '" aria-label="' +
+                          esc(p.name + ' ' + s) +
+                          '" /></td>'
+                        );
+                      })
+                      .join('') +
+                    '</tr>'
+                  );
+                })
+                .join('') +
+              '</table></div><div class="row" style="margin-top:14px"><button class="btn primary" id="st-save">Save stats</button><span class="muted small">Leave a box empty for none.</span></div></div>',
+          );
+          $('#st-match').onchange = function () {
+            STATS_MATCH = this.value;
+            go('#/teams/' + cal + '/stats?view=enter&m=' + this.value);
+          };
+          $('#st-new-add').onclick = function () {
+            var name = $('#st-new').value.trim();
+            if (!name) return toast('Type the stat’s name');
+            rpc('team_add_stat_name', { p_calendar: cal, p_name: name }).then(
+              function () {
+                toast(name + ' added');
+                screenStats(cal, { view: 'enter', m: match.event_id });
+              },
+              function (err) {
+                toast(friendly(err));
+              },
+            );
+          };
+          $('#st-save').onclick = function () {
+            var changed = $$('.st-in').filter(function (i) {
+              return String(i.value) !== String(i.dataset.was);
+            });
+            if (!changed.length) return toast('Nothing has changed');
+            var bad = changed.some(function (i) {
+              var n = Number(i.value || 0);
+              return !(n >= 0 && n <= 999 && Math.floor(n) === n);
+            });
+            if (bad) return toast('Use whole numbers from 0 to 999');
+            var button = this;
+            setBusy(button, true);
+            changed
+              .reduce(function (p, i) {
+                return p.then(function () {
+                  return rpc('team_stats_set', {
+                    p_event: match.event_id,
+                    p_player: i.dataset.p,
+                    p_stat: i.dataset.s,
+                    p_value: Number(i.value || 0),
+                  }).then(function () {
+                    i.dataset.was = i.value;
+                  });
+                });
+              }, Promise.resolve())
+              .then(
+                function () {
+                  setBusy(button, false);
+                  toast('Stats saved');
+                },
+                function (err) {
+                  setBusy(button, false);
+                  toast(friendly(err));
+                },
+              );
+          };
+        },
+        function (err) {
+          render(notice('error', esc(friendly(err))));
+        },
+      );
     }
 
     function screenPeople() {
@@ -987,13 +1552,16 @@
         bareTop(false) +
           '<div class="hq-wrap hq-join"><div id="hj-crest"></div><h1 class="hq-h1" id="hj-title">Join the team</h1><p class="hq-lead" id="hj-sub">Checking the invitation…</p>' +
           '<form id="hj-form" class="hq-join-form" novalidate><label for="hj-email">Your email</label><input type="email" id="hj-email" autocomplete="email" placeholder="you@example.com" />' +
-          '<div class="notice error" id="hj-err" hidden></div><button class="btn primary hq-big" type="submit">Join with my email</button></form>' +
-          '<p class="muted small hq-join-note">We email you a 6-digit code, no password. That makes your free Dayli account: use it here, or in the Dayli app if you ever want your fixtures in a calendar. Already on Dayli? Use the same email.</p></div>',
+          '<label for="hj-pw">Choose a password</label><input type="password" id="hj-pw" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" />' +
+          '<div class="notice error" id="hj-err" hidden></div><button class="btn primary hq-big" type="submit">Create account and join</button></form>' +
+          '<p class="muted small hq-join-note">We email you a 6-digit code once, to check it’s you. That makes your free Dayli account: use it here, or in the Dayli app if you ever want your fixtures in a calendar.</p>' +
+          '<p class="small">Already on Dayli? <a href="#/sign-in">Sign in</a> and you’ll join straight after.</p></div>',
         true,
       );
       document.body.classList.add('hq-bare');
       rpc('calendar_invite_preview', { p_code: code }).then(
         function (rows) {
+          if (!$('#hj-title')) return; // moved on already
           var row = rows && rows[0];
           if (!row) {
             pendingJoin(null);
@@ -1009,6 +1577,7 @@
             ' in already. Say if you can play, pay subs and see the team when it’s picked.';
         },
         function () {
+          if (!$('#hj-sub')) return;
           $('#hj-sub').textContent = 'Say if you can play, pay subs and see the team when it’s picked.';
         },
       );
@@ -1017,25 +1586,18 @@
         var err = $('#hj-err');
         err.hidden = true;
         var address = $('#hj-email').value.trim();
-        if (!/^\S+@\S+\.\S+$/.test(address)) {
-          err.textContent = 'Enter your email address.';
+        var pw = $('#hj-pw').value;
+        var why = !/^\S+@\S+\.\S+$/.test(address)
+          ? 'Enter your email address.'
+          : pw.length < 8
+            ? 'Choose a password of at least 8 characters.'
+            : null;
+        if (why) {
+          err.textContent = why;
           err.hidden = false;
           return;
         }
-        var button = $('#hj-form button[type=submit]');
-        setBusy(button, true, 'Sending…');
-        ctx.sendCode(address).then(
-          function () {
-            state.pendingEmail = address;
-            state.codeSent = true;
-            go('#/verify');
-          },
-          function (ex) {
-            setBusy(button, false);
-            err.textContent = friendly(ex);
-            err.hidden = false;
-          },
-        );
+        ctx.passwordAuth('create', address, pw, $('#hj-form button[type=submit]'), err);
       };
     }
 
@@ -1354,8 +1916,35 @@
             .join('') +
           '</span></a>';
       }
-      var dayItems = byDay[picked] || [];
-      var pd = new Date(picked + 'T12:00:00');
+      function side(day) {
+        var dayItems = byDay[day] || [];
+        var pd = new Date(day + 'T12:00:00');
+        return (
+          '<h3>' +
+          esc(pd.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })) +
+          '</h3>' +
+          (dayItems.length
+            ? dayItems
+                .map(function (it) {
+                  return (
+                    '<a class="hc-item" href="' +
+                    esc(calHref(it)) +
+                    '" style="--c:' +
+                    esc(calColour(it)) +
+                    '"><span class="hc-time">' +
+                    hhmm(it.starts_at) +
+                    (it.ends_at ? '<small>' + hhmm(it.ends_at) + '</small>' : '') +
+                    '</span><span class="grow"><b>' +
+                    esc(calTitle(it)) +
+                    '</b><small>' +
+                    esc(calSub(it)) +
+                    '</small></span><i>›</i></a>'
+                  );
+                })
+                .join('')
+            : '<p class="muted">Nothing on this day.</p>')
+        );
+      }
       var adds = [];
       if (runs('games')) adds.push(['#/games/new', 'New social game']);
       if (runs('teams'))
@@ -1402,35 +1991,39 @@
           '</div><div class="hc-days">' +
           cells +
           '</div></div>' +
-          '<div class="hc-side"><h3>' +
-          esc(pd.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })) +
-          '</h3>' +
-          (dayItems.length
-            ? dayItems
-                .map(function (it) {
-                  return (
-                    '<a class="hc-item" href="' +
-                    esc(calHref(it)) +
-                    '" style="--c:' +
-                    esc(calColour(it)) +
-                    '"><span class="hc-time">' +
-                    hhmm(it.starts_at) +
-                    (it.ends_at ? '<small>' + hhmm(it.ends_at) + '</small>' : '') +
-                    '</span><span class="grow"><b>' +
-                    esc(calTitle(it)) +
-                    '</b><small>' +
-                    esc(calSub(it)) +
-                    '</small></span><i>›</i></a>'
-                  );
-                })
-                .join('')
-            : '<p class="muted">Nothing on this day.</p>') +
+          '<div class="hc-side" id="hc-side">' +
+          side(picked) +
           '</div></div></div>',
       );
       $$('[data-f]').forEach(function (b) {
         b.onclick = function () {
           calFilter = b.dataset.f;
           drawCalendar(first, start, picked, items);
+        };
+      });
+      // A day in this month: show its list where it is (no reload, no jump to
+      // the top); on phones, scroll down to the list under the grid.
+      $$('.hc-day').forEach(function (a) {
+        a.onclick = function (e) {
+          if (a.classList.contains('out')) return; // another month: load it
+          e.preventDefault();
+          var day = (a.getAttribute('href').match(/d=(\d{4}-\d{2}-\d{2})/) || [])[1];
+          if (!day) return;
+          picked = day;
+          $$('.hc-day.on').forEach(function (x) {
+            x.classList.remove('on');
+          });
+          a.classList.add('on');
+          var box = $('#hc-side');
+          box.innerHTML = side(day);
+          try {
+            history.replaceState(null, '', a.getAttribute('href'));
+          } catch (ex) {
+            /* the address just doesn't update */
+          }
+          if (window.matchMedia && window.matchMedia('(max-width: 1100px)').matches) {
+            box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          }
         };
       });
       var add = $('#hc-add');
@@ -1524,6 +2117,7 @@
                   toast('Saved');
                   drawMenus();
                   setBusy(button, false);
+                  if (runs('teams') && !hq.teams.length) go('#/new-team');
                 },
                 function (err) {
                   setBusy(button, false);
@@ -3912,6 +4506,7 @@
       menuSheet: menuSheet,
       screenWelcome: screenWelcome,
       screenNewTeam: screenNewTeam,
+      screenStats: screenStats,
       screenJoin: screenJoin,
       screenJoinOut: screenJoinOut,
       screenPlay: screenPlay,

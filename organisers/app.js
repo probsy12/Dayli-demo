@@ -507,6 +507,10 @@
         setShell(true, 'join');
         return hq.screenJoin(parts[1] || '');
       }
+      if (parts[0] === 'teams' && parts[1] && parts[2] === 'stats') {
+        setShell(true, 'teams');
+        return hq.screenStats(parts[1], query);
+      }
       if (parts[0] === 'calendar') {
         setShell(true, 'calendar');
         return hq.screenCalendar(query);
@@ -517,7 +521,7 @@
       }
       if (parts[0] === 'new-team') {
         setShell(true, 'teams');
-        return hq.screenNewTeam();
+        return hq.screenNewTeam(parts[1] || null, parts[2] || null);
       }
       if (parts[0] === 'more') {
         setShell(true, 'more');
@@ -673,8 +677,11 @@
     email: function () {
       return email();
     },
-    sendCode: function (address) {
-      return sendCode(address, true);
+    shrinkPicture: function (file, size, quality) {
+      return shrinkPicture(file, size, quality);
+    },
+    passwordAuth: function (mode, address, password, button, err) {
+      return passwordAuth(mode, address, password, button, err);
     },
   });
 
@@ -694,7 +701,7 @@
   // --- sign in / create account --------------------------------------------
 
   function screenSignIn(mode) {
-    if (HQ && !state.classicSignIn) return screenSignInHQ();
+    if (HQ && !state.classicSignIn) return screenSignInHQ(mode);
     render(
       '<h1>Dayli for organisers</h1>' +
         '<p class="muted">List your events so people nearby can find them, say they’re going and keep them in their calendars.</p>' +
@@ -851,41 +858,169 @@
     }
   }
 
-  // Dayli HQ: one thing per screen, big buttons. A new email gets an account.
-  function screenSignInHQ() {
+  // Dayli HQ: create an account (email, password, then a one-off code we
+  // email) or sign in with email and password. Accounts made in the Dayli
+  // app with only a code can still ask for a code.
+  function screenSignInHQ(mode) {
+    mode = mode === 'create' ? 'create' : 'signin';
+    var create = mode === 'create';
     render(
       '<div class="hq-auth"><div class="hq-auth-logo"><img src="../img/icon.svg" alt="" />Dayli <span>HQ</span></div>' +
-        '<h1>Run your team, games and events</h1><p class="muted">New here? We make your account, no app needed. Already use the Dayli app? Same email.</p>' +
-        '<form id="hq-auth" novalidate><input type="email" name="email" class="hq-auth-inp" autocomplete="email" placeholder="you@example.com" />' +
-        '<div class="notice error" id="err" hidden></div><button class="btn primary hq-auth-go" type="submit">Send me a code</button></form>' +
-        '<p class="muted small">No password: we email you a 6-digit code.</p><button type="button" class="linkish small" id="hq-pw">Use a password instead</button></div>',
+        '<h1>' +
+        (create ? 'Create your account' : 'Welcome back') +
+        '</h1><p class="muted">' +
+        (create
+          ? 'Run your team, games and events. Your account works in the Dayli app too, if you ever want it.'
+          : 'Sign in to run your team, games and events.') +
+        '</p>' +
+        '<div class="hq-auth-tabs" role="tablist"><button type="button" data-mode="signin" class="' +
+        (create ? '' : 'on') +
+        '">Sign in</button><button type="button" data-mode="create" class="' +
+        (create ? 'on' : '') +
+        '">Create account</button></div>' +
+        '<form id="hq-auth" novalidate>' +
+        '<label class="hq-auth-lbl" for="hq-email">Email</label><input type="email" id="hq-email" name="email" class="hq-auth-inp" autocomplete="email" placeholder="you@example.com" />' +
+        '<label class="hq-auth-lbl" for="hq-pw">Password</label><input type="password" id="hq-pw" name="password" class="hq-auth-inp" autocomplete="' +
+        (create ? 'new-password' : 'current-password') +
+        '" minlength="8" placeholder="' +
+        (create ? 'At least 8 characters' : 'Your password') +
+        '" />' +
+        '<div class="notice error" id="err" hidden></div><button class="btn primary hq-auth-go" type="submit">' +
+        (create ? 'Create account' : 'Sign in') +
+        '</button></form>' +
+        (create
+          ? '<p class="muted small">We’ll email you a 6-digit code to confirm it’s you. You only need it once.</p>'
+          : '<p class="small hq-auth-alt"><button type="button" class="linkish" id="hq-forgot">Forgot password?</button> · <button type="button" class="linkish" id="hq-code">Email me a code instead</button></p>') +
+        '</div>',
       true,
     );
     var err = $('#err');
-    $('#hq-pw').onclick = function () {
-      state.classicSignIn = true;
-      screenSignIn('signin');
-    };
+    $$('.hq-auth-tabs button').forEach(function (b) {
+      b.onclick = function () {
+        var keep = $('#hq-email').value;
+        go(b.dataset.mode === 'create' ? '#/create-account' : '#/sign-in');
+        setTimeout(function () {
+          var input = $('#hq-email');
+          if (input && keep) input.value = keep;
+        }, 0);
+      };
+    });
+    function address() {
+      return $('#hq-email').value.trim();
+    }
     $('#hq-auth').onsubmit = function (e) {
       e.preventDefault();
       err.hidden = true;
-      var address = $('[name=email]').value.trim();
-      if (!/^\S+@\S+\.\S+$/.test(address)) return showError(err, 'Enter your email address.');
-      var button = $('.hq-auth-go');
-      setBusy(button, true, 'Sending…');
-      sendCode(address, true).then(
-        function () {
-          setBusy(button, false);
+      var a = address();
+      var pw = $('#hq-pw').value;
+      if (!/^\S+@\S+\.\S+$/.test(a)) return showError(err, 'Enter your email address.');
+      if (create && pw.length < 8) return showError(err, 'Use a password of at least 8 characters.');
+      if (!pw) return showError(err, 'Enter your password.');
+      passwordAuth(mode, a, pw, $('.hq-auth-go'), err);
+    };
+    if (!create) {
+      $('#hq-code').onclick = function () {
+        err.hidden = true;
+        var a = address();
+        if (!/^\S+@\S+\.\S+$/.test(a)) return showError(err, 'Enter your email address first.');
+        codeSignIn(a, this, err, null);
+      };
+      $('#hq-forgot').onclick = function () {
+        err.hidden = true;
+        var a = address();
+        if (!/^\S+@\S+\.\S+$/.test(a)) return showError(err, 'Enter your email address first.');
+        var button = this;
+        setBusy(button, true, 'Sending…');
+        sb.auth
+          .resetPasswordForEmail(a, { redirectTo: location.origin + location.pathname + '?reset=1' })
+          .then(function (res) {
+            setBusy(button, false);
+            if (res.error) return showError(err, friendly(res.error));
+            toast('Check your email for a link to choose a new password.');
+          })
+          .catch(function (ex) {
+            setBusy(button, false);
+            showError(err, friendly(ex));
+          });
+      };
+    }
+  }
+
+  // Email and password: create (then the emailed code) or sign in. Shared by
+  // HQ's sign-in and the team join page.
+  function passwordAuth(mode, address, password, button, err) {
+    setBusy(button, true);
+    var p =
+      mode === 'create'
+        ? sb.auth.signUp({ email: address, password: password })
+        : sb.auth.signInWithPassword({ email: address, password: password });
+    return p
+      .then(function (res) {
+        setBusy(button, false);
+        var user = res.data && res.data.user;
+        var exists =
+          (res.error && mode === 'create' && /already|registered/i.test(res.error.message)) ||
+          (!res.error && mode === 'create' && user && user.identities && user.identities.length === 0);
+        if (exists) {
+          // Already on Dayli: a code to sign in with, rather than a dead end.
+          return codeSignIn(address, button, err, 'You already have a Dayli account. We’ve emailed you a code to sign in with.');
+        }
+        if (res.error) {
+          if (mode === 'signin' && /Invalid login credentials/i.test(res.error.message)) {
+            return showError(
+              err,
+              'That email and password don’t match. Signed up in the Dayli app? You may not have a password yet: use “Email me a code instead”.',
+            );
+          }
+          if (mode === 'signin' && /not confirmed/i.test(res.error.message)) {
+            return codeSignIn(address, button, err, 'Confirm your email first: we’ve sent you a code.');
+          }
+          return showError(err, friendly(res.error));
+        }
+        if (!res.data || !res.data.session) {
+          // New account: sign-up has emailed the 6-digit code.
           state.pendingEmail = address;
           state.codeSent = true;
-          go('#/verify');
-        },
-        function (ex) {
-          setBusy(button, false);
-          showError(err, friendly(ex));
-        },
-      );
-    };
+          state.signupCode = true;
+          return go('#/verify');
+        }
+        state.session = res.data.session;
+        state.organiser = undefined;
+        loadOrganiser().then(
+          function () {
+            go(homeHash());
+          },
+          function () {
+            go(homeHash());
+          },
+        );
+      })
+      .catch(function (ex) {
+        setBusy(button, false);
+        showError(err, friendly(ex));
+      });
+  }
+  function codeSignIn(address, button, err, message) {
+    setBusy(button, true, 'Sending…');
+    return sendCode(address, false).then(
+      function () {
+        setBusy(button, false);
+        state.pendingEmail = address;
+        state.codeSent = true;
+        state.signupCode = false;
+        if (message) toast(message);
+        go('#/verify');
+      },
+      function (ex) {
+        setBusy(button, false);
+        showError(
+          err,
+          /Signups not allowed|not found/i.test(ex.message || '')
+            ? 'We couldn’t find an account for that email. Choose “Create account”.'
+            : friendly(ex),
+        );
+      },
+    );
   }
 
   function sendCode(address, create) {
@@ -932,7 +1067,13 @@
     var err = $('#err');
     function send(button) {
       setBusy(button, true, 'Sending…');
-      sendCode(address).then(
+      // A new account's code comes from sign-up; ask for that one again.
+      (state.signupCode
+        ? sb.auth.resend({ type: 'signup', email: address }).then(function (r) {
+            if (r.error) throw r.error;
+          })
+        : sendCode(address)
+      ).then(
         function () {
           setBusy(button, false);
           state.pendingEmail = address;
@@ -968,6 +1109,7 @@
           if (res.error) throw res.error;
           state.session = res.data.session || state.session;
           state.pendingEmail = null;
+          state.signupCode = false;
           state.codeSent = false;
           // The new session came from an emailed code, which is what counts.
           return rpc('organiser_mark_verified').catch(function () {

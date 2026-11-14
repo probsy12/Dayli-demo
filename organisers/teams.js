@@ -270,16 +270,18 @@
               });
           }
           if (tab === 'squad') {
-            return rpc('team_squad_stats', { p_calendar: cal }).then(
-              function (s) {
-                d.stats = s || [];
-                return d;
-              },
-              function () {
-                d.stats = [];
-                return d;
-              },
-            );
+            return Promise.all([
+              rpc('team_squad_stats', { p_calendar: cal }).catch(function () {
+                return [];
+              }),
+              rpc('team_lists', { p_calendar: cal }).catch(function () {
+                return null;
+              }),
+            ]).then(function (r) {
+              d.stats = r[0] || [];
+              d.lists = r[1] || { positions: [], stat_names: [] };
+              return d;
+            });
           }
           // Home shows who hasn't answered for the next match, which only the
           // fixture itself lists.
@@ -1948,8 +1950,6 @@
 
     // --- squad: a searchable list beside the chosen player's profile ------------
 
-    var FOOTBALL_POS = ['Goalkeeper', 'Defender', 'Midfielder', 'Forward'];
-
     function duesFor(pay, playerId) {
       var out = [];
       ((pay && pay.charges) || []).forEach(function (c) {
@@ -2030,16 +2030,20 @@
             );
           })
           .join('');
-        var football = f_isFootball(t);
-        var posField = football
-          ? '<select id="tq-pos"><option value="">Not set</option>' +
-            FOOTBALL_POS.concat(p.position && FOOTBALL_POS.indexOf(p.position) < 0 ? [p.position] : [])
-              .map(function (x) {
-                return '<option' + (x === p.position ? ' selected' : '') + '>' + esc(x) + '</option>';
-              })
-              .join('') +
-            '</select>'
-          : '<input type="text" id="tq-pos" maxlength="30" placeholder="Like Wing attack" value="' + esc(p.position || '') + '" />';
+        var lists = window.DayliSportLists;
+        var posList = lists.merge(
+          lists.merge(lists.positions[t.sport || 'football'] || [], (d.lists && d.lists.positions) || []),
+          p.position ? [p.position] : [],
+        );
+        var posField =
+          '<select id="tq-pos"><option value="">Not set</option>' +
+          posList
+            .map(function (x) {
+              return '<option' + (x === p.position ? ' selected' : '') + '>' + esc(x) + '</option>';
+            })
+            .join('') +
+          '<option value="__new">Add a position…</option></select>' +
+          '<div class="tq-newpos" id="tq-newpos" hidden><input type="text" id="tq-newpos-name" maxlength="30" placeholder="Like Sweeper keeper" /><button class="btn" id="tq-newpos-save">Save</button></div>';
         var roleField = p.user_id
           ? '<select id="tq-role"' +
             (p.is_me ? ' disabled' : '') +
@@ -2278,8 +2282,17 @@
             },
           );
         };
+      function savePosition(value) {
+        return rpc('team_set_position', { p_player: chosen.id, p_position: value });
+      }
       $('#tq-pos').onchange = function () {
-        rpc('team_set_position', { p_player: chosen.id, p_position: this.value }).then(
+        if (this.value === '__new') {
+          $('#tq-newpos').hidden = false;
+          $('#tq-newpos-name').focus();
+          return;
+        }
+        $('#tq-newpos').hidden = true;
+        savePosition(this.value).then(
           function () {
             toast('Position saved');
             again();
@@ -2288,6 +2301,26 @@
             toast(friendly(err));
           },
         );
+      };
+      $('#tq-newpos-save').onclick = function () {
+        var name = $('#tq-newpos-name').value.trim();
+        if (!name) return toast('Type the position');
+        var button = this;
+        button.disabled = true;
+        rpc('team_add_position', { p_calendar: cal, p_name: name })
+          .then(function () {
+            return savePosition(name);
+          })
+          .then(
+            function () {
+              toast(name + ' added to your positions');
+              again();
+            },
+            function (err) {
+              button.disabled = false;
+              toast(friendly(err));
+            },
+          );
       };
       if ($('#tq-remove'))
         $('#tq-remove').onclick = function () {
@@ -2303,10 +2336,6 @@
           );
         };
     }
-    function f_isFootball(t) {
-      return (t.sport || 'football') === 'football';
-    }
-
     // --- payments: a tab per team, players owing first, each player's detail ------
 
     function drawPaymentsPage(d, query) {
