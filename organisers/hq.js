@@ -2456,7 +2456,7 @@
     // Straight after making a game: share the link (and, once, how to keep HQ
     // on the home screen like an app).
     function drawGameMade(g) {
-      var link = SITE + '/g/?c=' + encodeURIComponent(g.code);
+      var link = 'https://daylihq.co.uk/g/?c=' + encodeURIComponent(g.code);
       var when = new Date(g.starts_at).toLocaleString('en-GB', {
         weekday: 'long',
         day: 'numeric',
@@ -2822,7 +2822,7 @@
       var bibs = g.bibs && g.bibs < places ? g.bibs : Math.floor(places / 2);
       // Each person's price: their share of the pitch when it's split.
       var price = g.pitch_pence ? g.share_pence : g.price_pence || sgPrice(g.cost);
-      var link = SITE + '/g/?c=' + encodeURIComponent(g.code);
+      var link = 'https://daylihq.co.uk/g/?c=' + encodeURIComponent(g.code);
       var when = new Date(g.starts_at).toLocaleDateString('en-GB', {
         weekday: 'long',
         day: 'numeric',

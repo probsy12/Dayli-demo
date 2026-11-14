@@ -145,10 +145,17 @@
     </div>
   </div>
 </main>
-<script src="../config.js?v=4667421"></script>
+<script src="../config.js?v=205d7cd"></script>
 <script>
   (function () {
     var cfg = window.DAYLI_CONFIG || {};
+    // Opened from Dayli HQ (daylihq.co.uk): your name is all it takes, and the
+    // app is offered as an extra, not pushed.
+    var HQ = /(^|\.)daylihq\.co\.uk$/.test(location.hostname);
+    if (HQ) {
+      var gl = document.getElementById('getLink');
+      if (gl && gl.parentNode) gl.parentNode.style.display = 'none';
+    }
     var params = new URLSearchParams(location.search);
     var code = (params.get('c') || params.get('code') || '').replace(/[^A-Za-z0-9]/g, '').toUpperCase();
     var $ = function (id) { return document.getElementById(id); };
@@ -269,6 +276,10 @@
       showPay(me);
       $('leave').textContent = me.status === 'in' ? "I can't make it any more" : 'Come off the waiting list';
       $('getTitle').textContent = me.status === 'in' ? "Get Dayli so you don't miss it" : 'Get Dayli to hear when a place comes up';
+      if (HQ) {
+        $('getTitle').textContent = 'Want reminders? Get the Dayli app (optional)';
+        if (me.status !== 'in') $('mineLine').textContent = 'Check back here: if a place comes up and you’re next, it’s yours.';
+      }
     }
 
     function pounds(p) { var v = p / 100; return '£' + (v % 1 ? v.toFixed(2) : v.toFixed(0)); }
@@ -368,7 +379,7 @@
       fetch(cfg.supabaseUrl + '/functions/v1/game-pay', {
         method: 'POST',
         headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'pay', code: code, token: t })
+        body: JSON.stringify({ action: 'pay', code: code, token: t, back: HQ ? 'hq' : undefined })
       }).then(function (r) { return r.json().then(function (d) { return { ok: r.ok, d: d || {} }; }); }).then(function (res) {
         if (res.ok && res.d.url) { location.href = res.d.url; return; }
         var m = res.d.error || '';
