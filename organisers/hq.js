@@ -964,6 +964,84 @@
     }
     // Where each player stands in their half: the keeper at the end, the rest
     // in two rows towards halfway.
+    // The playing area for the team sheet, drawn for the game's sport: bibs at
+    // the top, colours at the bottom. Lines are boxes placed in percentages.
+    function sgCourt(sport) {
+      function l(cls, css) {
+        return '<div class="ln' + (cls ? ' ' + cls : '') + '" style="' + css + '"></div>';
+      }
+      var k = gameSport(sport).k;
+      var lines;
+      if (k === 'basketball') {
+        lines =
+          l('', 'left:4%;right:4%;top:3%;bottom:3%;border-radius:4px') +
+          l('half', '') +
+          l('', 'left:50%;top:50%;width:22%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%)') +
+          // The keys, free-throw circles, three-point arcs and hoops.
+          l('', 'left:35%;right:35%;top:3%;height:20%') +
+          l('', 'left:35%;right:35%;bottom:3%;height:20%') +
+          l('', 'left:50%;top:23%;width:30%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);border-style:dashed') +
+          l('', 'left:50%;top:77%;width:30%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%);border-style:dashed') +
+          l('', 'left:10%;right:10%;top:3%;height:31%;border-top:0;border-radius:0 0 50% 50%/0 0 100% 100%') +
+          l('', 'left:10%;right:10%;bottom:3%;height:31%;border-bottom:0;border-radius:50% 50% 0 0/100% 100% 0 0') +
+          l('hoop', 'left:50%;top:6.5%') +
+          l('hoop', 'left:50%;top:93.5%');
+      } else if (k === 'netball') {
+        lines =
+          l('', 'left:4%;right:4%;top:3%;bottom:3%') +
+          l('half', 'top:34.3%') +
+          l('half', 'top:65.7%') +
+          l('', 'left:50%;top:50%;width:12%;aspect-ratio:1;border-radius:50%;transform:translate(-50%,-50%)') +
+          l('', 'left:26%;right:26%;top:3%;height:15%;border-top:0;border-radius:0 0 50% 50%/0 0 100% 100%') +
+          l('', 'left:26%;right:26%;bottom:3%;height:15%;border-bottom:0;border-radius:50% 50% 0 0/100% 100% 0 0');
+      } else if (k === 'hockey') {
+        lines =
+          l('', 'left:4%;right:4%;top:3%;bottom:3%;border-radius:4px') +
+          l('half', '') +
+          l('half dash', 'top:26%') +
+          l('half dash', 'top:74%') +
+          l('', 'left:22%;right:22%;top:3%;height:16%;border-top:0;border-radius:0 0 50% 50%/0 0 100% 100%') +
+          l('', 'left:22%;right:22%;bottom:3%;height:16%;border-bottom:0;border-radius:50% 50% 0 0/100% 100% 0 0') +
+          l('', 'left:44%;right:44%;top:1%;height:2%;border-bottom:0') +
+          l('', 'left:44%;right:44%;bottom:1%;height:2%;border-top:0');
+      } else if (k === 'tennis' || k === 'badminton' || k === 'padel') {
+        var side = k === 'padel' ? 4 : 10;
+        var inner = k === 'padel' ? null : k === 'tennis' ? 18 : 15;
+        var svc = k === 'tennis' ? 26 : k === 'padel' ? 20 : 40;
+        var back = k === 'badminton' ? 8.5 : null;
+        lines =
+          '<div class="court-in" style="left:' + side + '%;right:' + side + '%"></div>' +
+          l('', 'left:' + side + '%;right:' + side + '%;top:5%;bottom:5%') +
+          (inner ? l('', 'left:' + inner + '%;width:0;top:5%;bottom:5%;border-width:0 0 0 2px') : '') +
+          (inner ? l('', 'right:' + inner + '%;width:0;top:5%;bottom:5%;border-width:0 2px 0 0') : '') +
+          l('half', 'top:' + svc + '%;left:' + (inner || side) + '%;right:' + (inner || side) + '%') +
+          l('half', 'top:' + (100 - svc) + '%;left:' + (inner || side) + '%;right:' + (inner || side) + '%') +
+          (back ? l('half', 'top:' + back + '%;left:' + side + '%;right:' + side + '%') + l('half', 'top:' + (100 - back) + '%;left:' + side + '%;right:' + side + '%') : '') +
+          // The centre service line runs from service line to service line,
+          // except badminton's, which runs out to the back.
+          (k === 'badminton'
+            ? l('', 'left:50%;width:0;top:5%;height:' + (svc - 5) + '%;border-width:0 0 0 2px') +
+              l('', 'left:50%;width:0;bottom:5%;height:' + (svc - 5) + '%;border-width:0 0 0 2px')
+            : l('', 'left:50%;width:0;top:' + svc + '%;bottom:' + svc + '%;border-width:0 0 0 2px')) +
+          l('net', 'left:' + (side - 2) + '%;right:' + (side - 2) + '%');
+      } else if (k === 'volleyball') {
+        lines =
+          '<div class="court-in" style="left:12%;right:12%;top:8%;bottom:8%"></div>' +
+          l('', 'left:12%;right:12%;top:8%;bottom:8%') +
+          l('half', 'top:36%;left:12%;right:12%') +
+          l('half', 'top:64%;left:12%;right:12%') +
+          l('net', 'left:9%;right:9%');
+      } else if (k === 'board_games') {
+        lines = '<div class="board"></div>';
+      } else if (k === 'football') {
+        lines =
+          '<div class="ln box"></div><div class="ln half"></div><div class="ln circle"></div><div class="ln area top"></div><div class="ln area bottom"></div>';
+      } else {
+        lines = l('', 'left:4%;right:4%;top:3%;bottom:3%;border-radius:10px') + l('half', '');
+      }
+      return '<div class="sg-pitch gt-pitch court-' + k + '">' + lines;
+    }
+
     function sgHalf(n, top) {
       var rest = n - 1;
       var rows = rest > 1 ? [rest - Math.floor(rest / 2), Math.floor(rest / 2)] : rest === 1 ? [1] : [];
@@ -2357,7 +2435,7 @@
         return (
           scoreCard +
           dayliCard +
-          '<div class="sg-pitch gt-pitch"><div class="ln box"></div><div class="ln half"></div><div class="ln circle"></div><div class="ln area top"></div><div class="ln area bottom"></div>' +
+          sgCourt(g.sport) +
           '<span class="sg-sl" style="top:10px">BIBS · ' +
           nb +
           ' of ' +

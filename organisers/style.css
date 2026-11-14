@@ -4731,6 +4731,91 @@ i.nr {
 .sg-pitch .area.bottom {
   bottom: 3%;
 }
+/* The team sheet drawn for each sport (sgCourt in hq.js). */
+.sg-pitch .ln.half {
+  left: 4%;
+  right: 4%;
+  top: 50%;
+  height: 0;
+  border-width: 2px 0 0;
+}
+.sg-pitch .ln.dash {
+  border-style: dashed;
+}
+.sg-pitch .ln.net {
+  top: 50%;
+  height: 0;
+  border-width: 4px 0 0;
+  border-color: #fff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+.sg-pitch .ln.hoop {
+  width: 4%;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border-color: #e4572e;
+  border-width: 3px;
+  transform: translate(-50%, -50%);
+}
+.sg-pitch .court-in {
+  position: absolute;
+  top: 5%;
+  bottom: 5%;
+  pointer-events: none;
+}
+.court-basketball {
+  background: repeating-linear-gradient(90deg, #d49b62 0 26px, #cc9259 26px 52px);
+}
+.court-basketball .ln {
+  border-color: rgba(255, 255, 255, 0.8);
+}
+.court-netball {
+  background: #2f6f9f;
+}
+.court-hockey {
+  background: repeating-linear-gradient(0deg, #2d63a6 0 54px, #295c9b 54px 108px);
+}
+.court-tennis {
+  background: #4f8c5c;
+}
+.court-tennis .court-in {
+  background: #2f68a5;
+}
+.court-padel {
+  background: #1d4f86;
+  box-shadow: inset 0 0 0 6px rgba(255, 255, 255, 0.35);
+}
+.court-padel .court-in {
+  background: #2b6cb0;
+}
+.court-badminton {
+  background: #3d6b8f;
+}
+.court-badminton .court-in {
+  background: #3f8a63;
+}
+.court-volleyball {
+  background: #2c6aa0;
+}
+.court-volleyball .court-in {
+  background: #e08a3c;
+}
+.court-board_games {
+  background: repeating-linear-gradient(90deg, #8b5a34 0 34px, #84552f 34px 68px);
+}
+.court-board_games .board {
+  position: absolute;
+  left: 18%;
+  right: 18%;
+  top: 34%;
+  bottom: 34%;
+  border-radius: 8px;
+  background: repeating-conic-gradient(#efe4cf 0 25%, #c9b089 0 50%) 0 0 / 20% 20%;
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+.court-other {
+  background: #5d7f70;
+}
 .sg-sl {
   position: absolute;
   left: 12px;
