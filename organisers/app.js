@@ -465,6 +465,7 @@
         return screenSignIn(parts[0] === 'create-account' ? 'create' : 'signin');
       }
       if (parts[0] === 'verify' && state.pendingEmail) return screenVerify();
+      if (HQ && parts[0] === 'join') return hq.screenJoinOut(parts[1] || '');
       return screenSignIn('signin');
     }
     if (state.organiser === undefined) {
@@ -490,8 +491,8 @@
           render(notice('error', esc(friendly(err))), true);
         });
       }
-      var free = ['welcome', 'verify', 'profile', 'reset', 'admin'];
-      if (!hq.onboarded() && free.indexOf(parts[0]) < 0) return go('#/welcome');
+      var free = ['welcome', 'verify', 'profile', 'reset', 'admin', 'join', 'play'];
+      if (!hq.onboarded() && free.indexOf(parts[0]) < 0) return go(hq.homeHash()); // players: their teams
       if (parts[0] === 'welcome') {
         setShell(true, 'welcome');
         if (parts[1] === 'setup') return go('#/new-team'); // old link
@@ -501,6 +502,18 @@
       if (parts[0] === 'settings') {
         setShell(true, 'settings');
         return hq.screenSettings();
+      }
+      if (parts[0] === 'join') {
+        setShell(true, 'join');
+        return hq.screenJoin(parts[1] || '');
+      }
+      if (parts[0] === 'calendar') {
+        setShell(true, 'calendar');
+        return hq.screenCalendar(query);
+      }
+      if (parts[0] === 'play') {
+        setShell(true, 'play');
+        return hq.screenPlay();
       }
       if (parts[0] === 'new-team') {
         setShell(true, 'teams');
@@ -659,6 +672,9 @@
     },
     email: function () {
       return email();
+    },
+    sendCode: function (address) {
+      return sendCode(address, true);
     },
   });
 

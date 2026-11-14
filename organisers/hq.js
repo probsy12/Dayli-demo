@@ -4,6 +4,10 @@
  *   #/welcome            1. your name (a new account) and what you run
  *   #/welcome/people     2. bring people in (invite links; a new team)
  *   #/new-team           add a team
+ *   #/join/<code>        a player joins a team from its link (account, name,
+ *                        "which one is you?") and gets their team page
+ *   #/play               the teams you play for
+ *   #/calendar           everything you run, by month
  *   #/settings           what you run, account
  *   #/home               the first thing you run
  *   #/games[/<id>]       social games: add players, Bibs v Colours, who's paid
@@ -109,6 +113,10 @@
           teams: (r[1] || []).filter(function (t) {
             return t.my_role === 'manager' && !t.sample;
           }),
+          // Teams they play for (someone else manages): their team pages.
+          playing: (r[1] || []).filter(function (t) {
+            return t.my_role !== 'manager' && !t.sample;
+          }),
         };
         return hq;
       });
@@ -169,7 +177,9 @@
       return '#/teams/' + c.slice(5);
     }
     function homeHash() {
-      if (!hq || !hq.onboarded) return '#/welcome';
+      var joining = pendingJoin();
+      if (joining) return '#/join/' + joining;
+      if (!hq || !hq.onboarded) return hq && hq.playing.length ? '#/play' : '#/welcome';
       return contextHome(context());
     }
 
@@ -201,6 +211,7 @@
     }
     var ICON = {
       fixtures: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/>',
+      calendar: '<rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4M7.5 14h2M11 14h2M14.5 14h2M7.5 17.5h2M11 17.5h2"/>',
       squad: '<circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M3 20c0-3 3-5 6-5s6 2 6 5M15 15c3 0 6 1.5 6 4"/>',
       money: '<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/>',
       home: '<path d="M3 12l9-8 9 8M5 10v10h14V10"/>',
@@ -255,7 +266,10 @@
           link('#/profile', 'person', 'Profile', h === '#/profile');
       }
       if (bare) return out;
-      out += '<div class="hq-navgap"></div>' + link('#/settings', 'gear', 'Settings', h === '#/settings');
+      out +=
+        '<div class="hq-navgap"></div>' +
+        link('#/calendar', 'calendar', 'Calendar', h === '#/calendar') +
+        link('#/settings', 'gear', 'Settings', h === '#/settings');
       if (state.admin) out += link('#/admin', 'shield', 'Admin', /^#\/admin/.test(h));
       return out;
     }
@@ -296,7 +310,7 @@
           item('#/payouts', 'ticket', 'Tickets', /^#\/(payouts|tickets|checkin)/.test(h)) +
           item('#/analytics', 'chart', 'Analytics', /^#\/analytics/.test(h));
       }
-      out += item('#/more', 'more', 'More', /^#\/(more|settings|admin)/.test(h));
+      out += item('#/more', 'more', 'More', /^#\/(more|settings|admin|calendar)/.test(h));
       return out;
     }
     function switcherItems(c) {
@@ -523,6 +537,9 @@
           '</b><small>' +
           esc(mail || '') +
           '</small></span></div>' +
+          '<div class="hq-mo-list hq-mo-cal">' +
+          row('#/calendar', 'calendar', 'Calendar', 'Everything you run, by date') +
+          '</div>' +
           '<div class="hq-mo-lb">SWITCH TO</div><div class="hq-mo-tiles">' +
           tiles
             .map(function (t) {
@@ -850,7 +867,7 @@
       if (runs('teams')) {
         rows += hq.teams
           .map(function (t) {
-            var url = codes[t.calendar_id] ? SITE + '/join/' + codes[t.calendar_id] : null;
+            var url = codes[t.calendar_id] ? 'https://daylihq.co.uk/join/?code=' + codes[t.calendar_id] : null;
             return (
               '<div class="hq-tm">' +
               crest(t.name, t.color, 44) +
@@ -925,6 +942,511 @@
           go(homeHash());
         });
       };
+    }
+
+    // --- players: join a team from its link, then their team pages ----------------------
+    // The team's link (daylihq.co.uk/join/?code=…) lands on #/join/<code>. A player
+    // makes a Dayli account with their email (works here and in the Dayli app),
+    // joins the squad, says which name is theirs if the manager added them by
+    // hand, and gets their own team page (/t/?p=…): can you play, what you owe,
+    // the team once it's picked. No calendar to set up.
+
+    var JOIN_KEY = 'dayli-hq-join';
+    function pendingJoin(code) {
+      try {
+        if (code === undefined) return localStorage.getItem(JOIN_KEY);
+        if (code) localStorage.setItem(JOIN_KEY, code);
+        else localStorage.removeItem(JOIN_KEY);
+      } catch (e) {
+        /* private mode: the code stays in the address instead */
+      }
+      return null;
+    }
+    function cleanCode(c) {
+      return String(c || '')
+        .toUpperCase()
+        .replace(/[^A-Z0-9]/g, '');
+    }
+    function playerPage(token) {
+      return '../t/?p=' + encodeURIComponent(token);
+    }
+    function bareTop(signedIn) {
+      return (
+        '<div class="hq-top"><div class="hq-brand"><img src="../img/icon.svg" alt="" /> Dayli <span>HQ</span></div>' +
+        (signedIn ? '<button type="button" class="linkish" id="hq-out">Sign out</button>' : '') +
+        '</div>'
+      );
+    }
+
+    // Signed out: who's inviting, and an email box that makes the account.
+    function screenJoinOut(raw) {
+      var code = cleanCode(raw);
+      if (!code) return go('#/sign-in');
+      pendingJoin(code);
+      render(
+        bareTop(false) +
+          '<div class="hq-wrap hq-join"><div id="hj-crest"></div><h1 class="hq-h1" id="hj-title">Join the team</h1><p class="hq-lead" id="hj-sub">Checking the invitation…</p>' +
+          '<form id="hj-form" class="hq-join-form" novalidate><label for="hj-email">Your email</label><input type="email" id="hj-email" autocomplete="email" placeholder="you@example.com" />' +
+          '<div class="notice error" id="hj-err" hidden></div><button class="btn primary hq-big" type="submit">Join with my email</button></form>' +
+          '<p class="muted small hq-join-note">We email you a 6-digit code, no password. That makes your free Dayli account: use it here, or in the Dayli app if you ever want your fixtures in a calendar. Already on Dayli? Use the same email.</p></div>',
+        true,
+      );
+      document.body.classList.add('hq-bare');
+      rpc('calendar_invite_preview', { p_code: code }).then(
+        function (rows) {
+          var row = rows && rows[0];
+          if (!row) {
+            pendingJoin(null);
+            $('#hj-title').textContent = 'This link has expired';
+            $('#hj-sub').textContent = 'Ask your manager to send the team’s link again.';
+            $('#hj-form').hidden = true;
+            return;
+          }
+          $('#hj-crest').innerHTML = crest(row.name, '#2f6b4f', 64);
+          $('#hj-title').textContent = 'Join ' + row.name;
+          $('#hj-sub').textContent =
+            (row.member_count === 1 ? '1 person is' : row.member_count + ' people are') +
+            ' in already. Say if you can play, pay subs and see the team when it’s picked.';
+        },
+        function () {
+          $('#hj-sub').textContent = 'Say if you can play, pay subs and see the team when it’s picked.';
+        },
+      );
+      $('#hj-form').onsubmit = function (e) {
+        e.preventDefault();
+        var err = $('#hj-err');
+        err.hidden = true;
+        var address = $('#hj-email').value.trim();
+        if (!/^\S+@\S+\.\S+$/.test(address)) {
+          err.textContent = 'Enter your email address.';
+          err.hidden = false;
+          return;
+        }
+        var button = $('#hj-form button[type=submit]');
+        setBusy(button, true, 'Sending…');
+        ctx.sendCode(address).then(
+          function () {
+            state.pendingEmail = address;
+            state.codeSent = true;
+            go('#/verify');
+          },
+          function (ex) {
+            setBusy(button, false);
+            err.textContent = friendly(ex);
+            err.hidden = false;
+          },
+        );
+      };
+    }
+
+    // Signed in: your name (a new account), join, "which one is you?", done.
+    function screenJoin(raw) {
+      var code = cleanCode(raw);
+      if (!code) return go(homeHash());
+      pendingJoin(code);
+      loading();
+      loadName().then(function (name) {
+        if (name) return doJoin(code);
+        render(
+          bareTop(true) +
+            '<div class="hq-wrap hq-join"><h1 class="hq-h1">One more thing</h1><p class="hq-lead">What’s your name? Your manager and the squad see it.</p>' +
+            '<form id="hj-form" class="hq-join-form" novalidate><label for="hj-name">Your name</label><input type="text" id="hj-name" maxlength="60" autocomplete="name" placeholder="e.g. Sam Taylor" />' +
+            '<button class="btn primary hq-big" type="submit">Join the team</button></form></div>',
+        );
+        document.body.classList.add('hq-bare');
+        wireTop();
+        $('#hj-name').focus();
+        $('#hj-form').onsubmit = function (e) {
+          e.preventDefault();
+          var value = $('#hj-name').value.trim();
+          if (!value) return toast('Add your name');
+          var button = $('#hj-form button[type=submit]');
+          setBusy(button, true);
+          saveName(value).then(
+            function () {
+              doJoin(code);
+            },
+            function (err) {
+              setBusy(button, false);
+              toast(friendly(err));
+            },
+          );
+        };
+      });
+    }
+    function doJoin(code) {
+      loading();
+      rpc('join_calendar', { p_code: code })
+        .then(function (cal) {
+          pendingJoin(null);
+          if (!cal) throw new Error('expired');
+          return rpc('team_join_info', { p_calendar: cal }).then(
+            function (info) {
+              return info;
+            },
+            function () {
+              return { calendar_id: cal, notTeam: true };
+            },
+          );
+        })
+        .then(
+          function (info) {
+            load(true).then(function () {
+              if (info.notTeam) return drawJoined(info);
+              if (info.role === 'manager') return go('#/teams/' + info.calendar_id);
+              if ((info.unclaimed || []).length) return drawClaim(info);
+              drawJoined(info);
+            });
+          },
+          function (err) {
+            pendingJoin(null);
+            render(
+              bareTop(true) +
+                '<div class="hq-wrap hq-join"><h1 class="hq-h1">That didn’t work</h1><p class="hq-lead">' +
+                esc(
+                  err && err.message === 'expired'
+                    ? 'This team link has expired. Ask your manager to send it again.'
+                    : friendly(err),
+                ) +
+                '</p><a class="btn" href="' +
+                homeHash() +
+                '">Go to Dayli HQ</a></div>',
+            );
+            document.body.classList.add('hq-bare');
+            wireTop();
+          },
+        );
+    }
+    // The manager may have added them by name already: one tap and the squad
+    // lists them once.
+    function drawClaim(info) {
+      render(
+        bareTop(true) +
+          '<div class="hq-wrap hq-join"><div>' +
+          crest(info.name, info.color || '#2f6b4f', 64) +
+          '</div><h1 class="hq-h1">Which one is you?</h1><p class="hq-lead">' +
+          esc(info.name) +
+          '’s manager added these names. Tap yours so you’re only listed once.</p><div class="hq-claim">' +
+          info.unclaimed
+            .map(function (p) {
+              return '<button type="button" class="btn hq-claim-it" data-claim="' + esc(p.id) + '">' + esc(p.name) + '</button>';
+            })
+            .join('') +
+          '</div><button type="button" class="linkish" id="hj-none">I’m not on the list</button></div>',
+      );
+      document.body.classList.add('hq-bare');
+      wireTop();
+      $$('[data-claim]').forEach(function (b) {
+        b.onclick = function () {
+          setBusy(b, true);
+          rpc('team_claim_player', { p_player: b.dataset.claim })
+            .then(function () {
+              return rpc('team_join_info', { p_calendar: info.calendar_id });
+            })
+            .then(drawJoined, function (err) {
+              setBusy(b, false);
+              toast(friendly(err));
+            });
+        };
+      });
+      $('#hj-none').onclick = function () {
+        drawJoined(info);
+      };
+    }
+    function drawJoined(info) {
+      render(
+        bareTop(true) +
+          '<div class="hq-wrap hq-join"><div>' +
+          crest(info.name || 'D', info.color || '#2f6b4f', 64) +
+          '</div><h1 class="hq-h1">You’re in' +
+          (info.name ? ' ' + esc(info.name) : '') +
+          '</h1>' +
+          (info.notTeam
+            ? '<p class="hq-lead">It’s a shared calendar: it shows in the Dayli app.</p><a class="btn primary hq-big" href="' +
+              SITE +
+              '/download/">Get the Dayli app</a>'
+            : '<p class="hq-lead">Your team page is where you say if you can play, pay what you owe and see the team when it’s picked.</p><a class="btn primary hq-big" href="' +
+              playerPage(info.token) +
+              '">Open your team page</a>') +
+          '<p class="muted small hq-join-note">Find it again any time at <b class="ink">daylihq.co.uk</b>: sign in with your email. Your Dayli account works in the Dayli app too, if you ever want your fixtures in a calendar.</p>' +
+          '<p class="small"><a href="#/welcome">Run a team, games or events yourself? Set up HQ</a></p></div>',
+      );
+      document.body.classList.add('hq-bare');
+      wireTop();
+    }
+
+    // #/play: the teams you play for, each with your own page.
+    function screenPlay() {
+      loading();
+      load(true).then(function () {
+        var list = hq.playing;
+        Promise.all(
+          list.map(function (t) {
+            return rpc('team_join_info', { p_calendar: t.calendar_id }).catch(function () {
+              return null;
+            });
+          }),
+        ).then(function (infos) {
+          var bare = !hq.onboarded;
+          var rows = list
+            .map(function (t, i) {
+              var info = infos[i];
+              return (
+                '<div class="hq-tm">' +
+                crest(t.name, t.color, 44) +
+                '<div class="grow"><b>' +
+                esc(t.name) +
+                '</b><div class="muted small">' +
+                esc(sportName(t.sport)) +
+                ' · ' +
+                t.players +
+                ' in the squad</div></div>' +
+                (info && info.token ? '<a class="btn primary" href="' + playerPage(info.token) + '">Open</a>' : '') +
+                '</div>'
+              );
+            })
+            .join('');
+          render(
+            (bare ? bareTop(true) + '<div class="hq-wrap hq-left">' : '<div>') +
+              '<h1 class="hq-h1 hq-l">Your teams</h1><p class="hq-lead2">Say if you can play, pay what you owe and see the team when it’s picked.</p>' +
+              (rows
+                ? '<div class="hq-found">' + rows + '</div>'
+                : notice('info', 'You’re not in a team yet. Ask your manager for the team’s link.')) +
+              (bare ? '<p class="small" style="margin-top:22px"><a href="#/welcome">Run a team, games or events yourself? Set up HQ</a></p>' : '') +
+              '</div>',
+          );
+          if (bare) {
+            document.body.classList.add('hq-bare');
+            wireTop();
+          }
+        });
+      });
+    }
+
+    // --- calendar: everything you run, by month ------------------------------------------
+    // #/calendar?m=2026-11&d=2026-11-15. Games, team fixtures and training, and
+    // events (hq_calendar). A month grid with the day's list beside it (below on
+    // phones); filter by what it is; tap through to the game, fixture or event.
+
+    var CAL_KINDS = {
+      game: { label: 'Social game', colour: '#3a61c9', filter: 'games' },
+      match: { label: 'Match', colour: '#2f6b4f', filter: 'teams' },
+      training: { label: 'Training', colour: '#6e56cf', filter: 'teams' },
+      event: { label: 'Event', colour: '#d9741c', filter: 'events' },
+    };
+    var calFilter = 'all';
+    function calKind(it) {
+      return CAL_KINDS[it.kind] || { label: 'Team', colour: '#6e56cf', filter: 'teams' };
+    }
+    function calColour(it) {
+      return it.kind === 'match' && it.color ? it.color : calKind(it).colour;
+    }
+    function calHref(it) {
+      if (it.kind === 'game') return '#/games/' + it.id;
+      if (it.kind === 'event') return '#/events/' + it.id;
+      return '#/teams/' + it.calendar_id + '/fixture/' + it.id;
+    }
+    function calTitle(it) {
+      if (it.kind === 'match' && it.opponent) return (it.home ? 'v ' : '@ ') + it.opponent;
+      return it.title || calKind(it).label;
+    }
+    function calSub(it) {
+      var bits = [];
+      if (it.team) bits.push(it.team);
+      bits.push(calKind(it).label);
+      if (it.kind === 'game' && it.places) bits.push(it.taken + ' of ' + it.places + ' playing');
+      if (it.kind === 'event' && it.status && it.status !== 'published') bits.push(it.status === 'cancelled' ? 'Cancelled' : 'Draft');
+      if (it.location) bits.push(it.location);
+      return bits.join(' · ');
+    }
+    function ymd(d) {
+      return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+    }
+    function hhmm(iso) {
+      return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function screenCalendar(query) {
+      query = query || {};
+      var today = new Date();
+      var m = /^(\d{4})-(\d{2})$/.exec(query.m || '');
+      var first = m ? new Date(Number(m[1]), Number(m[2]) - 1, 1) : new Date(today.getFullYear(), today.getMonth(), 1);
+      var picked = /^\d{4}-\d{2}-\d{2}$/.test(query.d || '')
+        ? query.d
+        : first.getMonth() === today.getMonth() && first.getFullYear() === today.getFullYear()
+          ? ymd(today)
+          : ymd(first);
+      // Six weeks from the Monday on or before the 1st.
+      var start = new Date(first);
+      start.setDate(1 - ((first.getDay() + 6) % 7));
+      var end = new Date(start);
+      end.setDate(start.getDate() + 42);
+      loading();
+      Promise.all([load(), rpc('hq_calendar', { p_from: start.toISOString(), p_to: end.toISOString() })]).then(
+        function (r) {
+          drawCalendar(first, start, picked, r[1] || []);
+        },
+        function (err) {
+          render(notice('error', esc(friendly(err))));
+        },
+      );
+    }
+    function drawCalendar(first, start, picked, items) {
+      var kinds = [['all', 'Everything']];
+      if (runs('games')) kinds.push(['games', 'Games']);
+      if (runs('teams')) kinds.push(['teams', 'Teams']);
+      if (runs('events')) kinds.push(['events', 'Events']);
+      if (kinds.length === 2) kinds = [];
+      var shown = items.filter(function (it) {
+        return calFilter === 'all' || calKind(it).filter === calFilter;
+      });
+      var byDay = {};
+      shown.forEach(function (it) {
+        var k = ymd(new Date(it.starts_at));
+        (byDay[k] = byDay[k] || []).push(it);
+      });
+      var monthKey = first.getFullYear() + '-' + String(first.getMonth() + 1).padStart(2, '0');
+      var prev = new Date(first.getFullYear(), first.getMonth() - 1, 1);
+      var next = new Date(first.getFullYear(), first.getMonth() + 1, 1);
+      var mk = function (d) {
+        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0');
+      };
+      var todayKey = ymd(new Date());
+      var cells = '';
+      for (var i = 0; i < 42; i++) {
+        var d = new Date(start);
+        d.setDate(start.getDate() + i);
+        var k = ymd(d);
+        var list = byDay[k] || [];
+        cells +=
+          '<a class="hc-day' +
+          (d.getMonth() !== first.getMonth() ? ' out' : '') +
+          (k === todayKey ? ' today' : '') +
+          (k === picked ? ' on' : '') +
+          '" href="#/calendar?m=' +
+          monthKey +
+          '&d=' +
+          k +
+          '"><span class="hc-n">' +
+          d.getDate() +
+          '</span>' +
+          list
+            .slice(0, 3)
+            .map(function (it) {
+              return (
+                '<span class="hc-pill" style="--c:' +
+                esc(calColour(it)) +
+                '"><b>' +
+                hhmm(it.starts_at) +
+                '</b> ' +
+                esc(calTitle(it)) +
+                '</span>'
+              );
+            })
+            .join('') +
+          (list.length > 3 ? '<span class="hc-more">+' + (list.length - 3) + ' more</span>' : '') +
+          '<span class="hc-dots">' +
+          list
+            .slice(0, 4)
+            .map(function (it) {
+              return '<i style="background:' + esc(calColour(it)) + '"></i>';
+            })
+            .join('') +
+          '</span></a>';
+      }
+      var dayItems = byDay[picked] || [];
+      var pd = new Date(picked + 'T12:00:00');
+      var adds = [];
+      if (runs('games')) adds.push(['#/games/new', 'New social game']);
+      if (runs('teams'))
+        hq.teams.forEach(function (t) {
+          adds.push(['#/teams/' + t.calendar_id + '/new', 'Fixture for ' + t.name]);
+        });
+      if (runs('events')) adds.push(['#/events/new', 'New event']);
+      render(
+        '<div class="hc">' +
+          '<div class="page-head"><div><h1>Calendar</h1><p class="muted">Everything you run, by date.</p></div>' +
+          (adds.length
+            ? '<div class="hc-add"><button class="btn primary" id="hc-add">+ Add</button><div class="hc-add-menu" id="hc-add-menu" hidden>' +
+              adds
+                .map(function (a) {
+                  return '<a href="' + esc(a[0]) + '">' + esc(a[1]) + '</a>';
+                })
+                .join('') +
+              '</div></div>'
+            : '') +
+          '</div>' +
+          '<div class="hc-bar"><div class="hc-nav"><a class="hc-arrow" href="#/calendar?m=' +
+          mk(prev) +
+          '" aria-label="Previous month">‹</a><h2>' +
+          first.toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) +
+          '</h2><a class="hc-arrow" href="#/calendar?m=' +
+          mk(next) +
+          '" aria-label="Next month">›</a><a class="btn hc-today" href="#/calendar">Today</a></div>' +
+          (kinds.length
+            ? '<div class="hc-filters">' +
+              kinds
+                .map(function (f) {
+                  return '<button type="button" class="' + (calFilter === f[0] ? 'on' : '') + '" data-f="' + f[0] + '">' + esc(f[1]) + '</button>';
+                })
+                .join('') +
+              '</div>'
+            : '') +
+          '</div>' +
+          '<div class="hc-body"><div class="hc-grid"><div class="hc-wd">' +
+          ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun']
+            .map(function (w) {
+              return '<span>' + w + '</span>';
+            })
+            .join('') +
+          '</div><div class="hc-days">' +
+          cells +
+          '</div></div>' +
+          '<div class="hc-side"><h3>' +
+          esc(pd.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })) +
+          '</h3>' +
+          (dayItems.length
+            ? dayItems
+                .map(function (it) {
+                  return (
+                    '<a class="hc-item" href="' +
+                    esc(calHref(it)) +
+                    '" style="--c:' +
+                    esc(calColour(it)) +
+                    '"><span class="hc-time">' +
+                    hhmm(it.starts_at) +
+                    (it.ends_at ? '<small>' + hhmm(it.ends_at) + '</small>' : '') +
+                    '</span><span class="grow"><b>' +
+                    esc(calTitle(it)) +
+                    '</b><small>' +
+                    esc(calSub(it)) +
+                    '</small></span><i>›</i></a>'
+                  );
+                })
+                .join('')
+            : '<p class="muted">Nothing on this day.</p>') +
+          '</div></div></div>',
+      );
+      $$('[data-f]').forEach(function (b) {
+        b.onclick = function () {
+          calFilter = b.dataset.f;
+          drawCalendar(first, start, picked, items);
+        };
+      });
+      var add = $('#hc-add');
+      if (add)
+        add.onclick = function (e) {
+          e.stopPropagation();
+          var menu = $('#hc-add-menu');
+          menu.hidden = !menu.hidden;
+          document.addEventListener(
+            'click',
+            function () {
+              menu.hidden = true;
+            },
+            { once: true },
+          );
+        };
     }
 
     // --- settings ----------------------------------------------------------------------
@@ -3390,6 +3912,10 @@
       menuSheet: menuSheet,
       screenWelcome: screenWelcome,
       screenNewTeam: screenNewTeam,
+      screenJoin: screenJoin,
+      screenJoinOut: screenJoinOut,
+      screenPlay: screenPlay,
+      screenCalendar: screenCalendar,
       screenPeople: screenPeople,
       screenSettings: screenSettings,
       screenGames: screenGames,

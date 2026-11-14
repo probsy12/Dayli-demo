@@ -26,6 +26,9 @@
     var friendly = ctx.friendly;
     var setBusy = ctx.setBusy;
     var SITE = ctx.SITE;
+    // Players join and answer on Dayli HQ: a Dayli account, no calendar app needed.
+    var JOIN = 'https://daylihq.co.uk/join/?code=';
+    var HQ_APP = 'https://daylihq.co.uk/app/';
     var cfg = window.DAYLI_CONFIG || {};
 
     var KIND = { match: 'Match', training: 'Training', social: 'Social' };
@@ -164,10 +167,10 @@
                 ? '<div class="tm-list">' + mine.map(teamCard).join('') + '</div>'
                 : notice(
                     'info',
-                    'You don’t manage a team yet. Make one in the Dayli app (More → Sports → New team), then run it from here.',
+                    'You don’t manage a team yet. <a href="#/new-team">Add a team</a> and run it from here.',
                   )) +
               (playing.length
-                ? '<h3 style="margin-top:22px">Teams you play for</h3><p class="sub">The manager runs these; you answer and pay in the Dayli app.</p><div class="tm-list">' +
+                ? '<h3 style="margin-top:22px">Teams you play for</h3><p class="sub">The manager runs these; you answer and pay on your team page.</p><div class="tm-list">' +
                   playing.map(teamCard).join('') +
                   '</div>'
                 : ''),
@@ -181,7 +184,7 @@
     function teamCard(t) {
       return (
         '<a class="card tm-card" href="' +
-        (t.my_role === 'manager' ? teamUrl(t.calendar_id) : '#/teams') +
+        (t.my_role === 'manager' ? teamUrl(t.calendar_id) : '#/play') +
         '">' +
         crest(t, 46) +
         '<div><b>' +
@@ -299,8 +302,8 @@
               return render(
                 notice(
                   'info',
-                  'Only the team’s managers can run it here. You can answer and pay in the Dayli app.',
-                ) + '<a class="btn" href="#/teams">Back to teams</a>',
+                  'Only the team’s managers can run it here. You answer and pay on your team page.',
+                ) + '<a class="btn" href="#/play">Your team page</a>',
               );
             }
             if (!tab) return drawHome(d);
@@ -367,7 +370,7 @@
       );
       $('#tm-invite').onclick = function () {
         if (!d.code) return toast('No invite link for this team yet.');
-        var link = SITE + '/join/' + d.code;
+        var link = JOIN + d.code;
         copy(link, 'Invite link copied. Send it to your players.');
       };
       wire(d, tab);
@@ -786,7 +789,7 @@
       $$('[data-copy-invite]').forEach(function (b) {
         b.onclick = function () {
           if (!d.code) return toast('No invite link for this team yet.');
-          copy(SITE + '/join/' + d.code, 'Invite link copied. Send it to your players.');
+          copy(JOIN + d.code, 'Invite link copied. Send it to your players.');
         };
       });
       // The team's public page (fixtures and results for anyone), when it's open to followers.
@@ -829,8 +832,8 @@
             ' at ' +
             time(f.starts_at, f.timezone) +
             (f.location ? ' (' + f.location + ')' : '') +
-            '? Say yes, maybe or no in the Dayli app.' +
-            (d.code ? ' Not on Dayli yet? Join the team: ' + SITE + '/join/' + d.code : '');
+            '? Say yes, maybe or no on Dayli: ' + HQ_APP +
+            (d.code ? ' Not on Dayli yet? Join the team: ' + JOIN + d.code : '');
           window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
         };
       if ($('#th-remind'))
@@ -1729,7 +1732,7 @@
           (f.location ? ', ' + f.location : '');
         var text = starters.length
           ? 'Team for ' + line + '\n\n' + starters.map(first).join(', ') + (subs.length ? '\nSubs: ' + subs.map(first).join(', ') : '') + '\n\nCan’t make it any more? Tell me in Dayli.'
-          : 'Can you make ' + line + '? Say yes, maybe or no in the Dayli app.';
+          : 'Can you make ' + line + '? Say yes, maybe or no on Dayli: ' + HQ_APP;
         window.open('https://wa.me/?text=' + encodeURIComponent(text), '_blank', 'noopener');
       }
       function saveScore() {
@@ -1935,7 +1938,7 @@
         })
         .join('');
       return (
-        '<div class="card"><div class="row between"><div><h3>Squad</h3><p class="sub">Players join with the invite link (they get the fixtures in Dayli). Add someone by name if they’re not on Dayli.</p></div></div>' +
+        '<div class="card"><div class="row between"><div><h3>Squad</h3><p class="sub">Players join with the invite link and make a Dayli account (no app needed). Add someone by name if you want them listed first.</p></div></div>' +
         '<div class="row" style="margin-bottom:12px"><input type="text" id="tm-new-name" placeholder="Name" maxlength="60" style="max-width:260px" /><button class="btn" id="tm-add">Add player</button></div>' +
         '<div class="scroll-x"><table class="tm-table"><tr><th>Name</th><th>Role</th><th></th></tr>' +
         rows +
@@ -2122,7 +2125,7 @@
           '<div class="tq-grid"><div class="card tq-list"><div class="tq-add" id="tq-add" hidden><input type="text" id="tq-new" placeholder="Their name" maxlength="60" /><button class="btn primary" id="tq-add-go">Add</button></div><input type="search" id="tq-search" placeholder="Search the squad" />' +
           '<div id="tq-rows">' +
           players.map(listRow).join('') +
-          '</div><p class="muted small tq-tip">People join with the invite link and get fixtures in Dayli. Add someone by name if they’re not on Dayli; they can be linked when they join.</p></div>' +
+          '</div><p class="muted small tq-tip">Send the invite link to the group: players make a Dayli account and join, no app needed. Added someone by name? When they join they tap their name, so they’re only listed once.</p></div>' +
           profile(chosen) +
           '</div>',
       );
@@ -2229,7 +2232,7 @@
       $$('[data-copy-invite]').forEach(function (b) {
         b.onclick = function () {
           if (!d.code) return toast('No invite link for this team yet.');
-          copy(SITE + '/join/' + d.code, 'Invite link copied. Send it to your players.');
+          copy(JOIN + d.code, 'Invite link copied. Send it to your players.');
         };
       });
       $('#tq-add-open').onclick = function () {
