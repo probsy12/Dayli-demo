@@ -501,6 +501,10 @@
         setShell(true, 'settings');
         return hq.screenSettings();
       }
+      if (parts[0] === 'more') {
+        setShell(true, 'more');
+        return hq.screenMore();
+      }
       if (parts[0] === 'games') {
         setShell(true, 'games');
         return hq.screenGames(parts[1] || null, query);
@@ -647,6 +651,9 @@
     SITE: SITE,
     signOut: function () {
       signOut();
+    },
+    email: function () {
+      return email();
     },
   });
 

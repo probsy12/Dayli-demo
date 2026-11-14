@@ -211,6 +211,13 @@
       ball: '<circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10z"/>',
       gear: '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M5 19l2-2M17 7l2-2"/>',
       shield: '<path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"/>',
+      more: '<circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/>',
+      plus: '<path d="M12 5v14M5 12h14"/>',
+      list: '<path d="M5 6h14M5 12h14M5 18h9"/>',
+      card: '<rect x="3" y="6" width="18" height="13" rx="2"/><path d="M7 15h4"/>',
+      phone: '<rect x="6" y="2" width="12" height="20" rx="3"/><path d="M11 18h2"/>',
+      help: '<circle cx="12" cy="12" r="9"/><path d="M9.5 9a2.5 2.5 0 1 1 3.5 2.3c-.6.3-1 .9-1 1.6v.6M12 17h.01"/>',
+      out: '<path d="M15 4h4v16h-4M10 8l-4 4 4 4M6 12h10"/>',
     };
     function link(href, icon, label, on) {
       return (
@@ -253,16 +260,18 @@
       if (state.admin) out += link('#/admin', 'shield', 'Admin', /^#\/admin/.test(h));
       return out;
     }
-    // Phones: what you run along the bottom, and More (the menu) last.
+    // Phones: the pages of what you're running now along the bottom, and More,
+    // where you switch to another team, the games or the events.
     function bottomBar(c) {
       var h = location.hash.split('?')[0];
-      var item = function (href, icon, label, on) {
+      var item = function (href, icon, label, on, cls) {
         return (
           '<a href="' +
           href +
           '" class="' +
           (on ? 'on' : '') +
-          '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">' +
+          (cls ? ' ' + cls : '') +
+          '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
           ICON[icon] +
           '</svg><span>' +
           label +
@@ -270,20 +279,26 @@
         );
       };
       var out = '';
-      if (runs('teams')) {
-        var team = c && c.indexOf('team:') === 0 ? c.slice(5) : hq.teams[0] && hq.teams[0].calendar_id;
-        out += item(team ? '#/teams/' + team : '#/welcome/setup', 'squad', 'Team', c && c.indexOf('team:') === 0);
+      if (c && c.indexOf('team:') === 0) {
+        var base = '#/teams/' + c.slice(5);
+        out +=
+          item(base, 'home', 'Home', h === base) +
+          item(base + '/fixtures', 'fixtures', 'Fixtures', h === base + '/fixtures' || h.indexOf(base + '/fixture/') === 0 || h === base + '/new') +
+          item(base + '/squad', 'squad', 'Squad', h === base + '/squad') +
+          item(base + '/payments', 'money', 'Payments', h === base + '/payments');
+      } else if (c === 'games') {
+        out +=
+          item('#/games', 'ball', 'Games', /^#\/games/.test(h) && !/^#\/games\/(owed|new)/.test(h)) +
+          item('#/games/owed', 'money', 'Owed', /^#\/games\/owed/.test(h)) +
+          item('#/games/new', 'plus', 'New game', h === '#/games/new', 'hq-plus');
+      } else if (c === 'events') {
+        out +=
+          item('#/overview', 'home', 'Overview', h === '#/overview') +
+          item('#/events', 'fixtures', 'Events', /^#\/events/.test(h)) +
+          item('#/payouts', 'ticket', 'Tickets', /^#\/(payouts|tickets|checkin)/.test(h)) +
+          item('#/analytics', 'chart', 'Analytics', /^#\/analytics/.test(h));
       }
-      if (runs('games')) {
-        var owedOn = /^#\/games\/owed/.test(h);
-        out += item('#/games', 'ball', 'Games', c === 'games' && !owedOn);
-        out += item('#/games/owed', 'money', 'Owed', owedOn);
-      }
-      if (runs('events')) out += item('#/overview', 'ticket', 'Events', c === 'events');
-      out +=
-        '<button type="button" id="hq-more" class="' +
-        (/^#\/(settings|admin)/.test(h) ? 'on' : '') +
-        '"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg><span>More</span></button>';
+      out += item('#/more', 'more', 'More', /^#\/(more|settings|admin)/.test(h));
       return out;
     }
     function switcherItems(c) {
@@ -405,9 +420,23 @@
         '</div>';
       nav.innerHTML = menuLinks(c);
       nav.classList.add('hq-nav');
-      // Phones: the tabs carry a team's own pages; the bottom bar does the rest.
-      tabs.innerHTML = c && c.indexOf('team:') === 0 ? menuLinks(c, true) : '';
-      tabs.classList.toggle('hq-empty-tabs', !(c && c.indexOf('team:') === 0));
+      // Phones: the bottom bar carries the pages, so no tabs along the top.
+      tabs.innerHTML = '';
+      tabs.classList.add('hq-empty-tabs');
+      // Phones: where you are, in the top corner; tap it to switch (More).
+      var topbar = document.getElementById('topbar');
+      var chip = document.getElementById('hq-ctx');
+      if (topbar && !chip) {
+        chip = document.createElement('a');
+        chip.id = 'hq-ctx';
+        chip.className = 'hq-ctx';
+        chip.href = '#/more';
+        topbar.insertBefore(chip, document.getElementById('menu'));
+      }
+      if (chip) {
+        chip.innerHTML = crest(cur.name, cur.colour, 24) + '<span>' + esc(cur.name) + '</span>';
+        chip.setAttribute('aria-label', 'You’re in ' + cur.name + '. Switch');
+      }
       var bar = document.getElementById('hq-bottom');
       if (!bar) {
         bar = document.createElement('nav');
@@ -416,10 +445,6 @@
         document.body.appendChild(bar);
       }
       bar.innerHTML = bottomBar(c);
-      document.getElementById('hq-more').onclick = function () {
-        var m = document.getElementById('menu');
-        if (m) m.click();
-      };
       var up = document.getElementById('hq-upsell');
       if (!up) {
         up = document.createElement('div');
@@ -442,6 +467,107 @@
         { once: true },
       );
     }
+    // More (phones): switch to another thing you run, then your account.
+    function screenMore() {
+      if (!hq) return;
+      var c = context();
+      var tiles = [];
+      if (runs('teams'))
+        hq.teams.forEach(function (t) {
+          tiles.push({
+            href: '#/teams/' + t.calendar_id,
+            key: 'team:' + t.calendar_id,
+            name: t.name,
+            colour: t.color,
+            sub: sportName(t.sport) + ' · ' + t.players + ' in the squad',
+          });
+        });
+      if (runs('games')) tiles.push({ href: '#/games', key: 'games', name: 'Social games', colour: '#3a61c9', sub: 'One-off and weekly' });
+      if (runs('events'))
+        tiles.push({
+          href: state.organiser ? '#/overview' : '#/profile',
+          key: 'events',
+          name: state.organiser ? state.organiser.name : 'Your events',
+          colour: '#1c1a17',
+          sub: 'Events and tickets',
+        });
+      var adds = [];
+      if (runs('teams')) adds.push(['#/welcome/setup', '+ Add a team']);
+      if (runs('games')) adds.push(['#/games/new', '+ New social game']);
+      if (runs('events')) adds.push(['#/events/new', '+ New event']);
+      if (
+        RUNS.some(function (r) {
+          return !runs(r.key);
+        })
+      )
+        adds.push(['#/settings', 'Run something else too…']);
+      var row = function (href, icon, title, sub, extra) {
+        return (
+          '<a class="hq-mo-row" href="' +
+          href +
+          '"' +
+          (extra || '') +
+          '><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          ICON[icon] +
+          '</svg><span class="grow">' +
+          esc(title) +
+          (sub ? '<small>' + esc(sub) + '</small>' : '') +
+          '</span><i>›</i></a>'
+        );
+      };
+      var mail = ctx.email ? ctx.email() : '';
+      render(
+        '<div class="hq-more"><h1 class="hq-mo-h">More</h1>' +
+          '<div class="hq-mo-me">' +
+          crest(state.organiser ? state.organiser.name : mail || 'You', '#2f6b4f', 40) +
+          '<span class="grow"><b>' +
+          esc(state.organiser ? state.organiser.name : 'Your account') +
+          '</b><small>' +
+          esc(mail || '') +
+          '</small></span></div>' +
+          '<div class="hq-mo-lb">SWITCH TO</div><div class="hq-mo-tiles">' +
+          tiles
+            .map(function (t) {
+              var here = t.key === c;
+              return (
+                '<a class="hq-mo-tile' +
+                (here ? ' on' : '') +
+                '" href="' +
+                esc(t.href) +
+                '">' +
+                crest(t.name, t.colour, 44) +
+                (here ? '<span class="hq-mo-here">YOU’RE HERE</span>' : '') +
+                '<b>' +
+                esc(t.name) +
+                '</b><small>' +
+                esc(t.sub) +
+                '</small></a>'
+              );
+            })
+            .join('') +
+          '</div>' +
+          (adds.length
+            ? '<div class="hq-mo-adds">' +
+              adds
+                .map(function (a) {
+                  return '<a href="' + a[0] + '">' + esc(a[1]) + '</a>';
+                })
+                .join('') +
+              '</div>'
+            : '') +
+          '<div class="hq-mo-lb">ACCOUNT</div><div class="hq-mo-list">' +
+          row('#/settings', 'list', 'What you run', 'Teams, social games, events') +
+          row('#/settings', 'gear', 'Settings', '') +
+          (state.admin ? row('#/admin', 'shield', 'Admin', '') : '') +
+          row(SITE + '/app/', 'phone', 'Open the Dayli app', 'Your own calendar', ' target="_blank" rel="noopener"') +
+          row('mailto:hello@daylicalendar.co.uk', 'help', 'Help', 'hello@daylicalendar.co.uk') +
+          '<button type="button" class="hq-mo-row out" id="hq-mo-out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+          ICON.out +
+          '</svg><span class="grow">Sign out</span></button></div></div>',
+      );
+      $('#hq-mo-out').onclick = ctx.signOut;
+    }
+
     function menuSheet() {
       if (!hq) return '';
       var c = context();
@@ -3292,6 +3418,7 @@
       screenPeople: screenPeople,
       screenSettings: screenSettings,
       screenGames: screenGames,
+      screenMore: screenMore,
     };
   };
 })();

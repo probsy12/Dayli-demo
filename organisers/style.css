@@ -6905,3 +6905,229 @@ button.sg-pp {
   font: 700 18px Georgia, serif;
   color: var(--muted);
 }
+
+/* HQ More: switch what you run, then the account (screenMore in hq.js). */
+.hq-ctx {
+  display: none;
+}
+.hq-more {
+  max-width: 560px;
+  margin: 0 auto;
+}
+.hq-mo-h {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 28px;
+  margin: 4px 0 12px;
+}
+.hq-mo-me {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px 14px;
+}
+.hq-mo-me b {
+  display: block;
+  font-size: 15px;
+}
+.hq-mo-me small {
+  color: var(--muted);
+  font-size: 13px;
+}
+.hq-mo-lb {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.7px;
+  color: var(--muted);
+  margin: 18px 2px 8px;
+}
+.hq-mo-tiles {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.hq-mo-tile {
+  position: relative;
+  display: block;
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+  padding: 12px;
+  color: inherit;
+  text-decoration: none;
+  min-height: 104px;
+}
+.hq-mo-tile.on {
+  border: 2px solid var(--accent);
+  background: var(--accent-soft, #e4efe8);
+}
+.hq-mo-tile b {
+  display: block;
+  font-size: 14.5px;
+  margin-top: 10px;
+  line-height: 1.2;
+}
+.hq-mo-tile small {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 3px;
+  line-height: 1.3;
+}
+.hq-mo-here {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  font-size: 10px;
+  font-weight: 800;
+  color: #fff;
+  background: var(--accent);
+  border-radius: 999px;
+  padding: 3px 7px;
+}
+.hq-mo-adds {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+.hq-mo-adds a {
+  border: 1.5px dashed var(--border);
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: var(--accent);
+  text-decoration: none;
+  background: var(--surface);
+}
+.hq-mo-list {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+}
+.hq-mo-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 13px 14px;
+  border: 0;
+  border-bottom: 1px solid var(--border);
+  background: none;
+  font: inherit;
+  font-size: 15px;
+  font-weight: 600;
+  color: inherit;
+  text-decoration: none;
+  text-align: left;
+  cursor: pointer;
+}
+.hq-mo-row:last-child {
+  border-bottom: 0;
+}
+.hq-mo-row svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+  color: var(--muted);
+}
+.hq-mo-row small {
+  display: block;
+  font-size: 12px;
+  color: var(--muted);
+  font-weight: 500;
+}
+.hq-mo-row i {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 18px;
+}
+.hq-mo-row.out {
+  color: #c0392b;
+}
+.hq-mo-row.out svg {
+  color: #c0392b;
+}
+/* Phones and small tablets (no sidebar): the bottom bar and the "where you
+   are" chip replace the menu button and the tabs. */
+@media (max-width: 900px) {
+  html.hq .hq-bottom {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 20;
+    background: var(--surface);
+    border-top: 1px solid var(--border);
+    padding: 6px 4px calc(6px + env(safe-area-inset-bottom));
+    justify-content: space-around;
+  }
+  html.hq body.auth .hq-bottom,
+  html.hq body.hq-bare .hq-bottom {
+    display: none;
+  }
+  html.hq .hq-bottom a {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 3px;
+    color: var(--muted);
+    text-decoration: none;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 4px 0;
+  }
+  html.hq .hq-bottom svg {
+    width: 24px;
+    height: 24px;
+  }
+  html.hq .hq-bottom .on {
+    color: var(--accent);
+  }
+  html.hq main,
+  html.hq #app {
+    padding-bottom: 90px;
+  }
+  html.hq .tabs-nav.hq-empty-tabs,
+  html.hq .topbar .menu {
+    display: none !important;
+  }
+  html.hq .hq-ctx {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+    max-width: 55%;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 999px;
+    padding: 3px 10px 3px 3px;
+    font-size: 13px;
+    font-weight: 800;
+    color: inherit;
+    text-decoration: none;
+  }
+  html.hq .hq-ctx span {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  html.hq .hq-bottom a.hq-plus svg {
+    width: 44px;
+    height: 44px;
+    padding: 10px;
+    border-radius: 14px;
+    background: var(--accent);
+    color: #fff;
+    margin-top: -6px;
+  }
+  html.hq .hq-bottom a.hq-plus span {
+    display: none;
+  }
+}
