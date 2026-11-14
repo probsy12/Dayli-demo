@@ -494,6 +494,8 @@
       }
       var free = ['welcome', 'verify', 'profile', 'reset', 'admin', 'join', 'play', 'game', 'pg', 'me'];
       if (!hq.onboarded() && free.indexOf(parts[0]) < 0) return go(hq.homeHash()); // players: their teams
+      // Set up already: signing in again goes straight to HQ, not the welcome.
+      if (parts[0] === 'welcome' && hq.onboarded() && !parts[1]) return go(hq.homeHash());
       if (parts[0] === 'welcome') {
         setShell(true, 'welcome');
         if (parts[1] === 'setup') return go('#/new-team'); // old link

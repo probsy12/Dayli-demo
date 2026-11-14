@@ -116,7 +116,8 @@
         var p = r[0] || { runs: [], onboarded: false, has: {} };
         hq = {
           runs: p.runs || [],
-          onboarded: !!p.onboarded,
+          // Said what they run = set up (older accounts stopped on the old second page).
+          onboarded: !!p.onboarded || (p.runs || []).length > 0,
           has: p.has || {},
           teams: (r[1] || []).filter(function (t) {
             return t.my_role === 'manager' && !t.sample;
@@ -649,6 +650,7 @@
       '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 13l4 4L19 7"/></svg>';
 
     function steps(n) {
+      if (n === 1) return ''; // the welcome is one page now
       var names = ['What you run', 'Bring people in'];
       return (
         '<div class="hq-steps">' +
@@ -803,11 +805,17 @@
         setBusy(button, true);
         (input ? saveName(name) : Promise.resolve())
           .then(function () {
-            return rpc('hq_prefs_set', { p_runs: chosen, p_done: false });
+            // One page: once they've said what they run, HQ is set up for good.
+            return rpc('hq_prefs_set', { p_runs: chosen, p_done: true });
+          })
+          .then(function () {
+            chosen = null;
+            return load(true);
           })
           .then(
             function () {
-              go('#/welcome/people');
+              // Running a team and no team yet: set it up (name, logo, players). Else HQ.
+              go(runs('teams') && !hq.teams.length ? '#/new-team' : homeHash());
             },
             function (err) {
               setBusy(button, false);
@@ -3867,6 +3875,13 @@
           esc(g.title + ' · ' + when) +
           (g.location ? '<br>' + esc(g.location) : '') +
           '</p>' +
+          (g.payments_on && g.card_ready && g.pay_pence
+            ? '<div class="ng-stripe ok"><b>✓ Card payments are on</b><span class="muted small">Players pay ' +
+              sgPounds(g.pay_pence) +
+              ' by card, Apple Pay or Google Pay from the link or in Dayli (the card fee is on them). You get ' +
+              sgPounds(g.price_pence) +
+              ' each, straight to your bank.</span></div>'
+            : '') +
           (stripe
             ? '<div class="ng-stripe"><b>Let players pay you in Dayli</b><span class="muted small">' +
               (price ? 'They pay ' + sgPounds(price) + ' by card, Apple Pay or Google Pay from the link. ' : 'They pay by card, Apple Pay or Google Pay from the link. ') +
