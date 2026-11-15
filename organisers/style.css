@@ -2196,8 +2196,19 @@ input.bigin,
 }
 .ef-dt input {
   min-width: 0;
+  width: 100%;
+  max-width: 100%;
+  box-sizing: border-box;
   padding-left: 10px;
   padding-right: 8px;
+  /* iPhone Safari draws date and time boxes at a fixed width, past the screen's edge */
+  -webkit-appearance: none;
+  appearance: none;
+  min-height: 46px;
+  text-align: left;
+}
+.ef-dt input::-webkit-date-and-time-value {
+  text-align: left;
 }
 .ef-tz {
   color: var(--muted);

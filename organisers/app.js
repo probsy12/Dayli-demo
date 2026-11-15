@@ -1828,6 +1828,13 @@
     var tz = safeTz(ev.timezone || 'Europe/London');
     var starts = isoToZoned(ev.starts_at, tz);
     var ends = isoToZoned(ev.ends_at, tz);
+    // A new event starts filled in (a week today, 7 till 10pm) rather than blank.
+    if (!ev.starts_at && !starts.date) {
+      var wk = new Date(Date.now() + 7 * 86400000);
+      var d = wk.getFullYear() + '-' + pad(wk.getMonth() + 1) + '-' + pad(wk.getDate());
+      starts = { date: d, time: '19:00' };
+      ends = { date: d, time: '22:00' };
+    }
     var pounds = ev.price_from_pence != null ? (ev.price_from_pence / 100).toFixed(2) : '';
     var mode = ev.ticketing || (ev.ticket_url || ev.is_free === false ? 'external' : 'none');
     var cover = ev.cover_image_path ? coverUrl(ev.cover_image_path) : '';
