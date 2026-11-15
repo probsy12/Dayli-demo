@@ -6059,6 +6059,38 @@ html.hq .ng-time input {
   cursor: pointer;
   margin: 0;
 }
+.gi-rfrow {
+  cursor: default;
+}
+.gi-rfmain {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  cursor: pointer;
+}
+.gi-rf {
+  flex: none;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--danger);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.gi-rf:hover {
+  background: var(--danger-bg);
+}
 .gi-it:last-child {
   border-bottom: 0;
 }
@@ -8241,4 +8273,24 @@ html.hq .pl .pl-tabs {
   left: auto;
   right: auto;
   bottom: auto;
+}
+
+/* Social game pitch: drag a player to another spot or the other team. */
+.sg-pp {
+  touch-action: none;
+}
+.sg-pp.sg-lift {
+  opacity: 0.35;
+}
+.sg-ghost {
+  position: fixed;
+  z-index: 1000;
+  transform: translate(-50%, -50%) scale(1.08);
+  pointer-events: none;
+  filter: drop-shadow(0 6px 12px rgba(0, 0, 0, 0.3));
+}
+.sg-over {
+  outline: 3px solid #f2c94c;
+  outline-offset: 2px;
+  border-radius: 999px;
 }

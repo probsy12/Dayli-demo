@@ -702,6 +702,9 @@
     passwordAuth: function (mode, address, password, button, err) {
       return passwordAuth(mode, address, password, button, err);
     },
+    codeSignIn: function (address, button, err, message) {
+      return codeSignIn(address, button, err, message);
+    },
   });
 
   // HQ: its name, and Teams in the menus.
@@ -981,8 +984,14 @@
           (res.error && mode === 'create' && /already|registered/i.test(res.error.message)) ||
           (!res.error && mode === 'create' && user && user.identities && user.identities.length === 0);
         if (exists) {
-          // Already on Dayli: a code to sign in with, rather than a dead end.
-          return codeSignIn(address, button, err, 'You already have a Dayli account. We’ve emailed you a code to sign in with.');
+          // Already on Dayli: their password signs them in; if it isn't theirs
+          // (or they've never set one), a code to sign in with.
+          setBusy(button, true);
+          return sb.auth.signInWithPassword({ email: address, password: password }).then(function (r2) {
+            setBusy(button, false);
+            if (!r2.error && r2.data && r2.data.session) return signedIn(r2.data.session);
+            return codeSignIn(address, button, err, 'You already have a Dayli account. We’ve emailed you a code to sign in with.');
+          });
         }
         if (res.error) {
           if (mode === 'signin' && /Invalid login credentials/i.test(res.error.message)) {
@@ -1003,21 +1012,24 @@
           state.signupCode = true;
           return go('#/verify');
         }
-        state.session = res.data.session;
-        state.organiser = undefined;
-        loadOrganiser().then(
-          function () {
-            go(homeHash());
-          },
-          function () {
-            go(homeHash());
-          },
-        );
+        signedIn(res.data.session);
       })
       .catch(function (ex) {
         setBusy(button, false);
         showError(err, friendly(ex));
       });
+  }
+  function signedIn(session) {
+    state.session = session;
+    state.organiser = undefined;
+    loadOrganiser().then(
+      function () {
+        go(homeHash());
+      },
+      function () {
+        go(homeHash());
+      },
+    );
   }
   function codeSignIn(address, button, err, message) {
     setBusy(button, true, 'Sending…');

@@ -1785,20 +1785,22 @@
 
     // --- adding a fixture -----------------------------------------------------
 
-    function screenNew(cal) {
+    function screenNew(cal, day) {
       loading();
       rpc('team_overview', { p_calendar: cal }).then(
         function (t) {
-          drawNew(t);
+          drawNew(t, day);
         },
         function (err) {
           render(notice('error', esc(friendly(err))));
         },
       );
     }
-    function drawNew(t) {
+    function drawNew(t, day) {
       var cal = t.calendar_id;
       var today = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+      // From the calendar: the day that was picked (if it's not gone).
+      if (/^\d{4}-\d{2}-\d{2}$/.test(day || '') && day >= new Date().toISOString().slice(0, 10)) today = day;
       render(
         '<a class="linkish" href="' +
           teamUrl(cal) +
@@ -3055,7 +3057,7 @@
     function screen(parts, query) {
       var cal = parts[1];
       if (!cal) return screenList();
-      if (parts[2] === 'new') return screenNew(cal);
+      if (parts[2] === 'new') return screenNew(cal, query && query.d);
       if (parts[2] === 'fixture' && parts[3]) return screenFixture(cal, parts[3]);
       return screenTeam(cal, parts[2], query);
     }

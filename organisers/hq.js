@@ -1769,11 +1769,12 @@
         bareTop(false) +
           '<div class="hq-wrap hq-join"><div class="card pl-card pl-gamecard"><div class="kicker small muted" id="hj-kick">A GAME ON DAYLI</div><h1 class="hq-h1" id="hj-title">Take your place</h1><p class="muted" id="hj-sub">Checking the game…</p></div>' +
           '<h2 class="hq-h2 pl-signh">Sign in to take your place</h2>' +
+          '<div class="hq-auth-tabs hj-seg" role="tablist"><button type="button" data-mode="signin">I have an account</button><button type="button" data-mode="create">I’m new to Dayli</button></div>' +
           '<form id="hj-form" class="hq-join-form" novalidate><label for="hj-email">Your email</label><input type="email" id="hj-email" autocomplete="email" placeholder="you@example.com" />' +
-          '<label for="hj-pw">Choose a password</label><input type="password" id="hj-pw" autocomplete="new-password" minlength="8" placeholder="At least 8 characters" />' +
-          '<div class="notice error" id="hj-err" hidden></div><button class="btn primary hq-big" type="submit">Create account</button></form>' +
-          '<p class="muted small hq-join-note">We email you a 6-digit code once, to check it’s you. Your free Dayli account works for every game and team on Dayli HQ, and in the Dayli app if you ever want it.</p>' +
-          '<p class="small">Already on Dayli? <a href="#/sign-in">Sign in</a> and you’ll go straight back to the game.</p></div>',
+          '<label for="hj-pw" id="hj-pw-l">Your password</label><input type="password" id="hj-pw" autocomplete="current-password" placeholder="Your password" />' +
+          '<div class="notice error" id="hj-err" hidden></div><button class="btn primary hq-big" type="submit" id="hj-go">Sign in</button>' +
+          '<p class="small hj-alt" id="hj-alt"><button type="button" class="linkish" id="hj-code">No password? Email me a code</button></p></form>' +
+          '<p class="muted small hq-join-note" id="hj-note">We email you a 6-digit code once, to check it’s you. Your free Dayli account works for every game and team on Dayli HQ, and in the Dayli app if you ever want it.</p></div>',
         true,
       );
       document.body.classList.add('hq-bare');
@@ -1804,6 +1805,44 @@
           if ($('#hj-sub')) $('#hj-sub').textContent = 'Make your free Dayli account to carry on.';
         },
       );
+      // Signing in (email and password) or making an account. Remembered on
+      // this browser, so someone who has signed in before sees Sign in first.
+      var mode = 'signin';
+      try {
+        if (!localStorage.getItem('dayli_hq_had_account')) mode = 'create';
+      } catch (ex) {
+        /* private mode: new first */
+      }
+      function setMode(m) {
+        mode = m;
+        $$('.hj-seg button').forEach(function (b) {
+          b.classList.toggle('on', b.dataset.mode === m);
+        });
+        var create = m === 'create';
+        $('#hj-pw-l').textContent = create ? 'Choose a password' : 'Your password';
+        $('#hj-pw').setAttribute('autocomplete', create ? 'new-password' : 'current-password');
+        $('#hj-pw').placeholder = create ? 'At least 8 characters' : 'Your password';
+        $('#hj-go').textContent = create ? 'Create account' : 'Sign in';
+        $('#hj-alt').hidden = create;
+        $('#hj-note').hidden = !create;
+        $('#hj-err').hidden = true;
+      }
+      $$('.hj-seg button').forEach(function (b) {
+        b.onclick = function () {
+          setMode(b.dataset.mode);
+        };
+      });
+      setMode(mode);
+      $('#hj-code').onclick = function () {
+        var address = $('#hj-email').value.trim();
+        var err = $('#hj-err');
+        if (!/^\S+@\S+\.\S+$/.test(address)) {
+          err.textContent = 'Enter your email address first.';
+          err.hidden = false;
+          return;
+        }
+        ctx.codeSignIn(address, this, err, 'We’ve emailed you a code to sign in with.');
+      };
       $('#hj-form').onsubmit = function (e) {
         e.preventDefault();
         var err = $('#hj-err');
@@ -1812,15 +1851,22 @@
         var pw = $('#hj-pw').value;
         var why = !/^\S+@\S+\.\S+$/.test(address)
           ? 'Enter your email address.'
-          : pw.length < 8
+          : mode === 'create' && pw.length < 8
             ? 'Choose a password of at least 8 characters.'
-            : null;
+            : !pw
+              ? 'Enter your password.'
+              : null;
         if (why) {
           err.textContent = why;
           err.hidden = false;
           return;
         }
-        ctx.passwordAuth('create', address, pw, $('#hj-form button[type=submit]'), err);
+        try {
+          localStorage.setItem('dayli_hq_had_account', '1');
+        } catch (ex) {
+          /* fine */
+        }
+        ctx.passwordAuth(mode, address, pw, $('#hj-go'), err);
       };
     }
     function screenGame(raw, want) {
@@ -1907,6 +1953,10 @@
       return new Date(iso).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
     }
 
+    // A "new" link for a given day (yyyy-mm-dd): the form opens on that date.
+    function onDay(href, day) {
+      return day ? href + (href.indexOf('?') >= 0 ? '&' : '?') + 'd=' + day : href;
+    }
     function screenCalendar(query) {
       query = query || {};
       var today = new Date();
@@ -2038,7 +2088,7 @@
             ? '<div class="hc-add"><button class="btn primary" id="hc-add">+ Add</button><div class="hc-add-menu" id="hc-add-menu" hidden>' +
               adds
                 .map(function (a) {
-                  return '<a href="' + esc(a[0]) + '">' + esc(a[1]) + '</a>';
+                  return '<a data-base="' + esc(a[0]) + '" href="' + esc(onDay(a[0], picked)) + '">' + esc(a[1]) + '</a>';
                 })
                 .join('') +
               '</div></div>'
@@ -2095,6 +2145,10 @@
           a.classList.add('on');
           var box = $('#hc-side');
           box.innerHTML = side(day);
+          // + Add now makes things on this day.
+          $$('#hc-add-menu a[data-base]').forEach(function (l) {
+            l.setAttribute('href', onDay(l.dataset.base, day));
+          });
           try {
             history.replaceState(null, '', a.getAttribute('href'));
           } catch (ex) {
@@ -3035,7 +3089,7 @@
     }
 
     function screenGames(gameId, query) {
-      if (gameId === 'new') return screenNewGame();
+      if (gameId === 'new') return screenNewGame(query);
       if (gameId === 'owed') return query && query.p ? screenOwedPerson(query.p) : screenOwed();
       loading();
       if (query && query.made && gameId) {
@@ -3376,7 +3430,8 @@
     // Start a game: your recent games at the top (again, like last time: one
     // tap fills everything in for next week), or start fresh with a sport
     // tile, its format, and the details as rows you open to change.
-    function screenNewGame() {
+    function screenNewGame(query) {
+      var onDate = query && /^\d{4}-\d{2}-\d{2}$/.test(query.d || '') && query.d >= ymdLocal(new Date()) ? query.d : null;
       loading();
       var me = state.session && state.session.user ? state.session.user.id : null;
       Promise.all([
@@ -3401,7 +3456,7 @@
           sport: 'football',
           format: '5',
           places: 10,
-          day: ymdLocal(tomorrow),
+          day: onDate || ymdLocal(tomorrow),
           time: '19:00',
           place: '',
           weekly: false,
@@ -4269,6 +4324,22 @@
       });
       var dirty = placed > 0;
       var undoSide = null;
+      // Where each player stands in their half: {place_id: spot number}. Saved
+      // with the teams; loaded once (game_spots) and kept while you move people.
+      var spot = g.spots || {};
+      var undoSpot = null;
+      if (!g.spots && g.is_organiser !== false)
+        rpc('game_spots', { p_game: g.id }).then(
+          function (sp) {
+            g.spots = sp || {};
+            if (undoSpot) return; // they've already moved someone
+            spot = Object.assign({}, g.spots);
+            if (gameTab === 'teams') draw();
+          },
+          function () {
+            g.spots = {};
+          },
+        );
       var chosen = null; // 'fair' or 'random' once Dayli has chosen
       var played = g.ends_at && new Date(g.ends_at) < new Date();
 
@@ -4421,22 +4492,44 @@
       }
       function tabTeams() {
         function half(top) {
+          var which = top ? 'bibs' : 'colours';
           var mine2 = inn.filter(function (p) {
-            return side[p.id] === (top ? 'bibs' : 'colours');
+            return side[p.id] === which;
           });
           var cap = Math.max(top ? bibs : places - bibs, mine2.length);
           var spots = sgHalf(cap, top);
+          // Each player in their own spot if it's free; the rest fill the gaps.
+          var at = new Array(cap);
+          var rest = [];
+          mine2.forEach(function (p) {
+            var k = spot[p.id];
+            if (typeof k === 'number' && k >= 0 && k < cap && !at[k]) at[k] = p;
+            else rest.push(p);
+          });
+          rest.forEach(function (p) {
+            for (var k = 0; k < cap; k++)
+              if (!at[k]) {
+                at[k] = p;
+                break;
+              }
+          });
+          at.forEach(function (p, k) {
+            if (p) spot[p.id] = k;
+          });
           return spots
             .map(function (s, i) {
-              var p = mine2[i];
+              var p = at[i];
               var pos = 'left:' + s.x.toFixed(1) + '%;top:' + s.y.toFixed(1) + '%';
-              if (!p) return '<div class="sg-free" style="' + pos + '">+</div>';
+              var drop = ' data-side="' + which + '" data-i="' + i + '"';
+              if (!p) return '<div class="sg-free"' + drop + ' style="' + pos + '">+</div>';
               return (
                 '<button type="button" class="sg-pp' +
                 (top ? ' b' : '') +
                 '" data-p="' +
                 esc(p.id) +
-                '" style="' +
+                '"' +
+                drop +
+                ' style="' +
                 pos +
                 '">' +
                 sgAvatar(p, 38) +
@@ -4489,7 +4582,7 @@
           half(true) +
           half(false) +
           '</div><p class="muted small gt-help">' +
-          (inn.length ? 'Tap a player to swap sides. ' : 'When people say yes they take a spot here. ') +
+          (inn.length ? 'Drag a player to another spot or the other team, or tap to swap sides. ' : 'When people say yes they take a spot here. ') +
           (dirty ? '<b class="ink">Save the teams so everyone sees them.</b>' : g.sides_set ? 'Everyone sees these teams.' : '') +
           '</p><div class="gt-btns">' +
           (undoSide ? '<button type="button" class="btn" id="gt-undo">Undo</button>' : '') +
@@ -4540,7 +4633,26 @@
             paid.length,
             paid
               .map(function (p) {
-                return item(p, p.paid === 'card' ? 'Card' : 'Cash');
+                if (p.paid !== 'card') return item(p, 'Cash');
+                // Paid by card: Refund right there, next to the name.
+                var amount = g.pay_pence || price;
+                return (
+                  '<div class="gi-it gi-rfrow"><button type="button" class="gi-rfmain" data-who="' +
+                  esc(p.id) +
+                  '">' +
+                  sgAvatar(p, 24) +
+                  '<span><b>' +
+                  esc(sgFirst(p.name)) +
+                  '</b><small>Card' +
+                  (amount ? ' · ' + sgPounds(amount) : '') +
+                  '</small></span></button><button type="button" class="gi-rf" data-refund="' +
+                  esc(p.id) +
+                  '" data-name="' +
+                  esc(p.name) +
+                  '" data-amount="' +
+                  Number(amount || 0) +
+                  '">Refund</button></div>'
+                );
               })
               .join('') +
               (left.length
@@ -4635,10 +4747,13 @@
         var first = sgFirst(p.name);
         var me = p.user_id && p.user_id === g.organiser_id;
         if (p.status === 'in') {
-          return sgActions(p.name + ' · playing', [
+          var acts = [
             [me ? 'I can’t play' : first + ' can’t play', function () { move(p, 'no', p.name + ' can’t play'); }],
             ['Take ' + (me ? 'me' : first) + ' out of the game', function () { move(p, 'out', p.name + ' is out'); }, true],
-          ]);
+          ];
+          if (p.paid === 'card' && !me)
+            acts.splice(1, 0, ['Refund ' + first + (g.pay_pence ? ' ' + sgPounds(g.pay_pence) : ''), function () { refund(p.id, p.name, g.pay_pence || price); }]);
+          return sgActions(p.name + ' · playing', acts);
         }
         if (p.status === 'waiting') {
           var full = inn.length >= places;
@@ -4715,16 +4830,100 @@
           };
         $$('.sg-pp[data-p]').forEach(function (el) {
           el.onclick = function () {
+            if (el.dataset.dragged) return; // the end of a drag, not a tap
             var id = el.dataset.p;
+            keepUndo();
             side[id] = side[id] === 'bibs' ? 'colours' : 'bibs';
+            delete spot[id];
             dirty = true;
             draw();
           };
+          dragPlayer(el);
         });
+        // Drag a player (mouse or finger) onto a spot: an empty one, or
+        // someone else's (they swap). Either team.
+        function dragPlayer(el) {
+          el.onpointerdown = function (e) {
+            if (e.button) return;
+            var sx = e.clientX;
+            var sy = e.clientY;
+            var ghost = null;
+            var over = null;
+            function target(x, y) {
+              if (ghost) ghost.style.display = 'none';
+              var t = document.elementFromPoint(x, y);
+              if (ghost) ghost.style.display = '';
+              t = t && t.closest ? t.closest('[data-side][data-i]') : null;
+              return t && t !== el ? t : null;
+            }
+            function move(ev) {
+              if (!ghost) {
+                if (Math.abs(ev.clientX - sx) + Math.abs(ev.clientY - sy) < 8) return;
+                ghost = el.cloneNode(true);
+                ghost.className += ' sg-ghost';
+                ghost.removeAttribute('style');
+                document.body.appendChild(ghost);
+                el.classList.add('sg-lift');
+              }
+              ev.preventDefault();
+              ghost.style.left = ev.clientX + 'px';
+              ghost.style.top = ev.clientY + 'px';
+              // Near the top or bottom of the screen: scroll, to reach the other half.
+              if (ev.clientY > window.innerHeight - 50) window.scrollBy(0, 14);
+              else if (ev.clientY < 50) window.scrollBy(0, -14);
+              var t = target(ev.clientX, ev.clientY);
+              if (t !== over) {
+                if (over) over.classList.remove('sg-over');
+                over = t;
+                if (over) over.classList.add('sg-over');
+              }
+            }
+            function up(ev) {
+              document.removeEventListener('pointermove', move);
+              document.removeEventListener('pointerup', up);
+              document.removeEventListener('pointercancel', up);
+              if (!ghost) return; // a tap: the click handler swaps sides
+              ghost.remove();
+              el.classList.remove('sg-lift');
+              el.dataset.dragged = '1';
+              setTimeout(function () {
+                delete el.dataset.dragged;
+              }, 50);
+              var t = ev.type === 'pointerup' ? target(ev.clientX, ev.clientY) : null;
+              if (over) over.classList.remove('sg-over');
+              if (!t) return;
+              var id = el.dataset.p;
+              var toSide = t.dataset.side;
+              var toSpot = Number(t.dataset.i);
+              var other = t.dataset.p;
+              keepUndo();
+              if (other) {
+                // Swap places with whoever is there.
+                side[other] = side[id];
+                spot[other] = spot[id];
+              }
+              side[id] = toSide;
+              spot[id] = toSpot;
+              dirty = true;
+              draw();
+            }
+            document.addEventListener('pointermove', move, { passive: false });
+            document.addEventListener('pointerup', up);
+            document.addEventListener('pointercancel', up);
+          };
+        }
+        function saveSides() {
+          return rpc('game_set_sides', { p_game: g.id, p_sides: side }).then(function () {
+            g.spots = Object.assign({}, spot);
+            return rpc('game_set_spots', { p_game: g.id, p_spots: spot });
+          });
+        }
         function keepUndo() {
           undoSide = Object.assign({}, side);
+          undoSpot = Object.assign({}, spot);
         }
         function randomSplit() {
+          spot = {};
           var ids = inn
             .map(function (p) {
               return p.id;
@@ -4741,6 +4940,7 @@
         // shuffled snake drafts, each improved by swapping pairs; then one of
         // the best at random (so Again gives another fair split).
         function fairSplit(ratings) {
+          spot = {};
           var ids = inn.map(function (p) {
             return p.id;
           });
@@ -4836,6 +5036,8 @@
           $('#gt-undo').onclick = function () {
             side = undoSide;
             undoSide = null;
+            if (undoSpot) spot = undoSpot;
+            undoSpot = null;
             chosen = null;
             draw();
           };
@@ -4875,7 +5077,7 @@
             function saveScore(x, y, button) {
               setBusy(button, true);
               // The teams on the pitch are the ones the score is for.
-              (g.sides_set && !dirty ? Promise.resolve() : rpc('game_set_sides', { p_game: g.id, p_sides: side }))
+              (g.sides_set && !dirty ? Promise.resolve() : saveSides())
                 .then(function () {
                   return rpc('game_set_score', { p_game: g.id, p_bibs: x, p_colours: y });
                 })
@@ -4903,7 +5105,7 @@
           $('#gt-save').onclick = function () {
             var button = this;
             setBusy(button, true);
-            rpc('game_set_sides', { p_game: g.id, p_sides: side }).then(
+            saveSides().then(
               function () {
                 toast('Teams saved. Everyone sees them in Dayli.');
                 refreshGame();
