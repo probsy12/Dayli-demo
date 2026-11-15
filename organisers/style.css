@@ -8514,3 +8514,37 @@ html.hq .pl .pl-tabs {
     height: 26px;
   }
 }
+
+/* Deleting games and teams */
+.gl-card,
+.gl-row {
+  position: relative;
+}
+.gl-del {
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--muted);
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  align-self: center;
+}
+.gl-del:hover {
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+.gs-del {
+  color: var(--danger);
+  margin-top: 6px;
+}
+.th-danger {
+  margin: 28px 0 8px;
+  text-align: center;
+}
+.th-del {
+  color: var(--danger);
+}

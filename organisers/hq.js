@@ -96,6 +96,8 @@
       ['volleyball', 'Volleyball'],
       ['other', 'Something else'],
     ];
+    var BIN =
+      '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg>';
     var COLOURS = ['#6E56CF', '#2F6B4F', '#3A61C9', '#D9741C', '#B4432F', '#1C1A17'];
 
     var hq = null; // { runs: [], onboarded, has: {teams, games, events}, teams: [...] }
@@ -3611,6 +3613,33 @@
 
     // Games: everything coming up (soonest first, the next one outlined), then
     // past games (newest first, 20 at a time). Tap one to open it.
+    // Delete a game: it comes off everyone's calendar and they're told.
+    function deleteGame(g, done) {
+      var past = g.starts_at && new Date(g.starts_at) < new Date();
+      var card = (g.players || []).some(function (p) {
+        return p.paid === 'card';
+      });
+      var ok = confirm(
+        'Delete ' +
+          (g.title || 'this game') +
+          '?' +
+          (past ? ' It comes off the list and everyone’s calendar.' : ' It comes off everyone’s calendar and they’re told it’s off.') +
+          (card ? ' Some players paid by card: refund them first (Payments tab), as deleting doesn’t.' : '') +
+          (g.weekly || g.next_game_id ? ' Only this week’s game is deleted.' : ''),
+      );
+      if (!ok) return Promise.resolve(false);
+      return rpc('game_cancel', { p_game: g.id }).then(
+        function () {
+          toast((g.title || 'Game') + ' deleted');
+          if (done) done();
+          return true;
+        },
+        function (err) {
+          toast(friendly(err));
+          return false;
+        },
+      );
+    }
     function screenGamesList() {
       loading();
       Promise.all([rpc('game_list', { p_past: false }), rpc('game_list', { p_past: true })]).then(
@@ -3662,7 +3691,13 @@
               pct +
               '%"></i></span><span class="gl-chips">' +
               chips.join('') +
-              '</span></span><span class="gl-ar">›</span></a>'
+              '</span></span><button type="button" class="gl-del" data-del="' +
+              esc(x.id) +
+              '" aria-label="Delete ' +
+              esc(x.title) +
+              '" title="Delete">' +
+              BIN +
+              '</button><span class="gl-ar">›</span></a>'
             );
           }
           function row(x) {
@@ -3685,7 +3720,13 @@
               (x.price_each ? ' · ' + sgPounds(x.price_each) + ' each' : x.cost ? '' : ' · free') +
               '</small></span>' +
               (owed ? '<span class="gl-owed">' + sgPounds(owed) + ' owed</span>' : x.price_each ? '<span class="gl-paid">All paid</span>' : '') +
-              '<span class="gl-ar">›</span></a>'
+              '<button type="button" class="gl-del" data-del="' +
+              esc(x.id) +
+              '" aria-label="Delete ' +
+              esc(x.title) +
+              '" title="Delete">' +
+              BIN +
+              '</button><span class="gl-ar">›</span></a>'
             );
           }
           render(
@@ -3702,6 +3743,24 @@
                 : '') +
               '</div>',
           );
+          var all = coming.concat(past);
+          function wireDelete() {
+            $$('[data-del]').forEach(function (b) {
+              b.onclick = function (e) {
+                e.preventDefault();
+                e.stopPropagation();
+                var x = all.filter(function (y) {
+                  return y.id === b.dataset.del;
+                })[0];
+                if (!x) return;
+                deleteGame(x, function () {
+                  var a = b.closest('a');
+                  if (a) a.remove();
+                });
+              };
+            });
+          }
+          wireDelete();
           var last = past.length ? past[past.length - 1].starts_at : null;
           if ($('#gl-more'))
             $('#gl-more').onclick = function () {
@@ -3711,6 +3770,8 @@
                 function (more) {
                   more = more || [];
                   $('#gl-past').insertAdjacentHTML('beforeend', more.map(row).join(''));
+                  all = all.concat(more);
+                  wireDelete();
                   if (more.length) last = more[more.length - 1].starts_at;
                   if (more.length < 20) button.remove();
                   else setBusy(button, false);
@@ -5784,9 +5845,16 @@
             '<div class="ng-seg ng-cseg"><button type="button" data-gc="each">Price each</button><button type="button" data-gc="split">Split the pitch</button></div>' +
             '<div class="gs-cin"><label class="ng-money"><span>£</span><input type="text" id="gs-camt" class="ng-inp" inputmode="decimal" maxlength="7" /></label><button type="button" class="btn" id="gs-csave">Save</button></div></div>' +
             cardBar() +
-            '<button type="button" class="btn gs-wide" id="gs-link">Copy the game’s link</button>',
+            '<button type="button" class="btn gs-wide" id="gs-link">Copy the game’s link</button>' +
+            '<button type="button" class="btn gs-wide gs-del" id="gs-delete">Delete this game</button>',
           'gs-tall',
         );
+        $('#gs-delete', s.el).onclick = function () {
+          deleteGame(g, function () {
+            s.close();
+            go('#/games');
+          });
+        };
         // Cost: a price each, or the pitch fee split between everyone playing.
         var split = !!g.pitch_pence;
         var amounts = {

@@ -785,9 +785,35 @@
           afterHtml +
           '</div>' +
           started +
-          '</div>',
+          '</div>' +
+          (t.is_owner
+            ? '<div class="th-danger"><button type="button" class="linkish th-del" id="th-delete">Delete this team</button></div>'
+            : ''),
       );
 
+      if ($('#th-delete'))
+        $('#th-delete').onclick = function () {
+          var ok = confirm(
+            'Delete ' +
+              t.name +
+              '? Its fixtures, results, squad and payment records go for good, and it comes off everyone’s calendar. This can’t be undone.',
+          );
+          if (!ok) return;
+          var button = this;
+          setBusy(button, true, 'Deleting…');
+          rpc('team_delete', { p_calendar: cal }).then(
+            function () {
+              toast(t.name + ' deleted');
+              // HQ's menus list the team: start again from the top.
+              location.replace(location.pathname + '#/');
+              location.reload();
+            },
+            function (err) {
+              setBusy(button, false);
+              toast(friendly(err));
+            },
+          );
+        };
       $$('[data-copy-invite]').forEach(function (b) {
         b.onclick = function () {
           if (!d.code) return toast('No invite link for this team yet.');
