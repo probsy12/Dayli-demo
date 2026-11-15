@@ -2304,7 +2304,14 @@
       if (!code) return go(homeHash());
       stopChat();
       loading();
-      Promise.all([load(), loadName(), rpc('game_player', { p_code: code })]).then(
+      // Back from paying: ask Stripe first, so the page shows it paid now.
+      var back =
+        query && query.paid && !query.tries && /^cs_[A-Za-z0-9_]+$/.test(query.s || '')
+          ? invoke('game-pay', { action: 'confirm', session: query.s }).catch(function () {})
+          : Promise.resolve();
+      Promise.all([load(), loadName(), back.then(function () {
+        return rpc('game_player', { p_code: code });
+      })]).then(
         function (r) {
           if (!r[1]) return go('#/game/' + code); // a name first
           var g = r[2];
@@ -2819,9 +2826,9 @@
             .join('') +
           '</div></div>' +
           '<div class="card"><h3>What it costs</h3><div class="pay-fees">' +
-          '<div><b>Social games and tickets</b><span class="muted small">Players pay a booking fee on top: 3.5% + 10p. A £5 game is £5.34 for them; you get £5.</span></div>' +
-          '<div><b>Team subs and match fees</b><span class="muted small">A 1% Dayli fee, which you can pass on to players.</span></div>' +
-          '<div><b>Stripe’s card fee</b><span class="muted small">About 1.5% + 20p per payment, taken by Stripe from what you receive.</span></div>' +
+          '<div><b>Social games</b><span class="muted small">Players pay a small card fee on top: Stripe’s fee (1.5% + 20p on UK cards) and 20p to Dayli. A £5 game is £5.49 for them; you get the full £5.</span></div>' +
+          '<div><b>Team subs and match fees</b><span class="muted small">The same card fee, which players can pay on top (you get it all) or the club can cover.</span></div>' +
+          '<div><b>Tickets</b><span class="muted small">A booking fee on top of each order (3.5% + 10p, or you can cover it); Stripe’s fee comes out of your sales.</span></div>' +
           '</div></div>' +
           '<div class="card"><h3>Where you use it</h3><p class="muted small" style="margin:0">Once you’re set up, turn on card payments for a game (its Payments tab), for team subs and match fees (the team’s Payments page), or for event tickets. The same account is used for all of them.</p></div>',
       );

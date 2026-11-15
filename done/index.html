@@ -59,6 +59,7 @@
       <p id="text">Thanks. It shows as paid in Dayli in a moment.</p>
       <a class="btn" id="back" href="dayli://">Back to Dayli</a>
     </div>
+    <script src="/config.js"></script>
     <script>
       var q = new URLSearchParams(location.search);
       // Back to the team the payment is for, not the app's home screen.
@@ -72,6 +73,19 @@
         document.getElementById('title').textContent = title;
         document.getElementById('text').textContent = text;
       };
+      // Paid for a game: ask Stripe now, so Dayli shows it paid straight away.
+      var sess = q.get('s') || '';
+      if (q.get('paid') && /^cs_[A-Za-z0-9_]+$/.test(sess) && window.DAYLI_CONFIG && window.DAYLI_CONFIG.supabaseUrl) {
+        fetch(window.DAYLI_CONFIG.supabaseUrl + '/functions/v1/game-pay', {
+          method: 'POST',
+          headers: {
+            apikey: window.DAYLI_CONFIG.supabaseAnonKey,
+            Authorization: 'Bearer ' + window.DAYLI_CONFIG.supabaseAnonKey,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ action: 'confirm', session: sess }),
+        }).catch(function () {});
+      }
       if (q.get('cancelled')) set('↩️', 'No payment taken', 'You left before paying, so nothing was charged. Pay from Dayli whenever you are ready.');
       if (q.get('stripe')) set('🏦', 'Details sent to Stripe', 'Go back to Dayli and tap Check again. Stripe usually takes a few minutes, sometimes up to 5 working days.');
       if (q.get('retry')) set('↩️', 'That link has run out', 'Go back to Dayli and tap Set up payments again to carry on where you left off.');

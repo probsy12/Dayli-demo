@@ -152,7 +152,7 @@
     </div>
   </div>
 </main>
-<script src="../config.js?v=9729ac5"></script>
+<script src="../config.js?v=c45338f"></script>
 <script>
   (function () {
     var cfg = window.DAYLI_CONFIG || {};
@@ -180,7 +180,7 @@
     // place, the team sheet, paying and the chat). Someone who joined here by
     // name before keeps this page.
     if (HQ && code && !saved()) {
-      location.replace('/app/#/pg/' + code + (params.get('paid') ? '?paid=1' : ''));
+      location.replace('/app/#/pg/' + code + (params.get('paid') ? '?paid=1' + (params.get('s') ? '&s=' + encodeURIComponent(params.get('s')) : '') : ''));
       return;
     }
 
@@ -475,7 +475,18 @@
       }).catch(function () { alert('That didn’t work. Try again.'); });
     });
 
-    // Back from Stripe: Stripe tells Dayli a moment later, so look again for a few seconds.
+    // Back from Stripe: ask Stripe straight away (the session's id is in the
+    // address), so the page shows it paid without waiting for Stripe to tell Dayli.
+    function confirmBack() {
+      var s = params.get('s');
+      if (!params.get('paid') || !s || !/^cs_[A-Za-z0-9_]+$/.test(s)) return Promise.resolve();
+      return fetch(cfg.supabaseUrl + '/functions/v1/game-pay', {
+        method: 'POST',
+        headers: { apikey: cfg.supabaseAnonKey, Authorization: 'Bearer ' + cfg.supabaseAnonKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'confirm', session: s })
+      }).then(function () {}, function () {});
+    }
+    // And if that wasn't enough, look again for a few seconds.
     var tries = params.get('paid') ? 6 : 0;
     function settle() {
       if (!tries || !mineNow || mineNow.paid || mineNow.status !== 'in') return;
@@ -529,7 +540,7 @@
       if (leaveFine && acct) leaveFine.textContent = 'Your place is on your Dayli account: come back to this link any time.';
     }
 
-    account().then(function () { hqWords(); }).then(refresh).then(wanted).then(settle).catch(function () {
+    account().then(function () { hqWords(); }).then(confirmBack).then(refresh).then(wanted).then(settle).catch(function () {
       show('loading', false);
       $('bad').querySelector('p').textContent = 'Couldn’t load the game. Check your signal and refresh.';
       show('bad', true);
