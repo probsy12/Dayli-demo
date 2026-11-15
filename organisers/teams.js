@@ -231,8 +231,49 @@
           .then(function (r) {
             return r.data ? r.data.join_code : null;
           }),
+        rpc('team_waiting_fees', { p_calendar: cal }).catch(function () {
+          return [];
+        }),
       ]).then(function (r) {
-        return { team: r[0], results: r[1] || [], pay: r[2], code: r[3] };
+        return { team: r[0], results: r[1] || [], pay: r[2], code: r[3], waiting: r[4] || [] };
+      });
+    }
+
+    // Match fees set on fixtures, waiting for the club's Stripe account.
+    function waitingCard(d, cal) {
+      var w = d.waiting || [];
+      if (!w.length || (d.pay && d.pay.payout && d.pay.payout.ready)) return '';
+      return (
+        '<div class="card tw-fee"><div class="grow"><b>' +
+        (w.length === 1 ? 'A match fee is waiting' : w.length + ' match fees are waiting') +
+        '</b><span class="muted small">' +
+        esc(
+          w
+            .map(function (x) {
+              return pounds(x.fee_pence) + ' ' + x.title;
+            })
+            .join(' · '),
+        ) +
+        '. Set up Stripe and players who can play are asked to pay.</span></div><button class="btn primary" data-fee-stripe>' +
+        (d.pay && d.pay.payout && d.pay.payout.set ? 'Carry on with Stripe' : 'Set up Stripe') +
+        '</button></div>'
+      );
+    }
+    function wireFeeStripe(cal) {
+      $$('[data-fee-stripe]').forEach(function (b) {
+        b.onclick = function () {
+          setBusy(b, true, 'Opening Stripe…');
+          invoke('team-pay', { action: 'connect', calendar_id: cal, back: 'hq' }).then(
+            function (r) {
+              if (r && r.url) location.href = r.url;
+              else setBusy(b, false);
+            },
+            function (err) {
+              setBusy(b, false);
+              toast(friendly(err));
+            },
+          );
+        };
       });
     }
 
@@ -789,6 +830,7 @@
           '</h1></div><div class="row"><a class="btn" id="th-public" target="_blank" rel="noopener" hidden>Public page</a><button class="btn" data-copy-invite>Copy squad invite link</button><a class="btn primary" href="' +
           teamUrl(cal, 'new') +
           '">+ Add fixture</a></div></div>' +
+          waitingCard(d, cal) +
           hero +
           '<div class="th-tiles3">' +
           tiles +
@@ -807,6 +849,7 @@
             ? '<div class="th-danger"><button type="button" class="linkish th-del" id="th-delete">Delete this team</button></div>'
             : ''),
       );
+      wireFeeStripe(cal);
 
       if ($('#th-delete'))
         $('#th-delete').onclick = function () {
@@ -1950,17 +1993,24 @@
 
     function screenNew(cal, day) {
       loading();
-      rpc('team_overview', { p_calendar: cal }).then(
-        function (t) {
-          drawNew(t, day);
+      Promise.all([
+        rpc('team_overview', { p_calendar: cal }),
+        rpc('team_payments', { p_calendar: cal }).catch(function () {
+          return null;
+        }),
+      ]).then(
+        function (r) {
+          drawNew(r[0], day, r[1]);
         },
         function (err) {
           render(notice('error', esc(friendly(err))));
         },
       );
     }
-    function drawNew(t, day) {
+    function drawNew(t, day, pay) {
       var cal = t.calendar_id;
+      var canFee = !!pay && !t.sample;
+      var stripeReady = !!(pay && pay.payout && (pay.payout.ready || pay.payout.my_account_ready));
       var today = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
       // From the calendar: the day that was picked (if it's not gone).
       if (/^\d{4}-\d{2}-\d{2}$/.test(day || '') && day >= new Date().toISOString().slice(0, 10)) today = day;
@@ -1988,11 +2038,17 @@
           '<label data-only="match training">Meet before (minutes)<input type="number" id="f-meet" value="30" min="0" max="180" /></label>' +
           '<label class="wide">Where<input type="text" id="f-loc" placeholder="Pitch 4, Hackney Marshes" maxlength="200" /></label>' +
           '<label data-only="match training">Kit<input type="text" id="f-kit" placeholder="Home kit" maxlength="80" /></label>' +
+          (canFee
+            ? '<label data-only="match">Match fee (optional)<span class="tm-money"><b>£</b><input type="number" id="f-fee" min="1" max="1000" step="0.5" placeholder="5" inputmode="decimal" /></span></label>'
+            : '') +
           '<label data-only="training">Repeat<select id="f-every"><option value="0">Just once</option><option value="1">Every week</option><option value="2">Every other week</option></select></label>' +
           '<label data-only="training">Until<input type="date" id="f-until" /></label>' +
           '<label class="wide">Notes for the squad<textarea id="f-notes" rows="2" maxlength="1000"></textarea></label></div>' +
           '<label class="tm-check"><input type="checkbox" id="f-ask" checked /> Ask the squad if they can come</label>' +
           '<label class="tm-check" data-only="social"><input type="checkbox" id="f-plus" /> They can bring guests</label>' +
+          (canFee
+            ? '<div data-only="match"><div id="f-fee-more" hidden><label class="tm-check"><input type="checkbox" id="f-cover" checked /> Players cover the card fee (the club gets the full amount)</label><p class="muted small" id="f-fee-say"></p></div></div>'
+            : '') +
           '<div class="notice error" id="f-err" hidden></div>' +
           '<div class="row" style="margin-top:14px"><button class="btn primary" id="f-save">Add it</button><a class="btn" href="' +
           teamUrl(cal) +
@@ -2016,9 +2072,39 @@
         };
       });
       show();
+      function feePence() {
+        return $('#f-fee') ? Math.round(Number($('#f-fee').value) * 100) || 0 : 0;
+      }
+      function sayFee() {
+        if (!$('#f-fee')) return;
+        var f = feePence();
+        $('#f-fee-more').hidden = f < 100;
+        if (f < 100) return;
+        var fees = pay.fees || {};
+        var pct = (Number(fees.stripe_percent || 0) + Number(fees.dayli_percent || 0)) / 100;
+        var fixed = Number(fees.stripe_fixed_pence || 0) + Number(fees.dayli_fixed_pence || 0);
+        var each = $('#f-cover').checked ? Math.ceil((f + fixed) / (1 - pct)) : f;
+        $('#f-fee-say').textContent =
+          'Each player who can play pays ' +
+          pounds(each) +
+          '. ' +
+          (stripeReady
+            ? 'They’re asked in the app as soon as it’s added.'
+            : 'You’ll set up Stripe next (about five minutes); they’re asked once it’s done.');
+      }
+      if ($('#f-fee')) {
+        $('#f-fee').oninput = sayFee;
+        $('#f-cover').onchange = sayFee;
+      }
       $('#f-save').onclick = function () {
         var err = $('#f-err');
         err.hidden = true;
+        var fee = kind === 'match' ? feePence() : 0;
+        if ($('#f-fee') && kind === 'match' && $('#f-fee').value && (fee < 100 || fee > 100000)) {
+          err.hidden = false;
+          err.textContent = 'Put in a match fee between £1 and £1,000, or leave it empty.';
+          return;
+        }
         var date = $('#f-date').value;
         var tm = $('#f-time').value;
         if (!date || !tm) {
@@ -2056,18 +2142,53 @@
           p_plus_ones: kind === 'social' && $('#f-plus').checked,
           p_every_weeks: every,
           p_until: every ? $('#f-until').value : null,
-        }).then(
-          function () {
-            toast('Added. It’s in everyone’s calendar.');
-            go(teamUrl(cal));
-          },
-          function (e) {
-            setBusy(button, false);
-            err.hidden = false;
-            err.textContent = friendly(e);
-          },
-        );
+        })
+          .then(function (eventId) {
+            if (!fee) return null;
+            return rpc('team_fixture_set_fee', {
+              p_event: eventId,
+              p_amount_pence: fee,
+              p_member_pays_fee: $('#f-cover').checked,
+            }).then(
+              function (r) {
+                return r;
+              },
+              function (e) {
+                toast('The match is in, but not the fee: ' + friendly(e));
+                return null;
+              },
+            );
+          })
+          .then(
+            function (feeState) {
+              if (feeState === 'waiting') return drawFeeWaiting(t, fee);
+              toast(
+                feeState === 'asked'
+                  ? 'Added. Players who can play are asked for the ' + pounds(fee) + ' match fee.'
+                  : 'Added. It’s in everyone’s calendar.',
+              );
+              go(teamUrl(cal));
+            },
+            function (e) {
+              setBusy(button, false);
+              err.hidden = false;
+              err.textContent = friendly(e);
+            },
+          );
       };
+    }
+
+    // The match is in with a fee, but there's no Stripe yet: set it up now.
+    function drawFeeWaiting(t, fee) {
+      var cal = t.calendar_id;
+      render(
+        '<div class="card tw-made"><h1>Match added</h1><p class="muted">It’s in everyone’s calendar, and the ' +
+          pounds(fee) +
+          ' match fee is saved.</p><div class="ng-stripe"><b>Set up Stripe to collect it</b><span class="muted small">Players pay by card, Apple Pay or Google Pay, straight into the club’s own account. It takes about five minutes, once, for every match. Players who can play are asked to pay as soon as it’s done.</span><button type="button" class="btn primary" data-fee-stripe>Set up Stripe</button></div><a class="btn" href="' +
+          teamUrl(cal) +
+          '">Later</a></div>',
+      );
+      wireFeeStripe(cal);
     }
 
     // --- squad tab -----------------------------------------------------------------
@@ -3020,7 +3141,19 @@
         );
       if (!p.payout || !p.payout.ready) {
         return (
-          '<div class="card"><h3>Collect subs and match fees</h3><p class="sub">Players pay by card, Apple Pay or Google Pay, straight into the club’s own Stripe account. Setting up takes about five minutes.</p>' +
+          '<div class="card"><h3>' +
+          ((d.waiting || []).length ? 'Set up Stripe to collect your match fees' : 'Collect subs and match fees') +
+          '</h3><p class="sub">' +
+          ((d.waiting || []).length
+            ? esc(
+                d.waiting
+                  .map(function (x) {
+                    return pounds(x.fee_pence) + ' ' + x.title;
+                  })
+                  .join(' · '),
+              ) + ' is waiting. Players who can play are asked to pay as soon as Stripe is set up. '
+            : '') +
+          'Players pay by card, Apple Pay or Google Pay, straight into the club’s own Stripe account. Setting up takes about five minutes.</p>' +
           (p.payout && p.payout.set && !p.payout.ready
             ? notice('info', 'Stripe is still checking your details.') +
               '<div class="row"><button class="btn primary" id="tm-connect">Carry on with Stripe</button><button class="btn" id="tm-check">Check again</button></div>'

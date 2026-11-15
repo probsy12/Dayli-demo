@@ -8920,3 +8920,41 @@ html.hq .pl .pl-tabs {
   color: var(--muted);
   font-size: 12.5px;
 }
+
+/* Match fees waiting for Stripe */
+.tw-fee {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 12px;
+  border: 2px solid var(--accent);
+}
+.tw-fee .grow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+@media (max-width: 600px) {
+  .tw-fee {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+.tw-made {
+  max-width: 520px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.tw-made h1 {
+  margin: 0;
+}
+.tm-money {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tm-money b {
+  font-weight: 700;
+}
