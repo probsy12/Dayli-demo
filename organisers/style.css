@@ -8548,3 +8548,375 @@ html.hq .pl .pl-tabs {
 .th-del {
   color: var(--danger);
 }
+
+/* Team Home: the next fixture as a matchday poster */
+.th-poster {
+  --team: #6e56cf;
+  background: linear-gradient(160deg, var(--team), color-mix(in srgb, var(--team) 60%, #000));
+  color: #fff;
+  border-radius: 22px;
+  padding: 20px 20px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+.th-pk {
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  opacity: 0.8;
+}
+.th-vs {
+  display: flex;
+  align-items: center;
+  justify-content: space-around;
+  gap: 8px;
+}
+.th-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+  min-width: 0;
+  text-align: center;
+}
+.th-side b {
+  font-size: 14px;
+  line-height: 1.2;
+}
+.th-side .tm-crest {
+  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.85);
+}
+.th-vv {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 24px;
+  font-weight: 700;
+  opacity: 0.9;
+}
+.th-ptitle {
+  margin: 0;
+  font-size: 26px;
+}
+.th-pmeta {
+  font-size: 13.5px;
+  opacity: 0.88;
+  text-align: center;
+}
+.th-poster .th-pbtn {
+  background: #f2c94c;
+  color: #1c1a17;
+  border-color: #f2c94c;
+  font-weight: 800;
+  text-align: center;
+  padding: 13px;
+}
+.th-pbar {
+  display: flex;
+  height: 7px;
+  border-radius: 9px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.25);
+}
+.th-pbar i {
+  display: block;
+  height: 100%;
+  background: #6fd296;
+}
+.th-pbar i.y {
+  background: #f2c94c;
+}
+.th-pcount {
+  font-size: 12.5px;
+  opacity: 0.85;
+  text-align: center;
+  margin-top: -4px;
+}
+.th-pacts {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  flex-wrap: wrap;
+}
+.th-pacts .btn {
+  background: rgba(255, 255, 255, 0.14);
+  color: #fff;
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.th-tiles3 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(0, 1fr));
+  gap: 10px;
+  margin-bottom: 12px;
+}
+.th-t3 {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: var(--ink);
+  text-decoration: none;
+  min-width: 0;
+}
+.th-t3 small {
+  font-size: 11.5px;
+  color: var(--muted);
+  font-weight: 600;
+}
+.th-t3 b {
+  font-size: 22px;
+  font-family: var(--serif, Georgia, serif);
+}
+.th-t3 b.o {
+  color: var(--orange);
+}
+.th-last {
+  margin-bottom: 12px;
+}
+
+/* Team fixtures on a phone: a small calendar with dots, then the month's list */
+.tfc-cal {
+  padding: 12px;
+  margin-bottom: 12px;
+}
+.tfc-wd,
+.tfc-days {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  text-align: center;
+  gap: 2px;
+}
+.tfc-wd span {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--muted);
+  padding-bottom: 4px;
+}
+.tfc-d {
+  padding: 6px 0 4px;
+  border-radius: 10px;
+  color: var(--ink);
+  text-decoration: none;
+  font-size: 14px;
+  font-weight: 600;
+  min-height: 40px;
+}
+.tfc-d.x {
+  color: var(--muted);
+  opacity: 0.5;
+}
+.tfc-d.td span {
+  color: var(--accent);
+  font-weight: 800;
+}
+.tfc-d.has {
+  cursor: pointer;
+}
+.tfc-d.on {
+  background: var(--ink);
+  color: var(--bg);
+}
+.tfc-d i {
+  display: flex;
+  justify-content: center;
+  gap: 2px;
+  margin-top: 3px;
+}
+.tfc-d b,
+.tfc-key b {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  display: inline-block;
+}
+.tfc-d b.m,
+.tfc-key b.m {
+  background: #6e56cf;
+}
+.tfc-d b.t,
+.tfc-key b.t {
+  background: var(--accent);
+}
+.tfc-key {
+  display: flex;
+  gap: 14px;
+  justify-content: center;
+  font-size: 12px;
+  color: var(--muted);
+  margin-top: 8px;
+}
+.tfc-key span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.tfc-list {
+  padding: 2px 14px;
+}
+.tfc-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--alt);
+  color: var(--ink);
+  text-decoration: none;
+  transition: background 0.3s;
+}
+.tfc-row:last-child {
+  border-bottom: 0;
+}
+.tfc-row.past {
+  opacity: 0.75;
+}
+.tfc-row.flash {
+  background: var(--accent-soft);
+}
+.tfc-row .grow {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tfc-row small {
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.tfc-chip {
+  flex: none;
+  font-size: 11.5px;
+  font-weight: 800;
+  border-radius: 999px;
+  padding: 3px 9px;
+}
+.tfc-chip.ok {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+.tfc-chip.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+
+/* Squad: position chips and a dot for the next match */
+.tq-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 4px;
+}
+.tq-chips button {
+  border: 1.5px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  border-radius: 999px;
+  padding: 6px 13px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.tq-chips button.on {
+  background: var(--ink);
+  border-color: var(--ink);
+  color: var(--bg);
+}
+.tq-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  display: inline-block;
+  flex: none;
+  background: var(--alt);
+  border: 1.5px solid var(--border);
+}
+.tq-dot.available {
+  background: #2f7a4a;
+  border-color: #2f7a4a;
+}
+.tq-dot.maybe {
+  background: #e3b34a;
+  border-color: #e3b34a;
+}
+.tq-dot.cant {
+  background: #c8442c;
+  border-color: #c8442c;
+}
+.tq-dotkey {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin: 6px 0 2px;
+}
+.tq-dotkey .tq-dot {
+  width: 8px;
+  height: 8px;
+  margin-left: 6px;
+}
+.tq-dotkey .tq-dot:first-child {
+  margin-left: 0;
+}
+
+/* Team payments: the season card and what's been asked for */
+.tm-season {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.tm-season-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+}
+.tm-season-row b {
+  font-family: var(--serif, Georgia, serif);
+  font-size: 30px;
+}
+.tm-season-bar {
+  height: 8px;
+  border-radius: 9px;
+  background: var(--alt);
+  overflow: hidden;
+}
+.tm-season-bar i {
+  display: block;
+  height: 100%;
+  background: var(--accent);
+  border-radius: 9px;
+}
+.tm-season-btn {
+  align-self: stretch;
+  text-align: center;
+}
+.tm-ask-h {
+  margin: 16px 0 8px;
+}
+.tm-asks {
+  padding: 2px 14px;
+}
+.tm-ask {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 0;
+  border-bottom: 1px solid var(--alt);
+  color: var(--ink);
+  text-decoration: none;
+}
+.tm-ask:last-child {
+  border-bottom: 0;
+}
+.tm-ask .grow {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.tm-ask small {
+  color: var(--muted);
+  font-size: 12.5px;
+}

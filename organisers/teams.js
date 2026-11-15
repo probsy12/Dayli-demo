@@ -108,6 +108,14 @@
             esc(initials(t.name)) +
             '</span>';
     }
+    function oppColour(name) {
+      var cols = ['#B4432F', '#3A61C9', '#D9741C', '#2F6B4F', '#7A3B22', '#2B5A8A', '#8a5a2b', '#5b5b66'];
+      var h = 0;
+      String(name || '').split('').forEach(function (ch) {
+        h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+      });
+      return cols[h % cols.length];
+    }
     function fixtureName(f) {
       if (f.kind === 'match') return (f.home ? 'v ' : '@ ') + (f.opponent || 'TBC');
       return f.title || KIND[f.kind];
@@ -277,9 +285,15 @@
               rpc('team_lists', { p_calendar: cal }).catch(function () {
                 return null;
               }),
+              nextUp(d.team)
+                ? rpc('team_fixture', { p_event: nextUp(d.team).event_id }).catch(function () {
+                    return null;
+                  })
+                : null,
             ]).then(function (r) {
               d.stats = r[0] || [];
               d.lists = r[1] || { positions: [], stat_names: [] };
+              d.next = r[2] || null;
               return d;
             });
           }
@@ -514,76 +528,76 @@
         var pctM = total ? ((c.available + c.maybe) / total) * 100 : 0;
         var tz = next.timezone || undefined;
         var when = new Date(next.starts_at).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', timeZone: tz });
+        var opp = next.opponent || 'TBC';
+        var oppCrest =
+          '<span class="tm-crest" style="width:64px;height:64px;font-size:24px;background:' +
+          esc(oppColour(opp)) +
+          '">' +
+          esc(initials(opp)) +
+          '</span>';
         hero =
-          '<div class="th-hero" style="--team:' +
+          '<div class="th-poster" style="--team:' +
           esc(t.color || '#6e56cf') +
-          '"><div class="grow"><div class="th-kick">' +
-          (next.kind === 'match' ? 'NEXT MATCH' : 'NEXT UP') +
-          ' · ' +
-          esc(daysAway(next.starts_at).toUpperCase()) +
-          '</div><h2>' +
-          esc(fixtureName(next)) +
-          '</h2><div class="muted">' +
+          '"><div class="th-pk">' +
+          esc(
+            [
+              next.kind === 'match' ? 'NEXT MATCH' : 'NEXT UP',
+              daysAway(next.starts_at).toUpperCase(),
+              next.kind === 'match' ? (next.home ? 'HOME' : 'AWAY') : KIND[next.kind].toUpperCase(),
+            ].join(' · '),
+          ) +
+          '</div>' +
+          (next.kind === 'match'
+            ? '<div class="th-vs"><div class="th-side">' +
+              crest(t, 64) +
+              '<b>' +
+              esc(t.name) +
+              '</b></div><span class="th-vv">v</span><div class="th-side">' +
+              oppCrest +
+              '<b>' +
+              esc(opp) +
+              '</b></div></div>'
+            : '<h2 class="th-ptitle">' + esc(fixtureName(next)) + '</h2>') +
+          '<div class="th-pmeta">' +
           esc(
             [
               when,
               time(next.starts_at, next.timezone) + (next.kind === 'match' ? ' kick-off' : ''),
-              next.kind === 'match' ? (next.home ? 'Home' : 'Away') : KIND[next.kind],
-              next.competition ? next.competition.charAt(0).toUpperCase() + next.competition.slice(1) : null,
+              next.competition && next.competition !== 'league' ? cap(next.competition) : null,
               next.location,
             ]
               .filter(Boolean)
               .join(' · '),
           ) +
-          '</div><div class="th-counts"><div><b class="g">' +
-          c.available +
-          '</b><small>Can play</small></div><div><b class="y">' +
-          c.maybe +
-          '</b><small>Maybe</small></div><div><b>' +
-          c.none +
-          '</b><small>Not replied</small></div><div><b class="r">' +
-          c.cant +
-          '</b><small>Can’t</small></div></div><div class="th-acts"><a class="btn primary" href="' +
+          '</div><a class="btn th-pbtn" href="' +
           teamUrl(cal, 'fixture/' + next.event_id) +
           '">' +
           (next.kind === 'match' ? (next.sheet_sent ? 'Change the team' : 'Pick the team') : 'Who’s coming') +
-          '</a>' +
+          ' · ' +
+          c.available +
+          ' can play</a>' +
+          '<div class="th-pbar"><i style="width:' +
+          pct.toFixed(1) +
+          '%"></i><i class="y" style="width:' +
+          (pctM - pct).toFixed(1) +
+          '%"></i></div><div class="th-pcount">' +
+          c.available +
+          ' can play · ' +
+          c.maybe +
+          ' maybe · ' +
+          c.cant +
+          ' can’t · ' +
+          c.none +
+          ' not replied</div>' +
+          '<div class="th-pacts">' +
           (nudgeable
             ? '<button class="btn" id="th-nudge"' +
               (recent ? ' disabled title="You can nudge again 12 hours after the last time."' : '') +
               '>' +
-              (recent
-                ? 'Nudged ' + ago(next.nudged_at)
-                : nudgeable === waiting.length
-                  ? 'Nudge the ' + nudgeable
-                  : 'Nudge ' + nudgeable + ' on Dayli') +
+              (recent ? 'Nudged ' + ago(next.nudged_at) : 'Nudge ' + nudgeable) +
               '</button>'
             : '') +
-          '<button class="btn" id="th-share">Share to WhatsApp</button>' +
-          (waiting.length
-            ? '<span class="th-wait">Not replied: ' +
-              waiting
-                .slice(0, 5)
-                .map(function (p) {
-                  return avatar(p, 26);
-                })
-                .join('') +
-              (waiting.length > 5 ? '<span class="muted small">+' + (waiting.length - 5) + '</span>' : '') +
-              '</span>'
-            : '') +
-          '</div></div><div class="th-ring" style="background:conic-gradient(var(--accent) 0 ' +
-          pct.toFixed(1) +
-          '%,#e3b34a ' +
-          pct.toFixed(1) +
-          '% ' +
-          pctM.toFixed(1) +
-          '%,var(--alt) ' +
-          pctM.toFixed(1) +
-          '%)"><div><b>' +
-          c.available +
-          '/' +
-          total +
-          '</b><small>can play</small></div></div></div>';
+          '<button class="btn" id="th-share">Share to WhatsApp</button></div></div>';
       } else {
         hero =
           '<div class="th-hero th-empty"><div class="grow"><div class="th-kick">NOTHING PLANNED</div><h2>Add your next fixture</h2><div class="muted">It goes into every player’s Dayli calendar, and they can say whether they can play.</div><div class="th-acts"><a class="btn primary" href="' +
@@ -639,40 +653,41 @@
           l +
           '</div>'
         : '<div class="small muted">Your last five results show here.</div>';
-      var tiles =
-        '<div class="card th-tile"><div class="label">Last result</div><div class="th-tl">' +
-        tLast +
-        '</div></div><div class="card th-tile"><div class="label">Form · last 5</div>' +
-        tForm +
-        '</div>';
       var owing = d.pay && d.pay.totals ? owingCount(d.pay) : 0;
-      if (d.pay && d.pay.totals) {
-        tiles +=
-          '<div class="card th-tile"><div class="label">Money</div><div class="th-tl"><div class="th-v o">' +
-          pounds(d.pay.totals.owed_pence) +
-          '</div><div class="small grow"><b>' +
-          (owing ? 'owed by ' + owing + (owing === 1 ? ' person' : ' people') : 'nobody owes anything') +
-          '</b><div class="muted">' +
-          pounds(d.pay.totals.collected_pence) +
-          ' in so far</div></div>' +
-          (owing
-            ? '<button class="act" id="th-remind">Remind</button>'
-            : '<a class="act" href="' + teamUrl(cal, 'payments') + '">Payments</a>') +
-          '</div></div>';
-      } else {
-        var onDayli = (t.players || []).filter(function (p) {
-          return p.user_id;
-        }).length;
-        tiles +=
-          '<div class="card th-tile"><div class="label">Squad</div><div class="th-tl"><div class="th-v">' +
-          (t.players || []).length +
-          '</div><div class="small grow"><b>in the squad</b><div class="muted">' +
-          onDayli +
-          ' on Dayli</div></div><a class="act" href="' +
-          teamUrl(cal, 'squad') +
-          '">Squad</a></div></div>';
-      }
-
+      var onDayli = (t.players || []).filter(function (p) {
+        return p.user_id;
+      }).length;
+      var tiles =
+        '<a class="th-t3" href="' +
+        teamUrl(cal, 'fixtures') +
+        '"><small>Form</small>' +
+        (sc.length ? formChips(sc.slice(0, 5).reverse()) : '<b>–</b>') +
+        '<small>' +
+        (sc.length ? 'W' + w + ' D' + dr + ' L' + l : 'No results yet') +
+        '</small></a>' +
+        (d.pay && d.pay.totals
+          ? '<a class="th-t3" href="' +
+            teamUrl(cal, 'payments') +
+            '"><small>Owed</small><b class="' +
+            (owing ? 'o' : '') +
+            '">' +
+            pounds(d.pay.totals.owed_pence) +
+            '</b><small>' +
+            (owing ? owing + (owing === 1 ? ' player' : ' players') : 'All paid up') +
+            '</small></a>'
+          : '') +
+        '<a class="th-t3" href="' +
+        teamUrl(cal, 'squad') +
+        '"><small>Squad</small><b>' +
+        (t.players || []).length +
+        '</b><small>' +
+        onDayli +
+        ' on Dayli</small></a>';
+      var lastCard =
+        '<div class="card th-last"><div class="label">Last time out</div><div class="th-tl">' +
+        tLast +
+        (owing ? '' : '') +
+        '</div></div>';
       // After that: the next few entries.
       var after = upcoming
         .filter(function (f) {
@@ -775,9 +790,11 @@
           teamUrl(cal, 'new') +
           '">+ Add fixture</a></div></div>' +
           hero +
-          '<div class="th-tiles">' +
+          '<div class="th-tiles3">' +
           tiles +
-          '</div><div class="th-bottom' +
+          '</div>' +
+          lastCard +
+          '<div class="th-bottom' +
           (started ? '' : ' one') +
           '"><div class="card"><h3>After that<a class="th-more" href="' +
           teamUrl(cal, 'fixtures') +
@@ -1010,8 +1027,8 @@
         '">Month</a><a class="' +
         (view === 'list' ? 'on' : '') +
         '" href="' +
-        teamUrl(cal, 'fixtures') +
-        '?view=list">List</a></span>';
+        monthHash(year, month).replace('&view=month', '&view=list') +
+        '">List</a></span>';
       var main =
         view === 'month'
           ? '<div class="tf-mh"><a class="act tf-nav" href="' +
@@ -1027,7 +1044,111 @@
             wd +
             cells +
             '</div><p class="muted small">Click a match to see who can play, pick the team or add the score.</p>'
-          : '<div class="tf-mh">' + toggle + '</div>' + drawFixtures(d, nextUp(t), true);
+          : compactView();
+
+      // The phone view: a small month calendar with a dot on each day that has
+      // something (match or training), then that month's fixtures as a list.
+      function compactView() {
+        var dots = '';
+        for (var j = 0; j < weeks * 7; j++) {
+          var dd = new Date(year, month, 1 - lead + j);
+          var k = dd.getFullYear() + '-' + pad(dd.getMonth() + 1) + '-' + pad(dd.getDate());
+          var list = byDay[k] || [];
+          var out = dd.getMonth() !== month;
+          dots +=
+            '<a class="tfc-d' +
+            (out ? ' x' : '') +
+            (k === todayKey ? ' td' : '') +
+            (list.length ? ' has' : '') +
+            '"' +
+            (list.length && !out ? ' href="#tfc-' + k + '" data-day="' + k + '"' : '') +
+            '><span>' +
+            dd.getDate() +
+            '</span>' +
+            (list.length
+              ? '<i>' +
+                list
+                  .slice(0, 3)
+                  .map(function (f) {
+                    return '<b class="' + (f.kind === 'match' ? 'm' : 't') + '"></b>';
+                  })
+                  .join('') +
+                '</i>'
+              : '') +
+            '</a>';
+        }
+        var inMonth = all
+          .filter(function (f) {
+            var dt2 = new Date(f.starts_at);
+            return dt2.getFullYear() === year && dt2.getMonth() === month;
+          })
+          .sort(function (a, b) {
+            return new Date(a.starts_at) - new Date(b.starts_at);
+          });
+        var rows = inMonth.length
+          ? inMonth
+              .map(function (f) {
+                var past = new Date(f.ends_at) < now;
+                var chip = '';
+                if (f.kind === 'match' && past) {
+                  chip =
+                    f.score_us != null && f.score_them != null
+                      ? '<span class="tf-sc ' + wdl(f).toLowerCase() + '">' + f.score_us + '–' + f.score_them + '</span>'
+                      : '<span class="tfc-chip warn">Add score</span>';
+                } else if (!past && f.counts) {
+                  chip = f.sheet_sent
+                    ? '<span class="tfc-chip ok">Team sent</span>'
+                    : f.counts.none
+                      ? '<span class="tfc-chip warn">' + f.counts.none + ' to reply</span>'
+                      : '<span class="tfc-chip ok">All replied</span>';
+                }
+                var sub = [time(f.starts_at, f.timezone), f.kind === 'match' ? (f.home ? 'Home' : 'Away') : KIND[f.kind], f.location]
+                  .filter(Boolean)
+                  .join(' · ');
+                if (!past && f.counts) sub += ' · ' + f.counts.available + ' can play';
+                return (
+                  '<a class="tfc-row' +
+                  (past ? ' past' : '') +
+                  '" id="tfc-' +
+                  ymd(f.starts_at, f.timezone) +
+                  '" href="' +
+                  teamUrl(cal, 'fixture/' + f.event_id) +
+                  '">' +
+                  dateBlock(f) +
+                  '<span class="grow"><b>' +
+                  esc(fixtureName(f)) +
+                  '</b><small>' +
+                  esc(sub) +
+                  '</small></span>' +
+                  chip +
+                  '</a>'
+                );
+              })
+              .join('')
+          : '<p class="muted small" style="margin:8px 0">Nothing this month. <a href="' + teamUrl(cal, 'new') + '">Add a fixture</a></p>';
+        return (
+          '<div class="tf-mh"><a class="act tf-nav" href="' +
+          monthHash(year, month - 1).replace('&view=month', '&view=list') +
+          '" aria-label="Previous month">‹</a><h2>' +
+          esc(monthName) +
+          '</h2><a class="act tf-nav" href="' +
+          monthHash(year, month + 1).replace('&view=month', '&view=list') +
+          '" aria-label="Next month">›</a>' +
+          toggle +
+          '</div><div class="card tfc-cal"><div class="tfc-wd">' +
+          ['M', 'T', 'W', 'T', 'F', 'S', 'S']
+            .map(function (x) {
+              return '<span>' + x + '</span>';
+            })
+            .join('') +
+          '</div><div class="tfc-days">' +
+          dots +
+          '</div><div class="tfc-key"><span><b class="m"></b>Match</span><span><b class="t"></b>Training</span></div></div>' +
+          '<div class="card tfc-list">' +
+          rows +
+          '</div>'
+        );
+      }
 
       // Results down the side.
       var sc = scored(results);
@@ -1106,6 +1227,22 @@
       $$('tr.tm-row').forEach(function (tr) {
         tr.onclick = function () {
           go(tr.dataset.href);
+        };
+      });
+      $$('[data-day]').forEach(function (a) {
+        a.onclick = function (e) {
+          e.preventDefault();
+          $$('.tfc-d.on').forEach(function (x) {
+            x.classList.remove('on');
+          });
+          a.classList.add('on');
+          var row = document.getElementById('tfc-' + a.dataset.day);
+          if (!row) return;
+          row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          row.classList.add('flash');
+          setTimeout(function () {
+            row.classList.remove('flash');
+          }, 1200);
         };
       });
     }
@@ -2010,8 +2147,31 @@
         return p.user_id;
       }).length;
 
+      // Can they play the next fixture? From its answers, when there is one.
+      var nextStatus = {};
+      ((d.next && d.next.players) || []).forEach(function (x) {
+        nextStatus[x.id] = x.status || 'none';
+      });
+      function posGroup(pos) {
+        var x = String(pos || '').toLowerCase();
+        if (!x) return '';
+        if (/keep|goal|^gk$/.test(x)) return 'GK';
+        if (/back|def|centre-half|sweeper|^cb$|^lb$|^rb$/.test(x)) return 'DEF';
+        if (/mid|wing|^cm$|^dm$|^am$/.test(x)) return 'MID';
+        if (/forw|strik|attack|^st$|^cf$/.test(x)) return 'FWD';
+        return 'OTHER';
+      }
       function listRow(p) {
         var owes = owedBy(d.pay, p.id);
+        var st = stats[p.id];
+        var ns = nextStatus[p.id];
+        var dot = ns
+          ? '<span class="tq-dot ' +
+            ns +
+            '" title="' +
+            esc({ available: 'Can play', maybe: 'Maybe', cant: 'Can’t play', none: 'Not replied yet' }[ns] || '') +
+            ' next match"></span>'
+          : '';
         return (
           '<a class="tq-li' +
           (chosen && p.id === chosen.id ? ' on' : '') +
@@ -2021,22 +2181,43 @@
           esc(p.id) +
           '" data-name="' +
           esc(p.name.toLowerCase()) +
+          '" data-pos="' +
+          posGroup(p.position) +
           '">' +
-          avatar(p, 32) +
+          avatar(p, 34) +
           '<span class="grow"><b>' +
           esc(p.name) +
           (p.is_me ? ' <span class="muted small">(you)</span>' : '') +
           '</b><small class="muted">' +
           esc(
-            [p.position, p.role === 'manager' ? 'Manager' + (p.plays ? ', plays' : '') : 'Player', p.user_id ? null : 'not on Dayli yet']
+            [
+              p.position || (p.role === 'manager' ? 'Manager' : 'No position yet'),
+              st && st.played ? st.played + (st.played === 1 ? ' app' : ' apps') : null,
+              p.user_id ? null : 'not on Dayli yet',
+            ]
               .filter(Boolean)
               .join(' · '),
           ) +
           '</small></span>' +
           (owes ? '<span class="tq-owes">' + pounds(owes) + '</span>' : '') +
+          dot +
           '</a>'
         );
       }
+      var groups = ['GK', 'DEF', 'MID', 'FWD'].filter(function (g) {
+        return players.some(function (p) {
+          return posGroup(p.position) === g;
+        });
+      });
+      var posChips = groups.length
+        ? '<div class="tq-chips"><button type="button" class="on" data-g="">All</button>' +
+          groups
+            .map(function (g) {
+              return '<button type="button" data-g="' + g + '">' + g + '</button>';
+            })
+            .join('') +
+          '</div>'
+        : '';
 
       function profile(p) {
         if (!p) return '<div class="card tq-prof"><p class="muted">Add your first player.</p></div>';
@@ -2155,6 +2336,8 @@
           ' on Dayli</div></div><div class="row"><button class="btn" id="tq-links-open">Player links</button><button class="btn" data-copy-invite>Copy invite link</button><button class="btn primary" id="tq-add-open">+ Add player</button></div></div>' +
           '<div class="card tq-links" id="tq-links" hidden></div>' +
           '<div class="tq-grid"><div class="card tq-list"><div class="tq-add" id="tq-add" hidden><input type="text" id="tq-new" placeholder="Their name" maxlength="60" /><button class="btn primary" id="tq-add-go">Add</button></div><input type="search" id="tq-search" placeholder="Search the squad" />' +
+          posChips +
+          (d.next ? '<div class="tq-dotkey muted small"><span class="tq-dot available"></span>Can play next match<span class="tq-dot maybe"></span>Maybe<span class="tq-dot cant"></span>Can’t</div>' : '') +
           '<div id="tq-rows">' +
           players.map(listRow).join('') +
           '</div><p class="muted small tq-tip">Send the invite link to the group: players make a Dayli account and join, no app needed. Added someone by name? When they join they tap their name, so they’re only listed once.</p></div>' +
@@ -2255,12 +2438,25 @@
         );
       };
 
+      var group = '';
+      function applyFilter() {
+        $$('.tq-li').forEach(function (a) {
+          a.hidden = !!((filter && a.dataset.name.indexOf(filter) < 0) || (group && a.dataset.pos !== group));
+        });
+      }
       $('#tq-search').oninput = function () {
         filter = this.value.trim().toLowerCase();
-        $$('.tq-li').forEach(function (a) {
-          a.hidden = filter && a.dataset.name.indexOf(filter) < 0;
-        });
+        applyFilter();
       };
+      $$('.tq-chips [data-g]').forEach(function (b) {
+        b.onclick = function () {
+          group = b.dataset.g;
+          $$('.tq-chips [data-g]').forEach(function (x) {
+            x.classList.toggle('on', x === b);
+          });
+          applyFilter();
+        };
+      });
       $$('[data-copy-invite]').forEach(function (b) {
         b.onclick = function () {
           if (!d.code) return toast('No invite link for this team yet.');
@@ -2370,7 +2566,8 @@
       var t = d.team;
       var cal = t.calendar_id;
       var p = d.pay;
-      var view = query.view === 'charges' ? 'charges' : 'players';
+      // A player's detail (?p=) or a filter (?f=) is the Players view.
+      var view = query.view === 'charges' || query.view === 'players' ? query.view : query.p || query.f ? 'players' : 'asked';
       var tabs =
         (d.myTeams || []).length > 1
           ? '<div class="tm-ptabs">' +
@@ -2433,28 +2630,78 @@
         return r.owed;
       });
       var totals = p.totals || { collected_pence: 0, owed_pence: 0 };
-      var summary =
-        '<div class="tm-psum"><div><b class="g">' +
-        pounds(totals.collected_pence) +
-        '</b>collected</div><div><b class="o">' +
-        pounds(totals.owed_pence) +
-        '</b>owed by ' +
-        owing.length +
-        (owing.length === 1 ? ' person' : ' people') +
-        '</div><div><b>' +
-        (rows.length - owing.length) +
-        '</b>paid up</div>' +
+      var all = totals.collected_pence + totals.owed_pence;
+      var pctPaid = all ? Math.round((totals.collected_pence / all) * 100) : 100;
+      var viewTabs =
         '<span class="tf-seg tm-pview"><a class="' +
+        (view === 'asked' ? 'on' : '') +
+        '" href="' +
+        teamUrl(cal, 'payments') +
+        '">Asked for</a><a class="' +
         (view === 'players' ? 'on' : '') +
         '" href="' +
         teamUrl(cal, 'payments') +
-        '">Players</a><a class="' +
+        '?view=players">Players</a><a class="' +
         (view === 'charges' ? 'on' : '') +
         '" href="' +
         teamUrl(cal, 'payments') +
-        '?view=charges">Charges</a></span>' +
-        (owing.length ? '<button class="act tp-nudge" id="tm-nudge-all">Nudge all ' + owing.length + '</button>' : '') +
-        '</div>';
+        '?view=charges">Manage</a></span>';
+      var summary =
+        '<div class="card tm-season"><div class="label">So far</div><div class="tm-season-row"><b>' +
+        pounds(totals.collected_pence) +
+        '</b><span class="muted">collected</span></div><div class="tm-season-bar"><i style="width:' +
+        pctPaid +
+        '%"></i></div><div class="muted small">' +
+        (owing.length
+          ? pounds(totals.owed_pence) + ' still owed by ' + owing.length + (owing.length === 1 ? ' player' : ' players')
+          : 'Everyone’s paid up') +
+        '</div>' +
+        (owing.length ? '<button class="btn tm-season-btn" id="tm-nudge-all">Remind the ' + owing.length + '</button>' : '') +
+        '</div>' +
+        viewTabs;
+
+      if (view === 'asked') {
+        // Each request: how much, how many have paid, what's still owed.
+        var asked = (p.charges || [])
+          .map(function (c) {
+            var paidN = c.dues.filter(function (u) {
+              return u.status === 'paid' || u.status === 'cash';
+            }).length;
+            var owedP = c.dues
+              .filter(function (u) {
+                return u.status === 'owed';
+              })
+              .reduce(function (a, u) {
+                return a + c.amount_pence;
+              }, 0);
+            return (
+              '<a class="tm-ask" href="' +
+              teamUrl(cal, 'payments') +
+              '?view=charges#ch-' +
+              esc(c.id) +
+              '"><span class="grow"><b>' +
+              esc(c.title) +
+              '</b><small>' +
+              esc(pounds(c.amount_pence) + ' each · ' + paidN + ' of ' + c.dues.length + ' paid' + (c.closed ? ' · closed' : '')) +
+              '</small></span>' +
+              (owedP ? '<span class="tfc-chip warn">' + pounds(owedP) + ' owed</span>' : '<span class="tfc-chip ok">All paid</span>') +
+              '</a>'
+            );
+          })
+          .join('');
+        render(
+          head +
+            summary +
+            '<div class="label tm-ask-h">Asked for</div><div class="card tm-asks">' +
+            (asked ||
+              '<p class="muted small" style="margin:8px 0">Nothing asked for yet. <a href="' +
+                teamUrl(cal, 'payments') +
+                '?view=charges&ask=1">Ask for subs or a match fee</a></p>') +
+            '</div>',
+        );
+        wireNudgeAll();
+        return;
+      }
 
       if (view === 'charges') {
         render(head + summary + drawPayments(d));
@@ -2473,7 +2720,7 @@
         return filter === 'all' || (filter === 'owes' ? r.owed : !r.owed);
       });
       function fHref(f) {
-        return teamUrl(cal, 'payments') + (f === 'all' ? '' : '?f=' + f);
+        return teamUrl(cal, 'payments') + (f === 'all' ? '?view=players' : '?f=' + f);
       }
       var list =
         '<div class="card tq-list"><div class="tm-pfl"><a class="' +
@@ -2787,7 +3034,9 @@
             return u.status === 'paid' || u.status === 'cash';
           }).length;
           return (
-            '<div class="card tm-charge"><div class="row between"><div><h3>' +
+            '<div class="card tm-charge" id="ch-' +
+            esc(c.id) +
+            '"><div class="row between"><div><h3>' +
             esc(c.title) +
             (c.closed ? ' <span class="pill">closed</span>' : '') +
             '</h3><p class="sub">' +
