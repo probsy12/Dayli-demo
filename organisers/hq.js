@@ -894,63 +894,524 @@
         '</div>'
       );
     }
-    function screenNewTeam(cal, step) {
-      if (cal && step === 'positions') return setupPositions(cal);
-      if (cal && step === 'players') return setupPlayers(cal);
-      var logo = null; // the chosen picture, shrunk
-      render(
-        '<div class="ts">' +
-          setupSteps(1) +
-          '<h1>Set up your team</h1><p class="muted">You’re the manager. You can change all of this later.</p>' +
-          '<div class="card ts-card">' +
-          '<div class="ts-logo"><label class="ts-logo-pick" for="ts-logo-file"><span id="ts-logo-img">' +
-          crest('?', COLOURS[0], 72) +
-          '</span><small>Add a logo</small></label><input type="file" id="ts-logo-file" accept="image/*" hidden /></div>' +
-          teamForm() +
-          '</div></div>',
+    // --- new team: 1 sport (and who plays), 2 profile, 3 squad -------------------------
+    // The sport comes first, as a grid of icons with a search; picking one asks
+    // only what that sport needs (format, who plays). Nothing is made until the
+    // profile's Next, so backing out leaves no half-made team.
+    var newTeam = null; // { sport, format, who } before the team exists
+    var SPORT_ALL = [
+      ['football', 'Football'],
+      ['netball', 'Netball'],
+      ['rugby', 'Rugby'],
+      ['cricket', 'Cricket'],
+      ['hockey', 'Hockey'],
+      ['basketball', 'Basketball'],
+      ['volleyball', 'Volleyball'],
+      ['handball', 'Handball'],
+      ['lacrosse', 'Lacrosse'],
+      ['gaelic', 'Gaelic football'],
+      ['hurling', 'Hurling'],
+      ['softball', 'Softball'],
+      ['rounders', 'Rounders'],
+      ['ultimate', 'Ultimate frisbee'],
+      ['korfball', 'Korfball'],
+      ['waterpolo', 'Water polo'],
+      ['other', 'Something else'],
+    ];
+    var SPORT_FORMATS = {
+      football: [
+        ['11', '11-a-side'],
+        ['7', '7-a-side'],
+        ['5', '5-a-side'],
+      ],
+      rugby: [
+        ['union', 'Union'],
+        ['league', 'League'],
+        ['sevens', 'Sevens'],
+        ['touch', 'Touch'],
+      ],
+      cricket: [
+        ['league', 'League'],
+        ['t20', 'T20'],
+      ],
+    };
+    var WHO_PLAYS = [
+      ['adults', 'Adults'],
+      ['kids', 'Kids'],
+      ['veterans', 'Veterans'],
+      ['mixed', 'Mixed'],
+    ];
+    var AWAY_COLOURS = ['#FFFFFF', '#1C1A17', '#F2C94C', '#B4432F', '#3A61C9', '#2F6B4F'];
+    // Simple drawings of each ball (no emoji); the rest get a plain ball.
+    function sportArt(s) {
+      var k = '#1c1a17';
+      var art = {
+        football:
+          '<circle cx="24" cy="24" r="20" fill="#fff" stroke="' + k + '" stroke-width="2.5"/><path d="M24 15l8 6-3 9h-10l-3-9z" fill="' + k + '"/><path d="M24 15V5M32 21l9-4M29 30l6 8M19 30l-6 8M16 21l-9-4" stroke="' + k + '" stroke-width="2"/>',
+        netball:
+          '<circle cx="24" cy="24" r="20" fill="#f5a524" stroke="' + k + '" stroke-width="2.5"/><path d="M4 24h40M24 4v40M10 10c8 6 8 22 0 28M38 10c-8 6-8 22 0 28" stroke="' + k + '" stroke-width="2" fill="none"/>',
+        basketball:
+          '<circle cx="24" cy="24" r="20" fill="#e2702a" stroke="' + k + '" stroke-width="2.5"/><path d="M4 24h40M24 4v40M10 10c7 7 7 21 0 28M38 10c-7 7-7 21 0 28" stroke="' + k + '" stroke-width="2" fill="none"/>',
+        rugby:
+          '<ellipse cx="24" cy="24" rx="20" ry="12" transform="rotate(-35 24 24)" fill="#b5522b" stroke="' + k + '" stroke-width="2.5"/><path d="M17 31l14-14M19 23l4 4M22 20l4 4M25 17l4 4" stroke="#fff" stroke-width="2"/>',
+        cricket:
+          '<rect x="20" y="5" width="8" height="28" rx="3" transform="rotate(30 24 20)" fill="#e9c99a" stroke="' + k + '" stroke-width="2.5"/><circle cx="35" cy="37" r="6" fill="#c8442c" stroke="' + k + '" stroke-width="2.5"/>',
+        hockey: '<path d="M30 5L18 35c-2 5-9 6-11 2" fill="none" stroke="' + k + '" stroke-width="5" stroke-linecap="round"/><circle cx="35" cy="37" r="5" fill="#fff" stroke="' + k + '" stroke-width="2.5"/>',
+        volleyball:
+          '<circle cx="24" cy="24" r="20" fill="#fff" stroke="' + k + '" stroke-width="2.5"/><path d="M24 4c-6 10-6 19 0 20M24 24c10 4 15 11 13 16M24 24c-11 1-17 7-18 12" stroke="' + k + '" stroke-width="2" fill="none"/>',
+        other: '<circle cx="12" cy="24" r="4" fill="#847f74"/><circle cx="24" cy="24" r="4" fill="#847f74"/><circle cx="36" cy="24" r="4" fill="#847f74"/>',
+      };
+      return (
+        '<svg viewBox="0 0 48 48" width="100%" height="100%" aria-hidden="true">' +
+        (art[s] ||
+          '<circle cx="24" cy="24" r="20" fill="#edebe4" stroke="' + k + '" stroke-width="2.5"/><path d="M8 18c10 4 22 4 32 0M8 30c10-4 22-4 32 0" stroke="' + k + '" stroke-width="2" fill="none"/>') +
+        '</svg>'
       );
-      var nameInput = $('#t-name');
-      function preview() {
-        if (logo) return;
-        var colour = ($('#t-colour button.on') || {}).dataset ? $('#t-colour button.on').dataset.v : COLOURS[0];
-        $('#ts-logo-img').innerHTML = crest(nameInput.value.trim() || '?', colour, 72);
+    }
+    function newSteps(n) {
+      return (
+        '<div class="ts-steps">' +
+        ['Sport', 'Profile', 'Squad']
+          .map(function (name, i) {
+            var cls = i + 1 < n ? 'done' : i + 1 === n ? 'on' : '';
+            return '<span class="ts-st ' + cls + '"><b>' + (i + 1 < n ? '✓' : i + 1) + '</b>' + name + '</span>';
+          })
+          .join('<i></i>') +
+        '</div>'
+      );
+    }
+
+    // 1. What do you play?
+    function setupSport() {
+      var shown = 6; // the common ones; search or "More sports" for the rest
+      var query = '';
+      draw();
+      function list() {
+        var q = query.trim().toLowerCase();
+        if (q)
+          return SPORT_ALL.filter(function (s) {
+            return s[1].toLowerCase().indexOf(q) >= 0;
+          });
+        return shown >= SPORT_ALL.length ? SPORT_ALL : SPORT_ALL.slice(0, shown);
       }
-      nameInput.oninput = preview;
-      $$('#t-colour button').forEach(function (b) {
-        b.addEventListener('click', function () {
-          setTimeout(preview, 0);
+      function draw() {
+        var picked = newTeam && newTeam.sport;
+        render(
+          '<div class="ts nt">' +
+            newSteps(1) +
+            '<h1>What do you play?</h1>' +
+            '<input type="search" class="nt-search" id="nt-q" placeholder="Search sports" value="' +
+            esc(query) +
+            '" />' +
+            '<div class="nt-grid">' +
+            list()
+              .map(function (s) {
+                return (
+                  '<button type="button" class="nt-sp' +
+                  (picked === s[0] ? ' on' : '') +
+                  '" data-sp="' +
+                  s[0] +
+                  '"><span class="nt-ring">' +
+                  sportArt(s[0]) +
+                  '</span><span>' +
+                  esc(s[1]) +
+                  '</span></button>'
+                );
+              })
+              .join('') +
+            '</div>' +
+            (!query && shown < SPORT_ALL.length ? '<button type="button" class="linkish nt-more" id="nt-more">More sports</button>' : '') +
+            '</div>',
+        );
+        $('#nt-q').oninput = function () {
+          query = this.value;
+          var at = this.selectionStart;
+          draw();
+          var input = $('#nt-q');
+          input.focus();
+          try {
+            input.setSelectionRange(at, at);
+          } catch (e) {
+            /* not a text field */
+          }
+        };
+        if ($('#nt-more'))
+          $('#nt-more').onclick = function () {
+            shown = SPORT_ALL.length;
+            draw();
+          };
+        $$('[data-sp]').forEach(function (b) {
+          b.onclick = function () {
+            ask(b.dataset.sp);
+          };
         });
+      }
+      // The follow-ups for that sport, in a sheet.
+      function ask(sport) {
+        var formats = SPORT_FORMATS[sport] || [];
+        var pick = {
+          sport: sport,
+          format: newTeam && newTeam.sport === sport ? newTeam.format : formats[0] ? formats[0][0] : null,
+          who: (newTeam && newTeam.who) || 'adults',
+        };
+        var name = (
+          SPORT_ALL.filter(function (s) {
+            return s[0] === sport;
+          })[0] || [sport, sport]
+        )[1];
+        var s = sgSheet(
+          '<div class="nt-sheet"><div class="nt-sh-head"><span class="nt-ring sm">' +
+            sportArt(sport) +
+            '</span><h2>' +
+            esc(name) +
+            '</h2></div>' +
+            (formats.length
+              ? '<div class="field-label">' +
+                (sport === 'football' ? 'How many a side?' : 'Which kind?') +
+                '</div><div class="hq-chips" id="nt-fmt">' +
+                formats
+                  .map(function (f) {
+                    return '<button type="button" data-v="' + f[0] + '" class="' + (pick.format === f[0] ? 'on' : '') + '">' + esc(f[1]) + '</button>';
+                  })
+                  .join('') +
+                '</div>'
+              : '') +
+            '<div class="field-label">Who plays?</div><div class="hq-chips" id="nt-who">' +
+            WHO_PLAYS.map(function (w) {
+              return '<button type="button" data-v="' + w[0] + '" class="' + (pick.who === w[0] ? 'on' : '') + '">' + esc(w[1]) + '</button>';
+            }).join('') +
+            '</div>' +
+            (sport === 'other' ? '' : '') +
+            '<button class="btn primary hq-big" id="nt-next">Next</button></div>',
+        );
+        function chips(id, key) {
+          $$('#' + id + ' button', s.el).forEach(function (b) {
+            b.onclick = function () {
+              pick[key] = b.dataset.v;
+              $$('#' + id + ' button', s.el).forEach(function (x) {
+                x.classList.toggle('on', x === b);
+              });
+            };
+          });
+        }
+        chips('nt-fmt', 'format');
+        chips('nt-who', 'who');
+        $('#nt-next', s.el).onclick = function () {
+          newTeam = pick;
+          s.close();
+          go('#/new-team/profile');
+        };
+      }
+    }
+
+    // 2. The team's profile: badge, name, area, league, home and away colours.
+    // Next makes the team.
+    function setupProfile() {
+      if (!newTeam || !newTeam.sport) return go('#/new-team');
+      var logo = null;
+      var home = newTeam.home || COLOURS[0];
+      var away = newTeam.away || AWAY_COLOURS[0];
+      render(
+        '<div class="ts nt">' +
+          newSteps(2) +
+          '<h1>Your team</h1>' +
+          '<div class="nt-badge-row"><label class="nt-badge" for="nt-logo"><span id="nt-logo-img"></span></label><input type="file" id="nt-logo" accept="image/*" hidden />' +
+          '<p class="muted small">A logo or photo. No badge? We’ll make one from your initials and colours.<br><label for="nt-logo" class="linkish">Add a badge</label></p></div>' +
+          '<label class="field-label" for="nt-name">Team name</label><input type="text" id="nt-name" maxlength="60" placeholder="e.g. Hackney Titans" value="' +
+          esc(newTeam.name || '') +
+          '" />' +
+          '<div class="nt-two"><div><label class="field-label" for="nt-area">Area</label><input type="text" id="nt-area" maxlength="60" placeholder="e.g. Hackney" value="' +
+          esc(newTeam.area || '') +
+          '" /></div><div><label class="field-label" for="nt-league">League <span class="muted">(optional)</span></label><input type="text" id="nt-league" maxlength="80" placeholder="e.g. Hackney Sunday League" value="' +
+          esc(newTeam.league || '') +
+          '" /></div></div>' +
+          '<div class="field-label">Home and away colours</div>' +
+          '<div class="nt-kits"><div class="nt-kit"><span class="nt-shirt" id="nt-home-shirt"></span><small>Home</small><div class="hq-sws" id="nt-home">' +
+          COLOURS.map(function (c) {
+            return '<button type="button" aria-label="Home colour ' + c + '" data-v="' + c + '" class="' + (c === home ? 'on' : '') + '" style="background:' + c + '"></button>';
+          }).join('') +
+          '</div></div><div class="nt-kit"><span class="nt-shirt" id="nt-away-shirt"></span><small>Away</small><div class="hq-sws" id="nt-away">' +
+          AWAY_COLOURS.map(function (c) {
+            return '<button type="button" aria-label="Away colour ' + c + '" data-v="' + c + '" class="' + (c === away ? 'on' : '') + '" style="background:' + c + '"></button>';
+          }).join('') +
+          '</div></div></div>' +
+          '<p class="err" id="nt-err" hidden></p>' +
+          '<div class="ts-foot"><a class="btn" href="#/new-team">Back</a><button class="btn primary" id="nt-make">Next: your squad</button></div></div>',
+      );
+      var nameInput = $('#nt-name');
+      function preview() {
+        $('#nt-home-shirt').style.background = home;
+        $('#nt-away-shirt').style.background = away;
+        if (!logo) $('#nt-logo-img').innerHTML = crest(nameInput.value.trim() || '?', home, 78);
+      }
+      preview();
+      nameInput.oninput = preview;
+      function swatches(id, set) {
+        $$('#' + id + ' button').forEach(function (b) {
+          b.onclick = function () {
+            set(b.dataset.v);
+            $$('#' + id + ' button').forEach(function (x) {
+              x.classList.toggle('on', x === b);
+            });
+            preview();
+          };
+        });
+      }
+      swatches('nt-home', function (v) {
+        home = v;
       });
-      $('#ts-logo-file').onchange = function () {
+      swatches('nt-away', function (v) {
+        away = v;
+      });
+      $('#nt-logo').onchange = function () {
         var file = this.files && this.files[0];
         if (!file) return;
         ctx.shrinkPicture(file, { edge: 512 }, 0.85).then(function (blob) {
           if (!blob) return toast('That picture didn’t work. Try another.');
           logo = blob;
-          $('#ts-logo-img').innerHTML = '<img class="ts-logo-photo" alt="" src="' + URL.createObjectURL(blob) + '" />';
+          $('#nt-logo-img').innerHTML = '<img alt="" src="' + URL.createObjectURL(blob) + '" />';
         });
       };
-      $('#t-make').textContent = 'Next: positions';
-      wireTeamForm(function (newCal) {
-        var after = logo
-          ? ctx.sb.storage
-              .from('team-badges')
-              .upload(newCal + '/' + Date.now() + '.jpg', logo, { contentType: 'image/jpeg', cacheControl: '31536000' })
-              .then(function (r) {
-                if (r.error) throw r.error;
-                return rpc('team_set_badge', { p_calendar: newCal, p_path: r.data.path });
-              })
-              .catch(function () {
-                toast('The team is set up, but the logo didn’t upload. Add it again from the team page.');
-              })
-          : Promise.resolve();
-        after.then(function () {
-          return load(true);
-        }).then(function () {
-          drawMenus();
-          go('#/new-team/' + newCal + '/positions');
-        });
-      });
+      $('#nt-make').onclick = function () {
+        var name = nameInput.value.trim();
+        var err = $('#nt-err');
+        err.hidden = true;
+        if (!name) {
+          err.textContent = 'Give the team a name.';
+          err.hidden = false;
+          return nameInput.focus();
+        }
+        var area = $('#nt-area').value.trim();
+        var league = $('#nt-league').value.trim();
+        Object.assign(newTeam, { name: name, area: area, league: league, home: home, away: away });
+        var button = this;
+        setBusy(button, true, 'Making your team…');
+        var cal = null;
+        rpc('team_create', {
+          p_name: name,
+          p_sport: newTeam.sport,
+          p_league: league || null,
+          p_color: home,
+          p_sample: false,
+          p_format: newTeam.format || null,
+        })
+          .then(function (id) {
+            cal = id;
+            return Promise.all([
+              rpc('team_set_profile', { p_calendar: cal, p_age_group: newTeam.who || null, p_away_color: away }).catch(function () {}),
+              area ? rpc('team_set_area', { p_calendar: cal, p_area: area }).catch(function () {}) : null,
+              logo
+                ? ctx.sb.storage
+                    .from('team-badges')
+                    .upload(cal + '/' + Date.now() + '.jpg', logo, { contentType: 'image/jpeg', cacheControl: '31536000' })
+                    .then(function (r) {
+                      if (r.error) throw r.error;
+                      return rpc('team_set_badge', { p_calendar: cal, p_path: r.data.path });
+                    })
+                    .catch(function () {
+                      toast('The team is made, but the badge didn’t upload. Add it again from the team page.');
+                    })
+                : null,
+            ]);
+          })
+          .then(function () {
+            return load(true);
+          })
+          .then(
+            function () {
+              newTeam = null;
+              drawMenus();
+              go('#/new-team/' + cal + '/players');
+            },
+            function (e) {
+              setBusy(button, false);
+              if (cal) return go('#/new-team/' + cal + '/players');
+              err.textContent = friendly(e);
+              err.hidden = false;
+            },
+          );
+      };
+    }
+
+    // 3. The squad: the join link, players (with positions) and the managers.
+    function setupSquad(cal) {
+      loading();
+      Promise.all([
+        load(),
+        rpc('team_overview', { p_calendar: cal }),
+        rpc('team_lists', { p_calendar: cal }).catch(function () {
+          return {};
+        }),
+        ctx.sb.from('calendars').select('id, join_code').eq('id', cal).maybeSingle(),
+      ]).then(
+        function (r) {
+          var t = r[1] || {};
+          var team = t.name ? t : teamById(cal) || { name: 'Your team', sport: 'football' };
+          var players = t.players || [];
+          var own = (r[2] && r[2].positions) || [];
+          var code = r[3] && r[3].data && r[3].data.join_code;
+          var url = code ? 'https://daylihq.co.uk/join/?code=' + code : null;
+          draw();
+          function positions() {
+            var usual = (window.DayliSportLists && window.DayliSportLists.positions[team.sport]) || [];
+            return usual.concat(
+              own.filter(function (x) {
+                return usual.indexOf(x) < 0;
+              }),
+            );
+          }
+          function row(p) {
+            var opts = positions();
+            return (
+              '<div class="nt-pl">' +
+              sgAvatar({ id: p.id, name: p.name, avatar_url: p.avatar_url }, 36) +
+              '<span class="grow"><b>' +
+              esc(p.name) +
+              (p.is_me ? ' (you)' : '') +
+              '</b><small>' +
+              (p.user_id ? 'On Dayli' : 'Not joined yet') +
+              '</small></span>' +
+              (p.role === 'manager'
+                ? '<span class="nt-role">Manager</span>'
+                : '<select class="nt-pos" data-pos="' +
+                  esc(p.id) +
+                  '" aria-label="Position for ' +
+                  esc(p.name) +
+                  '"><option value="">Position</option>' +
+                  opts
+                    .map(function (o) {
+                      return '<option' + (p.position === o ? ' selected' : '') + '>' + esc(o) + '</option>';
+                    })
+                    .join('') +
+                  (p.position && opts.indexOf(p.position) < 0 ? '<option selected>' + esc(p.position) + '</option>' : '') +
+                  '<option value="__new">Add a position…</option></select>') +
+              '</div>'
+            );
+          }
+          function draw() {
+            var squad = players.filter(function (p) {
+              return p.role !== 'manager';
+            });
+            var bosses = players.filter(function (p) {
+              return p.role === 'manager';
+            });
+            render(
+              '<div class="ts nt">' +
+                newSteps(3) +
+                '<h1>Your squad</h1>' +
+                (url
+                  ? '<div class="nt-link"><code>' +
+                    esc(url.replace(/^https:\/\//, '')) +
+                    '</code><button type="button" class="linkish" id="nt-copy">Copy</button></div>' +
+                    '<a class="btn hq-wa nt-wa" target="_blank" rel="noopener" href="https://wa.me/?text=' +
+                    encodeURIComponent('Join ' + team.name + ' on Dayli for fixtures, who’s playing and subs: ' + url) +
+                    '">Send the link to your WhatsApp group</a>'
+                  : '') +
+                '<div class="nt-sec"><span>Players · ' +
+                squad.length +
+                '</span></div>' +
+                '<div class="card nt-list">' +
+                (squad.length ? squad.map(row).join('') : '<p class="muted small" style="margin:6px 0">Nobody yet. Send the link, or add names here.</p>') +
+                '<div class="nt-add"><input type="text" id="nt-add-p" maxlength="60" placeholder="Add a player by name" /><button class="btn" id="nt-add-p-go">Add</button></div></div>' +
+                '<div class="nt-sec"><span>Managers and coaches · ' +
+                bosses.length +
+                '</span></div>' +
+                '<div class="card nt-list">' +
+                bosses.map(row).join('') +
+                '<div class="nt-add"><input type="text" id="nt-add-m" maxlength="60" placeholder="Add a coach by name" /><button class="btn" id="nt-add-m-go">Add</button></div></div>' +
+                '<p class="muted small">When someone joins with the link, they tap their name so nobody is listed twice.</p>' +
+                '<div class="ts-foot"><span></span><a class="btn primary" href="#/teams/' +
+                esc(cal) +
+                '">Go to ' +
+                esc(team.name) +
+                '</a></div></div>',
+            );
+            if ($('#nt-copy'))
+              $('#nt-copy').onclick = function () {
+                (navigator.clipboard ? navigator.clipboard.writeText(url) : Promise.reject()).then(
+                  function () {
+                    toast('Link copied');
+                  },
+                  function () {
+                    window.prompt('Copy this link:', url);
+                  },
+                );
+              };
+            function adder(inputId, manager) {
+              var input = $('#' + inputId);
+              function go2() {
+                var name = input.value.trim();
+                if (!name) return toast('Type a name');
+                rpc('team_add_player', { p_calendar: cal, p_name: name })
+                  .then(function (id) {
+                    return manager && id ? rpc('team_set_role', { p_player: id, p_role: 'manager' }) : null;
+                  })
+                  .then(function () {
+                    return rpc('team_overview', { p_calendar: cal });
+                  })
+                  .then(
+                    function (fresh) {
+                      players = (fresh && fresh.players) || players;
+                      draw();
+                      var again = $('#' + inputId);
+                      if (again) again.focus();
+                    },
+                    function (err) {
+                      toast(friendly(err));
+                    },
+                  );
+              }
+              $('#' + inputId + '-go').onclick = go2;
+              input.onkeydown = function (e) {
+                if (e.key === 'Enter') go2();
+              };
+            }
+            adder('nt-add-p', false);
+            adder('nt-add-m', true);
+            $$('[data-pos]').forEach(function (sel) {
+              sel.onchange = function () {
+                var id = sel.dataset.pos;
+                var value = sel.value;
+                var p = players.filter(function (x) {
+                  return x.id === id;
+                })[0];
+                var before = p ? p.position || '' : '';
+                var made = Promise.resolve(value);
+                if (value === '__new') {
+                  var name = (window.prompt('New position (it’s saved to your list):') || '').trim();
+                  if (!name) {
+                    sel.value = before;
+                    return;
+                  }
+                  made = rpc('team_add_position', { p_calendar: cal, p_name: name }).then(function (list) {
+                    own = list || own;
+                    return name;
+                  });
+                }
+                made
+                  .then(function (pos) {
+                    return rpc('team_set_position', { p_player: id, p_position: pos || null }).then(function () {
+                      if (p) p.position = pos || null;
+                    });
+                  })
+                  .then(draw, function (err) {
+                    toast(friendly(err));
+                    draw();
+                  });
+              };
+            });
+          }
+        },
+        function (err) {
+          render(notice('error', esc(friendly(err))));
+        },
+      );
+    }
+    function screenNewTeam(cal, step) {
+      if (cal === 'profile') return setupProfile();
+      if (cal && step === 'positions') return setupPositions(cal);
+      if (cal && step === 'players') return setupSquad(cal);
+      return setupSport();
     }
     function teamById(cal) {
       return (
