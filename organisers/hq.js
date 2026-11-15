@@ -86,6 +86,67 @@
         icon: '<path d="M3 8h18v3a2 2 0 000 4v3H3v-3a2 2 0 000-4z M14 8v10"/>',
       },
     ];
+    // HQ's three spaces, each like its own site: its colour, menu and settings.
+    var SPACES = [
+      { key: 'teams', run: 'teams', name: 'Teams', colour: '#6e56cf', soft: '#ede8fb', icon: 'shield' },
+      { key: 'social', run: 'games', name: 'Social', colour: '#3a61c9', soft: '#e8eefb', icon: 'ball' },
+      { key: 'events', run: 'events', name: 'Events', colour: '#d9741c', soft: '#fff4e8', icon: 'ticket' },
+    ];
+    function spaceDef(k) {
+      return SPACES.filter(function (x) {
+        return x.key === k;
+      })[0];
+    }
+    function spaceOf(c) {
+      if (!c) return null;
+      if (c === 'games') return 'social';
+      if (c === 'events') return 'events';
+      return 'teams';
+    }
+    var LAST_TEAM = 'dayli_hq_last_team';
+    // Where a space opens: the team you were last on, your games, your events.
+    function spaceHome(k) {
+      if (k === 'social') return '#/games';
+      if (k === 'events') return state.organiser ? '#/overview' : '#/profile';
+      var last = null;
+      try {
+        last = localStorage.getItem(LAST_TEAM);
+      } catch (e) {
+        last = null;
+      }
+      if (last && valid('team:' + last)) return '#/teams/' + last;
+      return hq && hq.teams.length ? '#/teams/' + hq.teams[0].calendar_id : '#/new-team';
+    }
+    function spaceMark(sp, size) {
+      var z = size || 34;
+      return (
+        '<span class="hq-spm" style="width:' +
+        z +
+        'px;height:' +
+        z +
+        'px;background:' +
+        sp.colour +
+        '"><svg width="' +
+        Math.round(z * 0.55) +
+        '" height="' +
+        Math.round(z * 0.55) +
+        '" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
+        ICON[sp.icon] +
+        '</svg></span>'
+      );
+    }
+    function spaceSub(sp) {
+      if (sp.key === 'teams')
+        return hq.teams.length
+          ? hq.teams
+              .map(function (t) {
+                return t.name;
+              })
+              .join(', ')
+          : 'Fixtures, squad and subs';
+      if (sp.key === 'social') return 'Pick-up games anyone can join';
+      return state.organiser ? state.organiser.name : 'Events and tickets';
+    }
     var SPORTS = [
       ['football', 'Football'],
       ['netball', 'Netball'],
@@ -146,7 +207,12 @@
       if (m) return 'team:' + m[1];
       var h = location.hash.split('?')[0];
       if (/^#\/games/.test(h)) return 'games';
-      if (/^#\/(overview|events|analytics|payouts|tickets|checkin|profile)/.test(h)) return 'events';
+      if (/^#\/(overview|events|analytics|payouts|tickets|checkin|profile|settings\/events)/.test(h)) return 'events';
+      if (h === '#/settings/social') return runs('games') ? 'games' : null;
+      if (h === '#/settings/teams' && runs('teams')) {
+        var home = spaceHome('teams').match(/^#\/teams\/([0-9a-f-]{36})/);
+        if (home) return 'team:' + home[1];
+      }
       var saved = null;
       try {
         saved = localStorage.getItem(CTX_KEY);
@@ -178,6 +244,7 @@
     function remember(c) {
       try {
         localStorage.setItem(CTX_KEY, c);
+        if (c.indexOf('team:') === 0) localStorage.setItem(LAST_TEAM, c.slice(5));
       } catch (e) {
         /* private mode: fine */
       }
@@ -272,22 +339,26 @@
     function allSections() {
       var h = location.hash.split('?')[0];
       var c = context();
+      var sp = spaceOf(c);
       var out = '';
-      if (runs('games')) out += sectionHead('Social games', '#3a61c9', c === 'games') + menuLinks('games', true);
-      if (runs('teams')) {
+      if (sp === 'teams') {
         hq.teams.forEach(function (t) {
           var key = 'team:' + t.calendar_id;
           out += sectionHead(t.name, t.color, c === key) + menuLinks(key, true);
         });
         out += '<a class="hq-sec-add" href="#/new-team">+ Add a team</a>';
+      } else if (sp === 'social') {
+        out += menuLinks('games', true) + '<a class="hq-sec-add" href="#/games/new">+ New game</a>';
+      } else if (sp === 'events') {
+        out += menuLinks('events', true) + '<a class="hq-sec-add" href="#/events/new">+ New event</a>';
       }
-      if (runs('events'))
-        out += sectionHead(state.organiser ? state.organiser.name : 'Events', '#1c1a17', c === 'events') + menuLinks('events', true);
+      var def = spaceDef(sp);
       out +=
         '<div class="hq-navgap"></div>' +
         link('#/calendar', 'calendar', 'Calendar', h === '#/calendar') +
         (hq.paymentsOn ? link('#/payments', 'money', 'Card payments', h === '#/payments') : '') +
-        link('#/settings', 'gear', 'Settings', h === '#/settings');
+        (def ? link('#/settings/' + def.key, 'gear', def.name + ' settings', h === '#/settings/' + def.key) : '') +
+        link('#/settings', 'person', 'Account', h === '#/settings');
       if (state.admin) out += link('#/admin', 'shield', 'Admin', /^#\/admin/.test(h));
       return out;
     }
@@ -366,55 +437,33 @@
       return out;
     }
     function switcherItems(c) {
-      var out = '';
-      if (runs('teams')) {
-        out += '<div class="hq-dd-lb">YOUR TEAMS</div>';
-        out += hq.teams.length
-          ? hq.teams
-              .map(function (t) {
-                return (
-                  '<a class="hq-dd-it' +
-                  (c === 'team:' + t.calendar_id ? ' on' : '') +
-                  '" href="#/teams/' +
-                  esc(t.calendar_id) +
-                  '">' +
-                  crest(t.name, t.color, 30) +
-                  '<span>' +
-                  esc(t.name) +
-                  '<small>Manager · ' +
-                  t.players +
-                  ' in the squad</small></span></a>'
-                );
-              })
-              .join('')
-          : '<div class="hq-dd-empty">No teams yet</div>';
-      }
-      if (runs('games'))
-        out +=
-          '<div class="hq-dd-lb">GAMES</div><a class="hq-dd-it' +
-          (c === 'games' ? ' on' : '') +
-          '" href="#/games">' +
-          crest('G', '#3a61c9', 30) +
-          '<span>Social games<small>One-off and weekly</small></span></a>';
-      if (runs('events'))
-        out +=
-          '<div class="hq-dd-lb">EVENTS</div><a class="hq-dd-it' +
-          (c === 'events' ? ' on' : '') +
-          '" href="#/overview">' +
-          crest(state.organiser ? state.organiser.name : 'E', '#1c1a17', 30) +
-          '<span>' +
-          esc(state.organiser ? state.organiser.name : 'Your events') +
-          '<small>Events and tickets</small></span></a>';
-      if (runs('teams')) out += '<a class="hq-dd-add" href="#/new-team">+ Add a team</a>';
-      if (runs('games')) out += '<a class="hq-dd-add" href="#/games/new">+ New social game</a>';
-      if (runs('events')) out += '<a class="hq-dd-add" href="#/events/new">+ New event</a>';
-      if (
-        RUNS.some(function (r) {
-          return !runs(r.key);
-        })
-      )
-        out += '<a class="hq-dd-add" href="#/settings">Run something else too…</a>';
-      return out;
+      var here = spaceOf(c);
+      var mail = ctx.email ? ctx.email() : '';
+      return (
+        SPACES.map(function (sp) {
+          var on = runs(sp.run);
+          return (
+            '<a class="hq-dd-sp' +
+            (sp.key === here ? ' on' : '') +
+            (on ? '' : ' off') +
+            '" href="' +
+            (on ? spaceHome(sp.key) : '#/settings') +
+            '">' +
+            spaceMark(sp, 36) +
+            '<span class="grow"><b>Dayli ' +
+            esc(sp.name) +
+            '</b><small>' +
+            esc(on ? spaceSub(sp) : 'Turn it on in your account') +
+            '</small></span>' +
+            (sp.key === here ? '<i class="hq-dd-tick">✓</i>' : '') +
+            '</a>'
+          );
+        }).join('') +
+        '<div class="hq-dd-foot"><span>' +
+        esc(myName || mail || 'Your account') +
+        (myName && mail ? '<small>' + esc(mail) + '</small>' : '') +
+        '</span><a href="#/settings">Account settings</a><button type="button" class="linkish" id="hq-dd-out">Sign out</button></div>'
+      );
     }
     function current(c) {
       if (!c) return { name: 'Dayli HQ', sub: 'Pick what you run', colour: '#2f6b4f' };
@@ -472,19 +521,21 @@
         sw.id = 'hq-switch';
         nav.parentNode.insertBefore(sw, nav);
       }
+      var sp = spaceDef(spaceOf(c));
+      document.documentElement.style.setProperty('--space', sp ? sp.colour : '#2f6b4f');
+      document.documentElement.style.setProperty('--space-soft', sp ? sp.soft : '#e4efe8');
+      document.body.setAttribute('data-space', sp ? sp.key : '');
       sw.innerHTML =
         '<button type="button" class="hq-sw" id="hq-sw-btn" aria-expanded="false">' +
-        crest(cur.name, cur.colour, 36) +
-        '<span class="grow"><b>' +
-        esc(cur.name) +
-        '</b><small>' +
-        esc(cur.sub) +
-        '</small></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 10l5 5 5-5"/></svg></button><div class="hq-dd" id="hq-dd" hidden>' +
+        (sp ? spaceMark(sp, 36) : crest(cur.name, cur.colour, 36)) +
+        '<span class="grow"><small>Dayli</small><b>' +
+        esc(sp ? sp.name : 'HQ') +
+        '</b></span><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M7 10l5 5 5-5"/></svg></button><div class="hq-dd" id="hq-dd" hidden>' +
         switcherItems(c) +
         '</div>';
       nav.innerHTML = allSections();
       nav.classList.add('hq-nav', 'hq-nav-secs');
-      sw.classList.add('hq-sw-phone');
+      sw.classList.remove('hq-sw-phone');
       // Phones: the bottom bar carries the pages, so no tabs along the top.
       tabs.innerHTML = '';
       tabs.classList.add('hq-empty-tabs');
@@ -499,8 +550,12 @@
         topbar.insertBefore(chip, document.getElementById('menu'));
       }
       if (chip) {
-        chip.innerHTML = crest(cur.name, cur.colour, 24) + '<span>' + esc(cur.name) + '</span>';
-        chip.setAttribute('aria-label', 'You’re in ' + cur.name + '. Switch');
+        chip.innerHTML =
+          (sp ? spaceMark(sp, 24) : crest(cur.name, cur.colour, 24)) +
+          '<span>' +
+          esc(sp ? sp.name + (sp.key === 'teams' && hq.teams.length > 1 ? ' · ' + cur.name : '') : cur.name) +
+          '</span><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3"><path d="M7 10l5 5 5-5"/></svg>';
+        chip.setAttribute('aria-label', 'You’re in Dayli ' + (sp ? sp.name : 'HQ') + '. Switch');
       }
       var bar = document.getElementById('hq-bottom');
       if (!bar) {
@@ -524,6 +579,8 @@
         dd.hidden = !dd.hidden;
         btn.setAttribute('aria-expanded', String(!dd.hidden));
       };
+      var ddOut = document.getElementById('hq-dd-out');
+      if (ddOut) ddOut.onclick = ctx.signOut;
       document.addEventListener(
         'click',
         function () {
@@ -537,7 +594,9 @@
       if (!hq) return;
       var c = context();
       var tiles = [];
-      if (runs('teams'))
+      var here = spaceOf(c);
+      var hereDef = spaceDef(here);
+      if (here === 'teams')
         hq.teams.forEach(function (t) {
           tiles.push({
             href: '#/teams/' + t.calendar_id,
@@ -547,25 +606,10 @@
             sub: sportName(t.sport) + ' · ' + t.players + ' in the squad',
           });
         });
-      if (runs('games')) tiles.push({ href: '#/games', key: 'games', name: 'Social games', colour: '#3a61c9', sub: 'One-off and weekly' });
-      if (runs('events'))
-        tiles.push({
-          href: state.organiser ? '#/overview' : '#/profile',
-          key: 'events',
-          name: state.organiser ? state.organiser.name : 'Your events',
-          colour: '#1c1a17',
-          sub: 'Events and tickets',
-        });
       var adds = [];
-      if (runs('teams')) adds.push(['#/new-team', '+ Add a team']);
-      if (runs('games')) adds.push(['#/games/new', '+ New social game']);
-      if (runs('events')) adds.push(['#/events/new', '+ New event']);
-      if (
-        RUNS.some(function (r) {
-          return !runs(r.key);
-        })
-      )
-        adds.push(['#/settings', 'Run something else too…']);
+      if (here === 'teams') adds.push(['#/new-team', '+ Add a team']);
+      if (here === 'social') adds.push(['#/games/new', '+ New social game']);
+      if (here === 'events') adds.push(['#/events/new', '+ New event']);
       var row = function (href, icon, title, sub, extra) {
         return (
           '<a class="hq-mo-row" href="' +
@@ -583,42 +627,32 @@
       var mail = ctx.email ? ctx.email() : '';
       render(
         '<div class="hq-more"><h1 class="hq-mo-h">More</h1>' +
-          '<div class="hq-mo-me">' +
-          crest(state.organiser ? state.organiser.name : mail || 'You', '#2f6b4f', 40) +
-          '<span class="grow"><b>' +
-          esc(state.organiser ? state.organiser.name : 'Your account') +
-          '</b><small>' +
-          esc(mail || '') +
-          '</small></span></div>' +
-          '<div class="hq-mo-list hq-mo-cal">' +
-          row('#/calendar', 'calendar', 'Calendar', 'Everything you run, by date') +
-          (hq.paymentsOn ? row('#/payments', 'money', 'Card payments', 'Set up Stripe once, for everything') : '') +
-          (c && c.indexOf('team:') === 0
-            ? row('#/teams/' + c.slice(5) + '/stats', 'chart', 'Stats', 'Appearances, goals and more') +
-              row('#/teams/' + c.slice(5) + '/page', 'globe', 'Public page', 'Cover, badge, about and photos')
+          '<div class="hq-mo-lb">SWITCH TO</div><div class="hq-mo-spaces">' +
+          switcherItems(c).split('<div class="hq-dd-foot">')[0] +
+          '</div>' +
+          (tiles.length > 1
+            ? '<div class="hq-mo-lb">YOUR TEAMS</div><div class="hq-mo-tiles">' +
+              tiles
+                .map(function (t) {
+                  var on = t.key === c;
+                  return (
+                    '<a class="hq-mo-tile' +
+                    (on ? ' on' : '') +
+                    '" href="' +
+                    esc(t.href) +
+                    '">' +
+                    crest(t.name, t.colour, 44) +
+                    (on ? '<span class="hq-mo-here">YOU’RE HERE</span>' : '') +
+                    '<b>' +
+                    esc(t.name) +
+                    '</b><small>' +
+                    esc(t.sub) +
+                    '</small></a>'
+                  );
+                })
+                .join('') +
+              '</div>'
             : '') +
-          '</div>' +
-          '<div class="hq-mo-lb">SWITCH TO</div><div class="hq-mo-tiles">' +
-          tiles
-            .map(function (t) {
-              var here = t.key === c;
-              return (
-                '<a class="hq-mo-tile' +
-                (here ? ' on' : '') +
-                '" href="' +
-                esc(t.href) +
-                '">' +
-                crest(t.name, t.colour, 44) +
-                (here ? '<span class="hq-mo-here">YOU’RE HERE</span>' : '') +
-                '<b>' +
-                esc(t.name) +
-                '</b><small>' +
-                esc(t.sub) +
-                '</small></a>'
-              );
-            })
-            .join('') +
-          '</div>' +
           (adds.length
             ? '<div class="hq-mo-adds">' +
               adds
@@ -628,9 +662,19 @@
                 .join('') +
               '</div>'
             : '') +
+          '<div class="hq-mo-lb">' +
+          esc(hereDef ? 'DAYLI ' + hereDef.name.toUpperCase() : 'HQ') +
+          '</div><div class="hq-mo-list hq-mo-cal">' +
+          row('#/calendar', 'calendar', 'Calendar', 'Everything you run, by date') +
+          (hq.paymentsOn ? row('#/payments', 'money', 'Card payments', 'Set up Stripe once, for everything') : '') +
+          (c && c.indexOf('team:') === 0
+            ? row('#/teams/' + c.slice(5) + '/stats', 'chart', 'Stats', 'Appearances, goals and more') +
+              row('#/teams/' + c.slice(5) + '/page', 'globe', 'Public page', 'Cover, badge, about and photos')
+            : '') +
+          (hereDef ? row('#/settings/' + hereDef.key, 'gear', hereDef.name + ' settings', '') : '') +
+          '</div>' +
           '<div class="hq-mo-lb">ACCOUNT</div><div class="hq-mo-list">' +
-          row('#/settings', 'list', 'What you run', 'Teams, social games, events') +
-          row('#/settings', 'gear', 'Settings', '') +
+          row('#/settings', 'person', 'Account settings', mail || '') +
           (state.admin ? row('#/admin', 'shield', 'Admin', '') : '') +
           row(SITE + '/app/', 'phone', 'Open the Dayli app', 'Your own calendar', ' target="_blank" rel="noopener"') +
           row('mailto:hello@daylicalendar.co.uk', 'help', 'Help', 'hello@daylicalendar.co.uk') +
@@ -3332,14 +3376,90 @@
 
     // --- settings ----------------------------------------------------------------------
 
-    function screenSettings() {
+    // A space's settings: what's set up for it, each a step away.
+    function screenSpaceSettings(which) {
+      var sp = spaceDef(which);
+      loading();
+      load(true).then(function () {
+        if (!runs(sp.run)) {
+          return render(
+            '<div class="page-head"><div><h1>' +
+              esc(sp.name) +
+              ' settings</h1></div></div>' +
+              notice('info', 'Dayli ' + esc(sp.name) + ' is off for your account. <a href="#/settings">Turn it on</a>'),
+          );
+        }
+        var row = function (href, title, sub, extra) {
+          return (
+            '<a class="hq-st-row" href="' +
+            href +
+            '">' +
+            (extra || '') +
+            '<span class="grow"><b>' +
+            esc(title) +
+            '</b>' +
+            (sub ? '<small>' + esc(sub) + '</small>' : '') +
+            '</span><i>›</i></a>'
+          );
+        };
+        var pay = hq.paymentsOn ? row('#/payments', 'Card payments', 'Stripe, set up once for teams, games and events') : '';
+        var body = '';
+        if (which === 'teams') {
+          body =
+            '<div class="card hq-st"><h3>Your teams</h3>' +
+            (hq.teams.length
+              ? hq.teams
+                  .map(function (t) {
+                    return row('#/teams/' + t.calendar_id, t.name, sportName(t.sport) + ' · ' + t.players + ' in the squad', crest(t.name, t.color, 34));
+                  })
+                  .join('')
+              : '<p class="muted">No teams yet.</p>') +
+            '<a class="btn" href="#/new-team" style="margin-top:8px">+ Add a team</a></div>' +
+            '<div class="card hq-st"><h3>For each team</h3>' +
+            hq.teams
+              .map(function (t) {
+                return (
+                  row('#/teams/' + t.calendar_id + '/page', t.name + ': public page', 'Cover, badge, about and photos') +
+                  row('#/teams/' + t.calendar_id + '/payments', t.name + ': payments and reminders', 'Subs, match fees, nudging who owes')
+                );
+              })
+              .join('') +
+            '</div>' +
+            (pay ? '<div class="card hq-st"><h3>Money</h3>' + pay + '</div>' : '');
+        } else if (which === 'social') {
+          body =
+            '<div class="card hq-st"><h3>Your games</h3>' +
+            row('#/games', 'Social games', 'One-off and weekly games, places and waiting lists') +
+            row('#/games/owed', 'Owed to you', 'Who still owes for a game') +
+            '<a class="btn" href="#/games/new" style="margin-top:8px">+ New game</a></div>' +
+            (pay ? '<div class="card hq-st"><h3>Money</h3>' + pay + '</div>' : '');
+        } else {
+          body =
+            '<div class="card hq-st"><h3>You as an organiser</h3>' +
+            row('#/profile', 'Organiser profile', state.organiser ? state.organiser.name : 'Your name, logo and about, shown on your events') +
+            row('#/payouts', 'Tickets and payouts', 'Selling tickets and where the money goes') +
+            row('#/analytics', 'Analytics', 'Who’s looking and where they come from') +
+            '</div>';
+        }
+        render(
+          '<div class="page-head"><div><h1>' +
+            esc(sp.name) +
+            ' settings</h1><p class="muted">Settings for Dayli ' +
+            esc(sp.name) +
+            '. Your name, email and sign out are in <a href="#/settings">Account settings</a>.</p></div></div>' +
+            body,
+        );
+      });
+    }
+    function screenSettings(which) {
+      if (spaceDef(which)) return screenSpaceSettings(which);
       loading();
       Promise.all([load(true), loadName()]).then(function () {
         var sel = hq.runs.slice();
         function draw() {
           render(
-            '<div class="page-head"><div><h1>Settings</h1><p class="muted">What HQ shows you, and your account.</p></div></div>' +
-              '<div class="card"><h3>What you run</h3><p class="sub">Turn on what you need; HQ adds the menus. Turning something off only hides it: your teams, games and events stay as they are.</p><div class="hq-set">' +
+            '<div class="page-head"><div><h1>Account settings</h1><p class="muted">Your account, and which spaces HQ shows: Dayli Teams, Social and Events. Each space has its own settings in its menu.</p></div></div>' +
+              '<div class="card"><h3>Your spaces</h3><p class="sub">Turn on what you need; HQ adds the menus. Turning something off only hides it: your teams, games and events stay as they are.</p><div class="hq-set">' +
               RUNS.map(function (r) {
                 var on = sel.indexOf(r.key) >= 0;
                 return (
@@ -3354,7 +3474,7 @@
                   '" stroke-width="1.8">' +
                   r.icon +
                   '</svg></span><span class="grow"><b>' +
-                  esc(r.title) +
+                  esc('Dayli ' + { teams: 'Teams', games: 'Social', events: 'Events' }[r.key]) +
                   '</b><small>' +
                   esc(r.text) +
                   '</small></span><span class="hq-toggle"><span></span></span></button>'

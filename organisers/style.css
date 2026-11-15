@@ -8993,3 +8993,142 @@ html.hq .pl .pl-tabs {
 .pfe-f input {
   font-weight: 500;
 }
+
+/* HQ spaces: Dayli Teams, Social and Events, each in its own colour */
+.hq-spm {
+  border-radius: 10px;
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+}
+html.hq .side {
+  border-top: 4px solid var(--space, var(--accent));
+}
+html.hq .side-nav a.on {
+  background: var(--space-soft, var(--accent-soft));
+  color: var(--space, var(--accent));
+}
+html.hq .hq-sec-add {
+  color: var(--space, var(--accent));
+}
+.hq-sw small {
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.hq-dd {
+  width: auto;
+  right: 0;
+}
+.hq-dd-sp {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  border-radius: 12px;
+  color: var(--ink);
+  text-decoration: none;
+}
+.hq-dd-sp:hover,
+.hq-dd-sp.on {
+  background: var(--alt);
+}
+.hq-dd-sp b {
+  display: block;
+  font-size: 14px;
+}
+.hq-dd-sp .grow {
+  min-width: 0;
+}
+.hq-dd-sp small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hq-dd-sp.off {
+  opacity: 0.55;
+}
+.hq-dd-tick {
+  font-style: normal;
+  color: var(--accent);
+  font-weight: 800;
+}
+.hq-dd-foot {
+  border-top: 1px solid var(--alt);
+  margin-top: 6px;
+  padding: 10px 10px 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 13.5px;
+}
+.hq-dd-foot span small {
+  display: block;
+  color: var(--muted);
+  font-size: 12px;
+}
+.hq-dd-foot a,
+.hq-dd-foot .linkish {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: none;
+  text-align: left;
+  padding: 0;
+}
+.hq-ctx svg {
+  flex: none;
+  opacity: 0.6;
+}
+.hq-mo-spaces {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+.hq-mo-spaces .hq-dd-sp {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 16px;
+}
+.hq-mo-spaces .hq-dd-sp.on {
+  border-color: var(--space, var(--accent));
+  box-shadow: 0 0 0 3px var(--space-soft, var(--accent-soft));
+  background: var(--surface);
+}
+.hq-mo-spaces .hq-dd-sp small {
+  max-width: none;
+}
+.card.hq-st {
+  display: block;
+}
+.hq-st h3 {
+  margin-bottom: 6px;
+}
+.hq-st-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 11px 0;
+  border-bottom: 1px solid var(--alt);
+  color: var(--ink);
+  text-decoration: none;
+}
+.hq-st-row:last-of-type {
+  border-bottom: 0;
+}
+.hq-st-row b {
+  display: block;
+  font-size: 14.5px;
+}
+.hq-st-row small {
+  display: block;
+  color: var(--muted);
+  font-size: 12.5px;
+}
+.hq-st-row i {
+  font-style: normal;
+  color: var(--muted);
+  font-size: 18px;
+}

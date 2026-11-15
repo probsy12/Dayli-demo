@@ -504,7 +504,7 @@
       }
       if (parts[0] === 'settings') {
         setShell(true, 'settings');
-        return hq.screenSettings();
+        return hq.screenSettings(parts[1]);
       }
       if (parts[0] === 'game' && parts[1]) {
         setShell(true, 'game');
