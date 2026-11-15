@@ -568,6 +568,14 @@
         if (!state.organiser) return screenProfile(true);
         setShell(true, 'analytics');
         return analytics.screenAnalytics(parts[1] || null, query.tab, query.days);
+      case 'page':
+        // From a team's public page ("Edit this page in Dayli HQ"): its editor, for its managers.
+        if (!HQ || !parts[1]) return go(homeHash());
+        return sb
+          .rpc('team_page_public', { p_slug: parts[1] })
+          .then(function (r) {
+            go(r.data && r.data.calendar_id ? '#/teams/' + r.data.calendar_id + '/page' : homeHash());
+          });
       case 'teams':
         if (!HQ) return go(homeHash());
         setShell(true, 'teams');

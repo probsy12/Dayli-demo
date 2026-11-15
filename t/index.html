@@ -75,8 +75,10 @@
     .hi h1 { font: 700 28px/1.15 Georgia, serif; margin: 0; }
     .linkbtn { background: none; border: 0; color: var(--danger); font: inherit; font-weight: 700; font-size: 14.5px; cursor: pointer; display: block; margin: 8px auto; }
   </style>
+  <link rel="stylesheet" href="profile.css?v=1349b86" />
 <link rel="icon" type="image/png" sizes="32x32" href="/favicon-v2-32.png" /><link rel="icon" type="image/png" sizes="192x192" href="/favicon-v2-192.png" /><link rel="apple-touch-icon" href="/apple-touch-icon-v2.png" /></head>
 <body>
+<div id="pf" class="hidden"></div>
 <main>
   <div id="loading"><p class="muted">Loading…</p></div>
   <div id="bad" class="hidden">
@@ -114,7 +116,8 @@
     <p class="muted small" style="text-align:center;margin:12px 16px">Keep this link to yourself: it's just for you. Get Dayli to answer in one tap and hear when the team is picked.</p>
   </div>
 </main>
-<script src="../config.js?v=4ff7b52"></script>
+<script src="../config.js?v=1349b86"></script>
+<script src="profile.js?v=1349b86"></script>
 <script>
   (function () {
     var cfg = window.DAYLI_CONFIG || {};
@@ -194,9 +197,22 @@
       return '<div class="li"><span class="pill ' + r + '">' + r + '</span><div class="grow"><b>' + esc(m.opponent) + '</b> <span class="muted">(' + (m.home ? 'H' : 'A') + ')</span>' +
         '<div class="muted small">' + w.day + ' ' + w.mon + '</div></div><span class="score">' + m.score_us + '–' + m.score_them + '</span></div>';
     }
+    // The team's page, laid out as a profile (profile.js).
     function drawPublic(t) {
-      document.documentElement.style.setProperty('--team', teamColour(t.color));
       document.title = t.name + ' · Dayli';
+      if (window.DayliProfile) {
+        var box = $('pf');
+        box.innerHTML = DayliProfile.html(t, {
+          base: cfg.supabaseUrl + '/storage/v1/object/public/team-badges/',
+          hq: 'https://daylihq.co.uk/app/#/page/' + slug,
+        });
+        DayliProfile.wire(box);
+        document.querySelector('main').classList.add('hidden');
+        box.classList.remove('hidden');
+        document.body.style.background = getComputedStyle(box.firstChild).backgroundColor;
+        return;
+      }
+      document.documentElement.style.setProperty('--team', teamColour(t.color));
       crest($('pCrest'), t);
       $('pName').textContent = t.name;
       var rec = t.record || {};

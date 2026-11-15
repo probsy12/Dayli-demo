@@ -885,8 +885,10 @@
         function (slug) {
           var a = $('#th-public');
           if (!slug || !a) return;
-          a.href = SITE + '/t/' + slug;
-          a.title = 'Fixtures and results for anyone: ' + SITE.replace(/^https:\/\//, '') + '/t/' + slug;
+          // The page, laid out as a profile: edit it here, then share it.
+          a.href = teamUrl(cal, 'page');
+          a.removeAttribute('target');
+          a.title = 'Your team’s public page: ' + SITE.replace(/^https:\/\//, '') + '/t/' + slug;
           a.hidden = false;
         },
         function () {
@@ -3467,7 +3469,234 @@
       if (!cal) return screenList();
       if (parts[2] === 'new') return screenNew(cal, query && query.d);
       if (parts[2] === 'fixture' && parts[3]) return screenFixture(cal, parts[3]);
+      if (parts[2] === 'page') return screenPage(cal);
       return screenTeam(cal, parts[2], query);
+    }
+
+    // --- the public page, edited in place (web/t/profile.js) ------------------------
+
+    var pageTab = 'timeline';
+    function screenPage(cal) {
+      loading();
+      var slug = null;
+      rpc('team_slug', { p_calendar: cal })
+        .then(function (sl) {
+          slug = sl;
+          return sl ? rpc('team_page_public', { p_slug: sl }) : null;
+        })
+        .then(
+          function (t) {
+            if (!t || !t.can_edit || !window.DayliProfile)
+              return render(notice('error', 'Only the team’s managers can edit its public page.'));
+            drawPage(cal, slug, t);
+          },
+          function (err) {
+            render(notice('error', esc(friendly(err))));
+          },
+        );
+    }
+    function drawPage(cal, slug, t) {
+      var base = cfg.supabaseUrl + '/storage/v1/object/public/team-badges/';
+      var url = SITE + '/t/?s=' + slug;
+      render(
+        '<div class="pfe-bar"><span class="grow"><b>Your team’s public page.</b> Click the cover, the badge or a box to change it. Changes save as you go.</span><a class="btn" target="_blank" rel="noopener" href="' +
+          esc(url) +
+          '">View as a visitor</a><button class="btn" id="pfe-copy">Copy link</button></div>' +
+          (t.hidden
+            ? notice('info', 'Only your team can see this page at the moment: the team isn’t open to followers. Turn that on in the app (team settings → Let people follow) to make it public.')
+            : '') +
+          '<div id="pfe">' +
+          DayliProfile.html(t, { base: base, edit: true }) +
+          '</div>',
+      );
+      var root = $('#pfe');
+      DayliProfile.wire(root, {
+        tab: pageTab,
+        onTab: function (n) {
+          pageTab = n;
+        },
+      });
+      $('#pfe-copy').onclick = function () {
+        copy(url, 'Link copied. Share it anywhere.');
+      };
+      function again() {
+        return rpc('team_page_public', { p_slug: slug }).then(function (n) {
+          if (n) drawPage(cal, slug, n);
+        });
+      }
+      function pick(multiple, done) {
+        var input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.multiple = !!multiple;
+        input.onchange = function () {
+          if (input.files && input.files.length) done(Array.prototype.slice.call(input.files, 0, 12));
+        };
+        input.click();
+      }
+      function upload(file, name, edge) {
+        return ctx.shrinkPicture(file, { edge: edge }, 0.82).then(function (blob) {
+          return sb.storage
+            .from('team-badges')
+            .upload(cal + '/' + name + '-' + Date.now() + '-' + Math.random().toString(36).slice(2, 7) + '.jpg', blob || file, {
+              contentType: 'image/jpeg',
+              cacheControl: '31536000',
+            })
+            .then(function (r) {
+              if (r.error) throw r.error;
+              return r.data.path;
+            });
+        });
+      }
+      function dropFile(path) {
+        if (path) sb.storage.from('team-badges').remove([path]).catch(function () {});
+      }
+      function failed(err) {
+        toast('That didn’t save: ' + friendly(err));
+      }
+      $$('[data-pf-edit]', root).forEach(function (b) {
+        b.onclick = function () {
+          var what = b.getAttribute('data-pf-edit');
+          if (what === 'cover' || what === 'badge') {
+            pick(false, function (files) {
+              toast(what === 'cover' ? 'Uploading the cover…' : 'Uploading the badge…');
+              var old = what === 'cover' ? t.cover : t.badge;
+              upload(files[0], what, what === 'cover' ? 1800 : 512)
+                .then(function (path) {
+                  return rpc(what === 'cover' ? 'team_set_cover' : 'team_set_badge', { p_calendar: cal, p_path: path });
+                })
+                .then(function () {
+                  dropFile(old);
+                  toast(what === 'cover' ? 'Cover changed' : 'Badge changed');
+                  return again();
+                }, failed);
+            });
+          } else if (what === 'cover-off') {
+            if (!confirm('Take the cover photo off? The page goes back to the plain pitch.')) return;
+            rpc('team_set_cover', { p_calendar: cal, p_path: null }).then(function () {
+              dropFile(t.cover);
+              return again();
+            }, failed);
+          } else if (what === 'photos') {
+            pick(true, function (files) {
+              toast('Adding ' + (files.length === 1 ? 'the photo' : files.length + ' photos') + '…');
+              files
+                .reduce(function (chain, f) {
+                  return chain.then(function () {
+                    return upload(f, 'page', 1600).then(function (path) {
+                      return rpc('team_page_photo_add', { p_calendar: cal, p_path: path });
+                    });
+                  });
+                }, Promise.resolve())
+                .then(function () {
+                  toast(files.length === 1 ? 'Photo added' : files.length + ' photos added');
+                  return again();
+                }, failed);
+            });
+          } else if (what === 'intro') {
+            pageSheet(
+              '<h3 style="margin:6px 0 4px">About the team</h3><p class="muted small" style="margin:0 0 10px">Who you are, where and when you play, whether you’re looking for players. Anyone can read it.</p>' +
+                '<textarea id="pfe-about" rows="7" maxlength="600" style="width:100%">' +
+                esc(t.about || '') +
+                '</textarea><div class="muted small" id="pfe-n" style="text-align:right"></div>' +
+                '<div class="row" style="margin-top:10px"><button class="btn primary" id="pfe-save">Save</button><button class="btn" data-close>Cancel</button></div>',
+              function (sheet) {
+                var ta = document.getElementById('pfe-about');
+                function count() {
+                  document.getElementById('pfe-n').textContent = ta.value.length + ' / 600';
+                }
+                ta.oninput = count;
+                count();
+                ta.focus();
+                document.getElementById('pfe-save').onclick = function () {
+                  var button = this;
+                  setBusy(button, true);
+                  rpc('team_set_about', { p_calendar: cal, p_about: ta.value.trim() || null, p_links: t.links || [] }).then(
+                    function () {
+                      sheet.close();
+                      again();
+                    },
+                    function (err) {
+                      setBusy(button, false);
+                      failed(err);
+                    },
+                  );
+                };
+              },
+            );
+          } else if (what === 'details') {
+            var field = function (id, label, value, ph, max) {
+              return (
+                '<label class="pfe-f">' + label + '<input type="text" id="' + id + '" value="' + esc(value || '') + '" placeholder="' + esc(ph) + '" maxlength="' + max + '" /></label>'
+              );
+            };
+            pageSheet(
+              '<h3 style="margin:6px 0 10px">Details</h3>' +
+                field('pfe-ground', 'Where you play', t.ground, 'Hackney Marshes, pitch 4', 100) +
+                field('pfe-training', 'When you train', t.training, 'Thursdays 7pm, Mabley Green', 100) +
+                field('pfe-kit', 'Kit', t.kit, 'Purple and gold', 60) +
+                '<label class="pfe-f">Founded<input type="number" id="pfe-founded" value="' +
+                esc(t.founded || '') +
+                '" placeholder="2014" min="1800" max="' +
+                new Date().getFullYear() +
+                '" /></label>' +
+                '<div class="row" style="margin-top:12px"><button class="btn primary" id="pfe-save">Save</button><button class="btn" data-close>Cancel</button></div>',
+              function (sheet) {
+                document.getElementById('pfe-save').onclick = function () {
+                  var button = this;
+                  var y = document.getElementById('pfe-founded').value.trim();
+                  setBusy(button, true);
+                  rpc('team_set_details', {
+                    p_calendar: cal,
+                    p_ground: document.getElementById('pfe-ground').value,
+                    p_training: document.getElementById('pfe-training').value,
+                    p_kit: document.getElementById('pfe-kit').value,
+                    p_founded: y ? Number(y) : null,
+                  }).then(
+                    function () {
+                      sheet.close();
+                      again();
+                    },
+                    function (err) {
+                      setBusy(button, false);
+                      toast(/year/.test(String(err && err.message)) ? 'Check the year it was founded.' : friendly(err));
+                    },
+                  );
+                };
+              },
+            );
+          }
+        };
+      });
+      $$('[data-pf-del]', root).forEach(function (b) {
+        b.onclick = function (e) {
+          e.preventDefault();
+          if (!confirm('Take this photo off the page?')) return;
+          rpc('team_page_photo_remove', { p_photo: b.getAttribute('data-pf-del') }).then(function (path) {
+            dropFile(path);
+            return again();
+          }, failed);
+        };
+      });
+    }
+    // A sheet from the bottom (a panel on wide screens).
+    function pageSheet(html, ready) {
+      var dim = document.createElement('div');
+      dim.className = 'gs-dim';
+      var box = document.createElement('div');
+      box.className = 'gs-sheet';
+      box.innerHTML = '<div class="gs-grab"></div>' + html;
+      document.body.appendChild(dim);
+      document.body.appendChild(box);
+      function close() {
+        dim.remove();
+        box.remove();
+      }
+      dim.onclick = close;
+      $$('[data-close]', box).forEach(function (b) {
+        b.onclick = close;
+      });
+      ready({ el: box, close: close });
     }
 
     return { screen: screen };

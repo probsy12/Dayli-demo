@@ -8958,3 +8958,38 @@ html.hq .pl .pl-tabs {
 .tm-money b {
   font-weight: 700;
 }
+
+/* Editing the team's public page */
+.pfe-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  background: var(--ink);
+  color: var(--bg);
+  border-radius: 14px;
+  padding: 10px 14px;
+  margin-bottom: 12px;
+  font-size: 14px;
+}
+.pfe-bar .grow {
+  flex: 1;
+  min-width: 220px;
+}
+#pfe .pf {
+  border-radius: 16px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+.pfe-f {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--muted);
+  margin-bottom: 10px;
+}
+.pfe-f input {
+  font-weight: 500;
+}

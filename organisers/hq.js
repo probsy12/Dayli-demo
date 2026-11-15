@@ -229,6 +229,7 @@
       money: '<rect x="2" y="6" width="20" height="13" rx="2"/><path d="M2 10h20"/>',
       home: '<path d="M3 12l9-8 9 8M5 10v10h14V10"/>',
       chart: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+      globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3a14 14 0 0 1 0 18M12 3a14 14 0 0 0 0 18"/>',
       ticket: '<path d="M4 8h16v3a2 2 0 000 4v3H4v-3a2 2 0 000-4z"/>',
       person: '<circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/>',
       ball: '<circle cx="12" cy="12" r="9"/><path d="M12 7l4 3-1.5 4.5h-5L8 10z"/>',
@@ -301,7 +302,8 @@
           link(base + '/fixtures', 'fixtures', 'Fixtures & results', h === base + '/fixtures' || h.indexOf(base + '/fixture/') === 0 || h === base + '/new') +
           link(base + '/squad', 'squad', 'Squad', h === base + '/squad') +
           link(base + '/payments', 'money', 'Payments', h === base + '/payments') +
-          link(base + '/stats', 'chart', 'Stats', h === base + '/stats');
+          link(base + '/stats', 'chart', 'Stats', h === base + '/stats') +
+          link(base + '/page', 'globe', 'Public page', h === base + '/page');
       } else if (c === 'games') {
         out +=
           link('#/games', 'ball', 'Social games', /^#\/games/.test(h) && !/^#\/games\/owed/.test(h)) +
@@ -592,7 +594,8 @@
           row('#/calendar', 'calendar', 'Calendar', 'Everything you run, by date') +
           (hq.paymentsOn ? row('#/payments', 'money', 'Card payments', 'Set up Stripe once, for everything') : '') +
           (c && c.indexOf('team:') === 0
-            ? row('#/teams/' + c.slice(5) + '/stats', 'chart', 'Stats', 'Appearances, goals and more')
+            ? row('#/teams/' + c.slice(5) + '/stats', 'chart', 'Stats', 'Appearances, goals and more') +
+              row('#/teams/' + c.slice(5) + '/page', 'globe', 'Public page', 'Cover, badge, about and photos')
             : '') +
           '</div>' +
           '<div class="hq-mo-lb">SWITCH TO</div><div class="hq-mo-tiles">' +
