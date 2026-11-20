@@ -88,7 +88,7 @@ window.DayliTickets = function (ctx) {
         var status;
         if (!o.can_sell_tickets) {
           status =
-            '<h3>Selling tickets through Dayli</h3><p class="sub">Selling tickets isn’t switched on for your account. Email <a href="mailto:hello@daylicalendar.co.uk">hello@daylicalendar.co.uk</a> and we’ll look at it. Until then, keep using your own ticket link on each event.</p>';
+            '<h3>Selling tickets through Dayli</h3><p class="sub">Selling tickets isn’t switched on for your account. Email <a href="mailto:admin@daylihq.co.uk">admin@daylihq.co.uk</a> and we’ll look at it. Until then, keep using your own ticket link on each event.</p>';
         } else if (!o.stripe_account_id) {
           status =
             '<h3>Connect Stripe to get paid</h3><p class="sub">Free tickets work already. For paid ones, ticket money goes straight to your own Stripe account, and Stripe pays it into your bank. Setting up takes about five minutes: your details, your bank account, and a check of who you are.</p><button class="btn primary" id="tk-connect">Connect with Stripe</button>';
@@ -814,8 +814,10 @@ window.DayliTickets = function (ctx) {
             var next = function () {
               eventScreen(id, { manual: '1' });
             };
-            if (firstTime) offerPublish(id, next);
-            else next();
+            stripeFirst(p, s, function () {
+              if (firstTime) offerPublish(id, next);
+              else next();
+            });
           },
           function (err) {
             ctx.setBusy(btn, false);
@@ -892,6 +894,60 @@ window.DayliTickets = function (ctx) {
         URL.revokeObjectURL(a.href);
         a.remove();
       }, 500);
+    };
+  }
+
+  // --- Paid tickets with no Stripe: set it up now -------------------------------------------------
+
+  // Saved paid tickets while Stripe isn't connected (or isn't finished): they
+  // can't go on sale until it is, so say so and offer to set it up now.
+  // then() carries on (the publish question) if they'd rather do it later.
+  function stripeFirst(p, s, then) {
+    var paid = p.mode !== 'free' || p.others.some(function (o) {
+      return o.price;
+    });
+    if (!paid || !s || s.stripe_ready) return then();
+    var box = document.createElement('div');
+    box.className = 'pp-wrap';
+    box.innerHTML =
+      '<div class="pp-dim"></div><div class="pp-modal" role="dialog" aria-modal="true" aria-labelledby="sf-h">' +
+      '<div class="pp-kick">Tickets saved</div><h2 id="sf-h">Set up card payments to sell them</h2>' +
+      '<p class="pp-lead">Paid tickets go on sale once Stripe is set up, so the money can go straight to your bank. It takes about five minutes: your details, your bank account and a quick check of who you are. One set-up covers your events, games and team payments.</p>' +
+      '<div class="notice error" id="sf-err" hidden></div>' +
+      '<div class="pp-acts"><button type="button" class="btn" id="sf-later">Later</button><button type="button" class="btn primary" id="sf-go">' +
+      (s.stripe_connected ? 'Carry on with Stripe' : 'Set up card payments') +
+      '</button></div></div>';
+    document.body.appendChild(box);
+    var close = function () {
+      box.remove();
+    };
+    $('#sf-later', box).onclick = function () {
+      close();
+      then();
+    };
+    $('.pp-dim', box).onclick = function () {
+      close();
+      then();
+    };
+    $('#sf-go', box).onclick = function () {
+      var btn = this;
+      ctx.setBusy(btn, true, 'Opening Stripe…');
+      invoke('payout-setup', { action: 'start' }).then(
+        function (r) {
+          if (r && r.url) location.href = r.url;
+          else {
+            ctx.setBusy(btn, false);
+            location.hash = '#/payments';
+            close();
+          }
+        },
+        function (err) {
+          ctx.setBusy(btn, false);
+          var e = $('#sf-err', box);
+          e.textContent = friendly(err);
+          e.hidden = false;
+        },
+      );
     };
   }
 
@@ -1399,8 +1455,10 @@ window.DayliTickets = function (ctx) {
         rpc('organiser_ticket_types_save', { p_event: id, p_types: toTypes(p), p_settings: { absorb_fee: p.absorb, capacity: p.capacity } }).then(
           function () {
             toast(s.event_status === 'published' && s.can_sell ? 'Tickets are on sale' : 'Tickets saved');
-            offerPublish(id, function () {
-              eventScreen(id, { manual: '1' });
+            stripeFirst(p, s, function () {
+              offerPublish(id, function () {
+                eventScreen(id, { manual: '1' });
+              });
             });
           },
           function (err) {

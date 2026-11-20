@@ -677,7 +677,7 @@
           row('#/settings', 'person', 'Account settings', mail || '') +
           (state.admin ? row('#/admin', 'shield', 'Admin', '') : '') +
           row(SITE + '/app/', 'phone', 'Open the Dayli app', 'Your own calendar', ' target="_blank" rel="noopener"') +
-          row('mailto:hello@daylicalendar.co.uk', 'help', 'Help', 'hello@daylicalendar.co.uk') +
+          row('mailto:admin@daylihq.co.uk', 'help', 'Help', 'admin@daylihq.co.uk') +
           '<button type="button" class="hq-mo-row out" id="hq-mo-out"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">' +
           ICON.out +
           '</svg><span class="grow">Sign out</span></button></div></div>',
