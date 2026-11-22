@@ -16,7 +16,7 @@
     the calendar's Photos & frame → Set up a photo frame), keeps its key in this
     browser and asks the "frame" Edge Function (action "display") every minute.
     Wide screens: the month on the left, today on the right. Tall screens
-    (phones, a tablet on its side): today first, then the month.
+    (phones, a tablet on its side): the month first, then today underneath.
     A private link (…/display/#key=<key>, made by an admin in the app with
     "Copy display link") pairs it without a code; any number of screens can
     share one, and removing "Shared display link" in the app stops them all.
@@ -97,18 +97,18 @@
     .ft { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--faint); margin-top: auto; padding-top: 12px; }
     #latest:not([hidden]) + .ft { margin-top: 0; }
     #night { position: fixed; inset: 0; background: #000; opacity: 0; transition: opacity 4s; pointer-events: none; }
-    #night.on { opacity: .78; }
+    #night.on { opacity: .33; }
     #hint { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); background: rgba(28,26,23,.8); color: #fff; padding: 7px 16px;
       border-radius: 99px; font-size: 14px; opacity: 0; transition: opacity .6s; pointer-events: none; }
     #hint.on { opacity: 1; }
 
-    /* Tall or small screens (phones, a tablet on its side): today first, then
-       the month, and the page scrolls. */
+    /* Tall or small screens (phones, a tablet on its side): the month first,
+       then today and what's next underneath, and the page scrolls. */
     @media (max-aspect-ratio: 1/1), (max-width: 860px) {
       :root { --bar-h: 17px; --bar-gap: 2px; --num-h: 24px; }
       #show { display: flex; flex-direction: column; height: auto; min-height: 100vh; min-height: 100dvh; overflow: visible; }
       #month { flex: 1 0 auto; } .cal { flex: 1 0 auto; } .weeks { flex: 1 0 auto; }
-      #side { order: 0; border-left: 0; border-bottom: 1px solid var(--line); padding: 18px 16px 8px; overflow: visible; }
+      #side { order: 2; border-left: 0; border-top: 1px solid var(--line); padding: 18px 16px 16px; overflow: visible; }
       .clockrow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
       #time { font-size: 44px; } #date { margin-top: 0; text-align: right; }
       #lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); column-gap: 18px; }
