@@ -1,0 +1,460 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="robots" content="noindex" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="theme-color" content="#F6F5F1" />
+  <title>Dayli Display</title>
+  <link rel="icon" href="../img/icon.svg" type="image/svg+xml" />
+  <!--
+    Dayli Display: a shared calendar's month, as in the app, with today, tomorrow
+    and the days ahead beside it, for a home hub, a tablet on the wall or any
+    screen. It pairs exactly like the photo frame (the code goes in Dayli under
+    the calendar's Photos & frame → Set up a photo frame), keeps its key in this
+    browser and asks the "frame" Edge Function (action "display") every minute.
+    Wide screens: the month on the left, today on the right. Tall screens
+    (phones, a tablet on its side): today first, then the month.
+  -->
+  <style>
+    :root { --green: #2F6B4F; --paper: #F6F5F1; --ink: #1C1A17; --muted: #6F6A62; --faint: #A19B91; --line: #E8E5DE;
+      --red: #D14343; --bar-h: 19px; --bar-gap: 3px; --num-h: 26px; --side-w: clamp(300px, 31vw, 440px); }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { background: var(--paper); color: var(--ink); -webkit-font-smoothing: antialiased;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, Roboto, sans-serif; }
+    .serif { font-family: Georgia, "Times New Roman", serif; }
+    [hidden] { display: none !important; }
+
+    /* Pairing, as the frame */
+    #pair { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff;
+      gap: 3vmin; padding: 6vmin; text-align: center; background: radial-gradient(120% 90% at 50% 0%, #3A7D5D, var(--green) 50%, #1F4a37); }
+    #pair img { width: 12vmin; height: 12vmin; }
+    #pair h1 { font-size: 6vmin; font-weight: 400; letter-spacing: -0.02em; }
+    #code { font-family: ui-monospace, Menlo, Consolas, monospace; font-weight: 700; font-size: 14vmin; letter-spacing: 0.08em;
+      background: rgba(255,255,255,.12); padding: 1.5vmin 5vmin; border-radius: 3vmin; }
+    #pair p { font-size: max(15px, 3vmin); line-height: 1.45; max-width: 60ch; opacity: .9; }
+    #pair .small { font-size: max(13px, 2.4vmin); opacity: .7; }
+
+    /* Showing: month and side by side on wide screens */
+    #show { display: grid; grid-template-columns: minmax(0, 1fr) var(--side-w); height: 100vh; height: 100dvh; overflow: hidden; }
+    #month { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+    #side { order: 2; position: relative; background: #fff; border-left: 1px solid var(--line); padding: 26px 24px 18px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+
+    .hd { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; padding: 22px 22px 16px; }
+    #mname { font-size: clamp(30px, 3.6vw, 46px); font-weight: 700; line-height: 1; }
+    .who { margin-top: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; font-size: 15px; color: var(--muted); }
+    .chip { display: inline-flex; align-items: center; gap: 6px; background: #fff; border: 1px solid var(--line); border-radius: 999px;
+      padding: 4px 12px; font-weight: 600; color: var(--ink); }
+    .chip i { width: 9px; height: 9px; border-radius: 50%; background: var(--green); }
+    .ppl { display: flex; padding-left: 6px; }
+    .ppl span { width: 26px; height: 26px; border-radius: 50%; border: 2px solid var(--paper); margin-left: -6px; color: #fff; font-size: 11px;
+      font-weight: 700; display: flex; align-items: center; justify-content: center; }
+
+    .cal { flex: 1; min-height: 0; display: flex; flex-direction: column; background: #fff; border-top: 1px solid var(--line); }
+    .wd { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); border-bottom: 1px solid var(--line); }
+    .wd div { text-align: center; font-size: 13px; font-weight: 600; color: var(--muted); padding: 8px 0; }
+    .wd div:last-child { color: var(--red); }
+    .weeks { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+    .wk { position: relative; flex: 1 1 0; min-height: 0; border-bottom: 1px solid var(--line); overflow: hidden; }
+    .wk:last-child { border-bottom: 0; }
+    .days { position: absolute; inset: 0; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+    .day { position: relative; min-width: 0; background-size: cover; background-position: center; }
+    .day.ph::before { content: ''; position: absolute; inset: 0; background: linear-gradient(to bottom, rgba(0,0,0,.42), rgba(0,0,0,0) 45%); }
+    .num { position: relative; height: var(--num-h); display: flex; align-items: center; justify-content: center; font-size: 15px; font-variant-numeric: tabular-nums; }
+    .num span { min-width: 24px; height: 22px; padding: 0 5px; border-radius: 11px; display: inline-flex; align-items: center; justify-content: center; }
+    .day.out .num { color: #B9B4AB; }
+    .day.sun .num { color: var(--red); }
+    .day.ph .num { color: #fff; font-weight: 700; text-shadow: 0 1px 4px rgba(0,0,0,.6); }
+    .day.today .num span { background: var(--ink); color: #fff; font-weight: 700; text-shadow: none; }
+    .badge { position: absolute; top: 4px; right: 4px; min-width: 18px; height: 18px; border-radius: 9px; background: rgba(28,26,23,.78); color: #fff;
+      font-size: 11px; font-weight: 700; display: flex; align-items: center; justify-content: center; padding: 0 5px; }
+    .bar { position: absolute; height: var(--bar-h); border-radius: 3px; padding: 0 5px; font-size: 12.5px; font-weight: 600; line-height: var(--bar-h);
+      color: #fff; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bar.l { color: var(--ink); }
+    .more { position: absolute; font-size: 11px; color: var(--faint); text-align: center; }
+
+    /* Today and what's next */
+    #time { font-size: clamp(44px, 5.2vw, 64px); font-weight: 600; letter-spacing: -0.03em; line-height: 1; font-variant-numeric: tabular-nums; }
+    #date { font-size: 17px; color: var(--muted); margin-top: 6px; }
+    .k { font-size: 12px; font-weight: 700; letter-spacing: 1.2px; color: #8A847A; text-transform: uppercase; margin: 20px 0 9px; }
+    .ev { display: flex; gap: 12px; background: var(--paper); border-radius: 12px; padding: 11px 13px; margin-bottom: 7px; }
+    .ev.done { opacity: .5; }
+    .ev .b { flex: none; width: 5px; border-radius: 3px; }
+    .ev .t { flex: none; width: 50px; font-size: 13px; color: var(--muted); padding-top: 2px; font-variant-numeric: tabular-nums; }
+    .ev .n { font-size: 17px; font-weight: 600; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+    .ev .w { font-size: 13px; color: var(--muted); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .none { font-size: 15px; color: var(--faint); padding: 2px 2px 6px; }
+    .and { font-size: 13px; color: var(--faint); padding: 0 4px 4px; }
+    #latest { margin-top: auto; padding-top: 14px; }
+    #latest .pic { position: relative; border-radius: 14px; overflow: hidden; background: var(--paper) center / cover; }
+    #latest .pic span { position: absolute; left: 12px; right: 12px; bottom: 10px; color: #fff; font-weight: 600; font-size: 14px; text-shadow: 0 1px 6px rgba(0,0,0,.6);
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .ft { display: flex; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--faint); margin-top: auto; padding-top: 12px; }
+    #latest:not([hidden]) + .ft { margin-top: 0; }
+    #night { position: fixed; inset: 0; background: #000; opacity: 0; transition: opacity 4s; pointer-events: none; }
+    #night.on { opacity: .78; }
+    #hint { position: fixed; left: 50%; top: 12px; transform: translateX(-50%); background: rgba(28,26,23,.8); color: #fff; padding: 7px 16px;
+      border-radius: 99px; font-size: 14px; opacity: 0; transition: opacity .6s; pointer-events: none; }
+    #hint.on { opacity: 1; }
+
+    /* Tall or small screens (phones, a tablet on its side): today first, then
+       the month, and the page scrolls. */
+    @media (max-aspect-ratio: 1/1), (max-width: 860px) {
+      :root { --bar-h: 17px; --bar-gap: 2px; --num-h: 24px; }
+      #show { display: flex; flex-direction: column; height: auto; min-height: 100vh; min-height: 100dvh; overflow: visible; }
+      #month { flex: 1 0 auto; } .cal { flex: 1 0 auto; } .weeks { flex: 1 0 auto; }
+      #side { order: 0; border-left: 0; border-bottom: 1px solid var(--line); padding: 18px 16px 8px; overflow: visible; }
+      .clockrow { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
+      #time { font-size: 44px; } #date { margin-top: 0; text-align: right; }
+      #lists { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); column-gap: 18px; }
+      #latest { display: none; }
+      .ft { display: none; }
+      .hd { padding: 16px 16px 12px; }
+      .cal { min-height: auto; }
+      .wk { flex: 1 0 auto; min-height: clamp(84px, 14vw, 120px); }
+      .bar { font-size: 11px; padding: 0 3px; }
+      .num { font-size: 13px; }
+    }
+    @media (max-width: 480px) {
+      .ev .n { font-size: 15px; } .ev { padding: 9px 11px; } .who .names { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <section id="pair" hidden>
+    <img src="../img/icon.svg" alt="" />
+    <h1 class="serif">Dayli Display</h1>
+    <div id="code">······</div>
+    <p>In Dayli, open the calendar to show → <b>Photos &amp; frame</b> → <b>Set up a photo frame</b>, and enter this code.</p>
+    <p class="small" id="pairNote">The code changes every 15 minutes.</p>
+  </section>
+
+  <main id="show" hidden>
+    <aside id="side">
+      <div class="clockrow"><div id="time"></div><div id="date"></div></div>
+      <div id="lists">
+        <div><div class="k">Today</div><div id="today"></div></div>
+        <div><div class="k">Tomorrow</div><div id="tomorrow"></div></div>
+        <div><div class="k">Coming up</div><div id="soon"></div></div>
+      </div>
+      <div id="latest" hidden><div class="pic" id="pic"><span id="picCap"></span></div></div>
+      <div class="ft"><span id="ftName">Dayli</span><span id="updated"></span></div>
+    </aside>
+    <section id="month">
+      <div class="hd">
+        <div>
+          <div id="mname" class="serif"></div>
+          <div class="who"><span class="chip"><i id="calDot"></i><span id="calName"></span></span><span class="ppl" id="ppl"></span><span class="names" id="names"></span></div>
+        </div>
+      </div>
+      <div class="cal">
+        <div class="wd"><div>M</div><div>T</div><div>W</div><div>T</div><div>F</div><div>S</div><div>S</div></div>
+        <div class="weeks" id="weeks"></div>
+      </div>
+    </section>
+  </main>
+  <div id="night"></div>
+  <div id="hint">Tap for full screen</div>
+
+<script src="../config.js"></script>
+<script>
+(function () {
+  var cfg = window.DAYLI_CONFIG || {};
+  var FN = cfg.supabaseUrl + '/functions/v1/frame';
+  var KEY = 'dayli.display.token';
+  var $ = function (id) { return document.getElementById(id); };
+  var store = {
+    get: function () { try { return localStorage.getItem(KEY); } catch (e) { return null; } },
+    set: function (v) { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch (e) {} },
+  };
+  function call(body) {
+    return fetch(FN, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', apikey: cfg.supabaseAnonKey, authorization: 'Bearer ' + cfg.supabaseAnonKey },
+      body: JSON.stringify(body),
+    }).then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }); });
+  }
+  var wait = function (ms) { return new Promise(function (r) { setTimeout(r, ms); }); };
+  function el(tag, cls, text) { var e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  // ---------- pairing (as the frame) ----------
+  var FAST_MS = 3000, SLOW_MS = 10000, FAST_FOR_MS = 2 * 60000, GIVE_UP_MS = 60 * 60000;
+  function whenVisible() {
+    if (!document.hidden) return Promise.resolve();
+    return new Promise(function (r) { document.addEventListener('visibilitychange', function on() { if (!document.hidden) { document.removeEventListener('visibilitychange', on); r(); } }); });
+  }
+  function whenTapped() { return new Promise(function (r) { document.addEventListener('click', function on() { document.removeEventListener('click', on); r(); }); }); }
+  var pairing = false;
+  async function pair() {
+    if (pairing) return;
+    pairing = true;
+    $('show').hidden = true; $('pair').hidden = false;
+    var since = Date.now();
+    while (true) {
+      if (Date.now() - since > GIVE_UP_MS) { $('code').textContent = '······'; $('pairNote').textContent = 'Tap to show a new code.'; await whenTapped(); since = Date.now(); }
+      await whenVisible();
+      var started;
+      try { started = await call({ action: 'start' }); } catch (e) { started = null; }
+      if (!started || started.status !== 200) { $('code').textContent = '······'; $('pairNote').textContent = 'Can’t reach Dayli. Trying again…'; await wait(10000); continue; }
+      var code = started.body.code, secret = started.body.secret;
+      $('code').textContent = code.slice(0, 3) + '-' + code.slice(3);
+      $('pairNote').textContent = 'The code changes every 15 minutes.';
+      while (true) {
+        await wait(Date.now() - since < FAST_FOR_MS ? FAST_MS : SLOW_MS);
+        await whenVisible();
+        var r;
+        try { r = await call({ action: 'claim', secret: secret }); } catch (e) { continue; }
+        if (r.body.status === 'paired') { store.set(r.body.token); pairing = false; return show(); }
+        if (r.body.status === 'expired') break;
+      }
+    }
+  }
+
+  // ---------- days ----------
+  var TZ = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  var fmts = {};
+  // "YYYY-MM-DD" for an instant in a time zone (as the app's dateKey).
+  function dateKey(d, tz) {
+    var f = fmts[tz] || (fmts[tz] = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }));
+    return f.format(d);
+  }
+  function localKey(d) { return d.getFullYear() + '-' + ('0' + (d.getMonth() + 1)).slice(-2) + '-' + ('0' + d.getDate()).slice(-2); }
+  function addDays(key, n) { var p = key.split('-'); return localKey(new Date(+p[0], +p[1] - 1, +p[2] + n)); }
+  function keyDate(key) { var p = key.split('-'); return new Date(+p[0], +p[1] - 1, +p[2]); }
+  // The days an entry is on, as the app works them out (entryDays): timed
+  // entries in this screen's time zone, all-day ones in their own; the end is
+  // exclusive, so something ending at midnight stays on the day before.
+  function daysOf(e) {
+    var tz = e.all_day ? (e.timezone || TZ) : TZ;
+    var first = dateKey(new Date(e.starts_at), tz), last = dateKey(new Date(Date.parse(e.ends_at) - 1), tz);
+    if (last < first) last = first;
+    return { first: first, last: last };
+  }
+  var two = function (n) { return (n < 10 ? '0' : '') + n; };
+  function hm(d) { return two(d.getHours()) + ':' + two(d.getMinutes()); }
+  var WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+  var MONTHS = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+  function light(hex) {
+    var m = /^#?([0-9a-f]{6})$/i.exec(hex || ''); if (!m) return false;
+    var n = parseInt(m[1], 16), r = n >> 16 & 255, g = n >> 8 & 255, b = n & 255;
+    return (0.299 * r + 0.587 * g + 0.114 * b) > 170;
+  }
+
+  // The six-week grid for the month on screen: Monday to Sunday.
+  function grid(now) {
+    var first = new Date(now.getFullYear(), now.getMonth(), 1);
+    var back = (first.getDay() + 6) % 7;
+    var start = new Date(first.getFullYear(), first.getMonth(), 1 - back);
+    var last = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    var weeks = Math.ceil((back + last.getDate()) / 7);
+    return { start: localKey(start), weeks: weeks, month: now.getMonth(), year: now.getFullYear() };
+  }
+
+  // ---------- drawing ----------
+  var data = null, entries = [], lastFetch = 0;
+
+  function drawMonth() {
+    var now = new Date(), g = grid(now), today = localKey(now);
+    $('mname').textContent = MONTHS[g.month];
+    var box = $('weeks'); box.textContent = '';
+    var photoDays = (data && data.photo_days) || {};
+    for (var w = 0; w < g.weeks; w++) {
+      var wkStart = addDays(g.start, w * 7), wkEnd = addDays(wkStart, 6);
+      var row = el('div', 'wk'), days = el('div', 'days');
+      for (var i = 0; i < 7; i++) {
+        var key = addDays(wkStart, i), d = keyDate(key);
+        var cell = el('div', 'day' + (d.getMonth() !== g.month ? ' out' : '') + (i === 6 ? ' sun' : '') + (key === today ? ' today' : ''));
+        var ph = photoDays[key];
+        if (ph && d.getMonth() === g.month) {
+          cell.classList.add('ph'); cell.style.backgroundImage = 'url("' + ph.url + '")';
+          if (ph.count > 1) cell.appendChild(el('div', 'badge', String(ph.count)));
+        }
+        var num = el('div', 'num'); num.appendChild(el('span', null, String(d.getDate()))); cell.appendChild(num);
+        days.appendChild(cell);
+      }
+      row.appendChild(days);
+      row._range = [wkStart, wkEnd];
+      box.appendChild(row);
+    }
+    layoutBars();
+  }
+
+  // Entries as bars, in lanes, as the app's month: longer ones first, each in
+  // the first lane free for all its days; what doesn't fit shows as "+n".
+  function layoutBars() {
+    var rows = $('weeks').children;
+    var cs = getComputedStyle(document.documentElement);
+    var barH = parseFloat(cs.getPropertyValue('--bar-h')) || 19, gap = parseFloat(cs.getPropertyValue('--bar-gap')) || 3;
+    var numH = parseFloat(cs.getPropertyValue('--num-h')) || 26;
+    for (var r = 0; r < rows.length; r++) {
+      var row = rows[r], a = row._range[0], b = row._range[1];
+      row.querySelectorAll('.bar, .more').forEach(function (n) { n.remove(); });
+      var segs = entries.filter(function (e) { return e.first <= b && e.last >= a; }).map(function (e) {
+        var s = e.first < a ? a : e.first, t = e.last > b ? b : e.last;
+        var c0 = Math.round((keyDate(s) - keyDate(a)) / 864e5), c1 = Math.round((keyDate(t) - keyDate(a)) / 864e5);
+        return { e: e, c0: c0, c1: c1, span: c1 - c0 + 1 };
+      });
+      segs.sort(function (x, y) {
+        return (y.span > 1) - (x.span > 1) || (y.e.all_day - x.e.all_day) || x.c0 - y.c0 || y.span - x.span || Date.parse(x.e.starts_at) - Date.parse(y.e.starts_at);
+      });
+      var h = row.clientHeight;
+      var lanes = Math.max(1, Math.floor((h - numH - 14) / (barH + gap)));
+      var used = [], hidden = [0, 0, 0, 0, 0, 0, 0];
+      segs.forEach(function (sg) {
+        var lane = 0;
+        for (; lane < 50; lane++) {
+          var u = used[lane] || (used[lane] = []), free = true;
+          for (var c = sg.c0; c <= sg.c1; c++) if (u[c]) { free = false; break; }
+          if (free) { for (c = sg.c0; c <= sg.c1; c++) u[c] = true; break; }
+        }
+        if (lane >= lanes) { for (var c2 = sg.c0; c2 <= sg.c1; c2++) hidden[c2]++; return; }
+        // Timed entries over more than a day carry their start time, as in the app.
+        var label = !sg.e.all_day && sg.e.first !== sg.e.last ? hm(new Date(sg.e.starts_at)) + ' ' + sg.e.title : sg.e.title;
+        var bar = el('div', 'bar' + (light(sg.e.color) ? ' l' : ''), label);
+        bar.title = sg.e.title;
+        bar.style.background = sg.e.color || '#2F6B4F';
+        bar.style.top = (numH + lane * (barH + gap)) + 'px';
+        bar.style.left = 'calc(' + (sg.c0 / 7 * 100) + '% + 1px)';
+        bar.style.width = 'calc(' + (sg.span / 7 * 100) + '% - 2px)';
+        row.appendChild(bar);
+      });
+      hidden.forEach(function (n, c) {
+        if (!n) return;
+        var m = el('div', 'more', '+' + n);
+        m.style.left = (c / 7 * 100) + '%'; m.style.width = (100 / 7) + '%';
+        m.style.top = (numH + lanes * (barH + gap)) + 'px';
+        row.appendChild(m);
+      });
+    }
+  }
+
+  function card(e, label) {
+    var c = el('div', 'ev' + (Date.parse(e.ends_at) < Date.now() ? ' done' : ''));
+    var b = el('div', 'b'); b.style.background = e.color || '#2F6B4F'; c.appendChild(b);
+    var start = new Date(e.starts_at);
+    c.appendChild(el('div', 't', label || (e.all_day ? 'All day' : hm(start))));
+    var body = el('div'); body.style.minWidth = '0';
+    body.appendChild(el('div', 'n', e.title));
+    var bits = [];
+    if (label) bits.push(e.all_day ? 'All day' : hm(start));
+    if (e.location) bits.push(e.location);
+    if (bits.length) body.appendChild(el('div', 'w', bits.join(' · ')));
+    c.appendChild(body);
+    return c;
+  }
+  function fill(id, list, max, labelFn, empty) {
+    var box = $(id); box.textContent = '';
+    if (!list.length) { box.appendChild(el('div', 'none', empty)); return; }
+    list.slice(0, max).forEach(function (e) { box.appendChild(card(e, labelFn && labelFn(e))); });
+    if (list.length > max) box.appendChild(el('div', 'and', 'and ' + (list.length - max) + ' more'));
+  }
+  function byStart(a, b) { return (b.all_day - a.all_day) || Date.parse(a.starts_at) - Date.parse(b.starts_at); }
+
+  function drawSide() {
+    var now = new Date(), today = localKey(now), tomorrow = addDays(today, 1), weekOut = addDays(today, 7);
+    var tall = matchMedia('(max-aspect-ratio: 1/1), (max-width: 860px)').matches;
+    var soon = entries.filter(function (e) { return e.first > tomorrow && e.first <= weekOut; })
+      .sort(function (a, b) { return a.first < b.first ? -1 : a.first > b.first ? 1 : byStart(a, b); });
+    var soonLabel = function (e) { return WD[keyDate(e.first).getDay()]; };
+    fill('today', entries.filter(function (e) { return e.first <= today && e.last >= today; }).sort(byStart), tall ? 3 : 4, null, 'Nothing planned');
+    fill('tomorrow', entries.filter(function (e) { return e.first <= tomorrow && e.last >= tomorrow; }).sort(byStart), 3, null, 'Nothing planned');
+    fill('soon', soon, tall ? 3 : 4, soonLabel, 'Nothing else this week');
+    var l = data && data.latest, latest = $('latest');
+    latest.hidden = true;
+    if (!l || tall) return;
+    $('pic').style.backgroundImage = 'url("' + l.url + '")';
+    $('picCap').textContent = [l.caption, l.from ? 'from ' + l.from : null].filter(Boolean).join(' · ');
+    // The latest photo goes in the room left: two coming-up cards fewer if
+    // that makes room for it, otherwise no photo.
+    var side = $('side'), lists = $('lists'), ft = side.querySelector('.ft');
+    // What's left under the lists, less the footer and the side's padding.
+    var room = function () { return side.clientHeight - (lists.offsetTop + lists.offsetHeight) - ft.offsetHeight - 12 - 18 - 14; };
+    if (room() < 150 && soon.length > 2) fill('soon', soon, 2, soonLabel, '');
+    if (room() < 150) { fill('soon', soon, 4, soonLabel, 'Nothing else this week'); return; }
+    latest.hidden = false;
+    $('pic').style.height = Math.min(220, room() - 2) + 'px';
+    // Text can still settle (fonts, long titles): take any overflow off the photo.
+    requestAnimationFrame(function () {
+      var over = side.scrollHeight - side.clientHeight;
+      if (over <= 0) return;
+      var h = $('pic').offsetHeight - over - 2;
+      if (h < 120) latest.hidden = true; else $('pic').style.height = h + 'px';
+    });
+  }
+
+  function drawHeader() {
+    if (!data) return;
+    $('calName').textContent = data.calendar.name;
+    $('calDot').style.background = data.calendar.color || '';
+    $('ftName').textContent = 'Dayli · ' + data.calendar.name;
+    var ppl = $('ppl'); ppl.textContent = '';
+    var named = (data.people || []).filter(function (p) { return p.name; });
+    named.slice(0, 6).forEach(function (p) { var s = el('span', null, p.name.trim().charAt(0).toUpperCase()); s.style.background = p.color || '#2F6B4F'; ppl.appendChild(s); });
+    var names = named.map(function (p) { return p.name.trim().split(/\s+/)[0]; });
+    $('names').textContent = names.length > 4 ? names.slice(0, 3).join(', ') + ' and ' + (names.length - 3) + ' more'
+      : names.length > 1 ? names.slice(0, -1).join(', ') + ' and ' + names[names.length - 1] : names.join('');
+  }
+
+  function tick() {
+    var now = new Date();
+    $('time').textContent = now.getHours() + ':' + two(now.getMinutes());
+    $('date').textContent = now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
+    var h = now.getHours();
+    $('night').classList.toggle('on', h >= 23 || h < 6);
+    if (lastFetch) {
+      var mins = Math.round((Date.now() - lastFetch) / 60000);
+      $('updated').textContent = mins < 2 ? 'Updated just now' : 'Updated ' + mins + ' min ago';
+    }
+  }
+
+  var shownDay = null;
+  function drawAll() { drawHeader(); drawMonth(); drawSide(); tick(); shownDay = localKey(new Date()); }
+
+  async function load() {
+    var token = store.get();
+    if (!token) return pair();
+    var now = new Date(), g = grid(now);
+    var from = keyDate(g.start), to = keyDate(addDays(g.start, g.weeks * 7));
+    var weekOut = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 9);
+    if (weekOut > to) to = weekOut;
+    var r;
+    try { r = await call({ action: 'display', token: token, from: from.toISOString(), to: to.toISOString() }); } catch (e) { return; }
+    if (r.status === 401) { store.set(null); clearInterval(loadTimer); return pair(); }
+    if (r.status !== 200) return;
+    data = r.body; lastFetch = Date.now();
+    entries = (data.events || []).map(function (e) { var d = daysOf(e); e.first = d.first; e.last = d.last; return e; });
+    drawAll();
+  }
+
+  var loadTimer = null;
+  function show() {
+    $('pair').hidden = true; $('show').hidden = false;
+    load();
+    clearInterval(loadTimer);
+    loadTimer = setInterval(load, 60000);
+  }
+
+  // A new day (or month) redraws straight away; a resize re-fits the bars.
+  setInterval(function () { tick(); if (data && shownDay !== localKey(new Date())) drawAll(); }, 15000);
+  var rz = null;
+  addEventListener('resize', function () { clearTimeout(rz); rz = setTimeout(function () { if (data) { layoutBars(); drawSide(); } }, 150); });
+
+  // Keep the screen awake and offer full screen.
+  function awake() { if ('wakeLock' in navigator && document.visibilityState === 'visible') navigator.wakeLock.request('screen').catch(function () {}); }
+  document.addEventListener('visibilitychange', function () { awake(); if (!document.hidden && store.get() && Date.now() - lastFetch > 60000) load(); });
+  document.addEventListener('click', function () {
+    var d = document.documentElement;
+    if (!document.fullscreenElement && d.requestFullscreen && !matchMedia('(max-width: 860px)').matches) d.requestFullscreen().catch(function () {});
+    awake();
+  });
+  if (document.fullscreenEnabled && !matchMedia('(max-width: 860px)').matches) { $('hint').classList.add('on'); setTimeout(function () { $('hint').classList.remove('on'); }, 6000); }
+
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (data) drawSide(); });
+  awake();
+  if (store.get()) show(); else pair();
+})();
+</script>
+</body>
+</html>
