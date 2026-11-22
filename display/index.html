@@ -17,6 +17,9 @@
     browser and asks the "frame" Edge Function (action "display") every minute.
     Wide screens: the month on the left, today on the right. Tall screens
     (phones, a tablet on its side): today first, then the month.
+    A private link (…/display/#key=<key>, made by an admin in the app with
+    "Copy display link") pairs it without a code; any number of screens can
+    share one, and removing "Shared display link" in the app stops them all.
   -->
   <style>
     :root { --green: #2F6B4F; --paper: #F6F5F1; --ink: #1C1A17; --muted: #6F6A62; --faint: #A19B91; --line: #E8E5DE;
@@ -165,10 +168,23 @@
   var FN = cfg.supabaseUrl + '/functions/v1/frame';
   var KEY = 'dayli.display.token';
   var $ = function (id) { return document.getElementById(id); };
+  // The pairing key lives in this browser. Inside an iframe some browsers
+  // refuse storage, so it's also kept in memory for as long as the page is open.
+  var mem = null;
   var store = {
-    get: function () { try { return localStorage.getItem(KEY); } catch (e) { return null; } },
-    set: function (v) { try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch (e) {} },
+    get: function () { try { return localStorage.getItem(KEY) || mem; } catch (e) { return mem; } },
+    set: function (v) { mem = v || null; try { v ? localStorage.setItem(KEY, v) : localStorage.removeItem(KEY); } catch (e) {} },
   };
+  // A private link (…/#key=<pairing key>) pairs this screen without a code.
+  // The key is taken out of the address bar straight away; the part after #
+  // never reaches a server or its logs.
+  function keyFromLink() {
+    var h = location.hash || '';
+    if (h.indexOf('key=') < 0) return null;
+    try { history.replaceState(null, '', location.pathname + location.search); } catch (e) {}
+    var m = /(?:^#|&)key=([A-Za-z0-9._~-]{32,128})(?:&|$)/.exec(h);
+    return m ? m[1] : null;
+  }
   function call(body) {
     return fetch(FN, {
       method: 'POST',
@@ -453,7 +469,18 @@
 
   if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (data) drawSide(); });
   awake();
-  if (store.get()) show(); else pair();
+  start();
+  // Check a link's key before keeping it: a removed or mistyped one shows the
+  // code instead. If Dayli can't be reached, keep it and carry on trying.
+  async function start() {
+    var key = keyFromLink();
+    if (!key) return store.get() ? show() : pair();
+    var now = new Date(), r = null;
+    try { r = await call({ action: 'display', token: key, from: now.toISOString(), to: new Date(now.getTime() + 864e5).toISOString() }); } catch (e) {}
+    if (r && r.status !== 200 && r.status < 500) { store.set(null); return pair(); }
+    store.set(key);
+    show();
+  }
 })();
 </script>
 </body>
