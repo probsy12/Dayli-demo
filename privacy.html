@@ -26,7 +26,7 @@
 <body>
 <main>
   <h1>Dayli privacy policy</h1>
-  <p class="muted">Last updated 20 November 2026</p>
+  <p class="muted">Last updated 24 November 2026</p>
 
   <p>Dayli is a shared calendar for families and friends. This page says what the app stores, why, who else sees it, and how to delete it. It is written to be read, not skimmed past.</p>
 
@@ -54,13 +54,13 @@
     <tr><td>Payments: tickets you buy, and match fees, subs and game costs you pay or collect</td><td>To give you your tickets and show who has paid. Dayli keeps what was bought, the amount, Dayli's booking fee, whether it was paid or refunded, and Stripe's reference for it. The organiser, manager or game host you pay sees your name, what you paid for and whether it went through. Card details are typed into Stripe's own page and never reach Dayli</td></tr>
     <tr><td>Stripe accounts of organisers, managers and hosts who take payments</td><td>So money goes straight to their own bank. Stripe asks for and keeps the identity and bank details it needs; Dayli keeps only the Stripe account's reference and whether it is ready to take payments</td></tr>
     <tr><td>A push notification token for your device, only if you allow notifications</td><td>To deliver invitations, replies and reminders</td></tr>
-    <tr><td>What you type or say into Ask Dayli and smart add, and the answer</td><td>To turn it into events, and so we can fix mistakes the assistant makes. Voice is turned into text on your phone; only the text is sent</td></tr>
+    <tr><td>What you type or say into Ask Dayli and smart add, and the answer</td><td>To turn it into events, and so we can fix mistakes the assistant makes. Voice is turned into text on your phone; only the text is sent. If you paste a web link, Dayli's server opens that page once to read the event from it: the website sees a visit from Dayli, not from you, and the page's text goes to the assistant with what you typed. The link is saved on the entry</td></tr>
   </table>
 
   <h2>Who else processes it</h2>
   <ul>
     <li><strong>Supabase</strong> hosts the database, files and sign-in, in a European data centre.</li>
-    <li><strong>DeepSeek</strong> reads the text you type into Ask Dayli and smart add (and emails you forward to Dayli), together with the names of people in your calendars, to draft events and answer questions. The suggestion on your home screen sends your first name and a short summary of how busy your day is. No other calendar data is sent.</li>
+    <li><strong>DeepSeek</strong> reads the text you type into Ask Dayli and smart add (and emails you forward to Dayli, and the text of web pages whose links you paste), together with the names of people in your calendars, to draft events and answer questions. The suggestion on your home screen sends your first name and a short summary of how busy your day is. No other calendar data is sent.</li>
     <li><strong>Anthropic</strong> (the Claude assistant, in the United States) reads any photo or screenshot you choose to scan, with the names of people in your calendars, to turn it into events. Under Anthropic's commercial terms it is not used to train their models.</li>
     <li><strong>Open-Meteo</strong> receives the coordinates of your home town to return a forecast, and looks up the names of places (a town you type, or the place in an event) to find them on a map.</li>
     <li><strong>OpenRouteService</strong> (Heidelberg Institute for Geoinformation Technology, Germany) receives the start and end points of a journey to work out a travel time.</li>
